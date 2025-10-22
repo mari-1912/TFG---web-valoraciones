@@ -1,7 +1,7 @@
 [
   {
     "id": "1",
-    "imgSrc": "src/img/books/alas-onix.png",
+    "imgSrc": "/src/img/books/alas-onix.png",
     "title": "Alas de Ónix",
     "author": "Rebecca Yarros",
     "description": "Romantasy épico con dragones, acción y magia oscura en una batalla por el poder.",
@@ -10,7 +10,7 @@
   },
   {
     "id": "2",
-    "imgSrc": "/images/fantasy2.jpg",
+    "imgSrc": "/src/img/books/trono-dioses.png",
     "title": "Trono de Dioses",
     "author": "Amber V. Nicole",
     "description": "Un mundo de mitología, conflictos sobrenaturales y un desenlace intenso y emotivo.",
@@ -19,7 +19,7 @@
   },
   {
     "id": "3",
-    "imgSrc": "/images/fantasy3.jpg",
+    "imgSrc": "/src/img/books/torre-mendigos.png",
     "title": "La Torre de los Mendigos",
     "author": "Torsten Weitze",
     "description": "Fantasía clásica con academia mágica y un viaje inolvidable de crecimiento y peligro.",
@@ -28,7 +28,7 @@
   },
   {
     "id": "4",
-    "imgSrc": "/images/fantasy4.jpg",
+    "imgSrc": "/src/img/books/reino-malditos.png",
     "title": "El Reino de los Malditos",
     "author": "Kerri Maniscalco",
     "description": "Misterio sobrenatural y pasión oscura en un mundo gótico repleto de secretos y traición.",

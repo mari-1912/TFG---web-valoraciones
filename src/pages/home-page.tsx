@@ -79,9 +79,11 @@ export default function HomePage() {
 
       {/* Servicios a valorar */}
       <section className="mt-12 w-full max-w-5xl">
-        <h3 className="text-2xl font-semibold mb-6 text-gray-800">
-          Servicios que puedes valorar
+        <h3 className="flex text-2xl font-semibold mb-6 text-gray-800">
+          Lleva un registro de lo que te gusta.
         </h3>
+        <h3 className="text-2xl font-semibold mb-6 text-gray-800">Guarda y reseña tus experiencias.</h3>
+        <h3 className="text-2xl font-semibold mb-6 text-gray-800">¡Dile a tus amigos cuáles valen la pena! </h3>
         <SectionMovies />
         <SectionBooks />
         {/* Agrega más secciones aquí */}
