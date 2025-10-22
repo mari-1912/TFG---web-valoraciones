@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1",
+    "imgSrc": "src/img/books/alas-onix.png",
+    "title": "Alas de Ónix",
+    "author": "Rebecca Yarros",
+    "description": "Romantasy épico con dragones, acción y magia oscura en una batalla por el poder.",
+    "publicationYear": 2023,
+    "rating": 5
+  },
+  {
+    "id": "2",
+    "imgSrc": "/images/fantasy2.jpg",
+    "title": "Trono de Dioses",
+    "author": "Amber V. Nicole",
+    "description": "Un mundo de mitología, conflictos sobrenaturales y un desenlace intenso y emotivo.",
+    "publicationYear": 2024,
+    "rating": 4
+  },
+  {
+    "id": "3",
+    "imgSrc": "/images/fantasy3.jpg",
+    "title": "La Torre de los Mendigos",
+    "author": "Torsten Weitze",
+    "description": "Fantasía clásica con academia mágica y un viaje inolvidable de crecimiento y peligro.",
+    "publicationYear": 2024,
+    "rating": 5
+  },
+  {
+    "id": "4",
+    "imgSrc": "/images/fantasy4.jpg",
+    "title": "El Reino de los Malditos",
+    "author": "Kerri Maniscalco",
+    "description": "Misterio sobrenatural y pasión oscura en un mundo gótico repleto de secretos y traición.",
+    "publicationYear": 2023,
+    "rating": 4
+  },
+  {
+    "id": "5",
+    "imgSrc": "/images/fantasy5.jpg",
+    "title": "La Espada Fulgurante",
+    "author": "Lev Grossman",
+    "description": "Una épica aventura de magia y poder en un mundo al borde de la destrucción.",
+    "publicationYear": 2023,
+    "rating": 5
+  }
+]
