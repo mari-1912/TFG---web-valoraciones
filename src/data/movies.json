@@ -54,5 +54,12 @@
     "title": "Forrest Gump",
     "description": "La extraordinaria vida de un hombre común que influye en la historia estadounidense.",
     "rating": 5
+  },
+  {
+    "id": "9",
+    "imgSrc": "/src/img/movies/black-phone2.png",
+    "title": "Black Phone 2",
+    "description": "La extraordinaria vida de un hombre común que influye en la historia estadounidense.",
+    "rating": 5
   }
 ]

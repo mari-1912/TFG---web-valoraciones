@@ -1,0 +1,141 @@
+{
+  "peliculas": {
+    "categorias": {
+        "genericas": [
+        {
+            "id": "p1",
+            "name": "Películas clásicas de acción",
+            "description": "Las mejores películas de acción de los 80 y 90",
+            "items": ["Die Hard", "Terminator", "Lethal Weapon"],
+            "creator": "admin"
+        },
+        {
+            "id": "p2",
+            "name": "Películas de ciencia ficción",
+            "description": "Futuros distópicos y viajes espaciales",
+            "items": ["Blade Runner", "The Matrix", "Interstellar"],
+            "creator": "admin"
+        }
+        ],
+        "personales": [
+        {
+            "id": "p3",
+            "name": "Mis favoritas",
+            "description": "Películas que me encantan de todos los tiempos",
+            "items": ["Inception", "Gladiator", "The Dark Knight"],
+            "creator": "yo"
+        }
+        ]
+    }
+  },
+  "series": {
+    "categorias": {
+        "genericas": [
+        {
+            "id": "s1",
+            "name": "Series clásicas",
+            "description": "Series populares de los 90",
+            "items": ["Friends", "Seinfeld", "The X-Files"],
+            "creator": "admin"
+        }
+        ],
+        "personales": [
+        {
+            "id": "s2",
+            "name": "Lo que veo ahora",
+            "description": "Series que sigo actualmente",
+            "items": ["Stranger Things", "The Witcher", "Dark"],
+            "creator": "yo"
+        }
+        ]
+    }
+  },
+  "libros": {
+    "categorias": {
+        "genericas": [
+        {
+            "id": "l1",
+            "name": "Libros juveniles populares",
+            "description": "Lecturas recomendadas para jóvenes",
+            "items": ["Harry Potter", "Percy Jackson", "The Hunger Games"],
+            "creator": "admin"
+        }
+        ],
+        "personales": [
+        {
+            "id": "l2",
+            "name": "Mis lecturas",
+            "description": "Libros favoritos que he leído",
+            "items": ["1984", "The Hobbit", "Fahrenheit 451"],
+            "creator": "yo"
+        }
+        ]
+    }
+  },
+  "videojuegos": {
+    "categorias": {
+        "genericas": [
+        {
+            "id": "v1",
+            "name": "Videojuegos retro",
+            "description": "Los juegos que marcaron una época",
+            "items": ["Super Mario Bros", "The Legend of Zelda", "Pac-Man"],
+            "creator": "admin"
+        }
+        ],
+        "personales": [
+        {
+            "id": "v2",
+            "name": "Mis juegos favoritos",
+            "description": "Videojuegos que disfruto jugando",
+            "items": ["Witcher 3", "Dark Souls", "Celeste"],
+            "creator": "yo"
+        }
+        ]
+    }
+  },
+  "juegos-de-mesa": {
+    "categorias": {
+        "genericas": [
+        {
+            "id": "jm1",
+            "name": "Juegos de mesa familiares",
+            "description": "Para jugar en familia y con amigos",
+            "items": ["Catan", "Carcassonne", "Ticket to Ride"],
+            "creator": "admin"
+        }
+        ],
+        "personales": [
+        {
+            "id": "jm2",
+            "name": "Mis juegos",
+            "description": "Juegos de mesa que me gustan",
+            "items": ["Puerto Rico", "Azul", "7 Wonders"],
+            "creator": "yo"
+        }
+        ]
+    }
+  },
+  "discos": {
+    "categorias": {
+        "genericas": [
+        {
+            "id": "d1",
+            "name": "Discos clásicos",
+            "description": "Albumes imprescindibles en la música",
+            "items": ["Abbey Road", "Thriller", "Back in Black"],
+            "creator": "admin"
+        }
+        ],
+        "personales": [
+        {
+            "id": "d2",
+            "name": "Mis discos favoritos",
+            "description": "Albumes que escucho constantemente",
+            "items": ["OK Computer", "The Dark Side of the Moon", "Rumours"],
+            "creator": "yo"
+        }
+        ]
+    }
+  }
+}

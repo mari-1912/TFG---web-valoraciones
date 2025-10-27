@@ -1,0 +1,58 @@
+[
+  {
+    "id": "1",
+    "imgSrc": "/src/img/video-games/elden-ring-2025.png",
+    "title": "Elden Ring: Expansion 2025",
+    "description": "Nueva expansión del RPG de mundo abierto que explora nuevas tierras y jefes desafiantes.",
+    "rating": 5
+  },
+  {
+    "id": "2",
+    "imgSrc": "/src/img/video-games/starfield.png",
+    "title": "Starfield",
+    "description": "Juego de exploración espacial con misiones épicas y una galaxia inmensa por descubrir.",
+    "rating": 5
+  },
+  {
+    "id": "3",
+    "imgSrc": "/src/img/video-games/zelda-tears-kingdom.png",
+    "title": "The Legend of Zelda: Tears of the Kingdom",
+    "description": "Aventura épica en Hyrule con nuevas mecánicas, acertijos y batallas contra jefes.",
+    "rating": 5
+  },
+  {
+    "id": "4",
+    "imgSrc": "/src/img/video-games/hogwarts-legacy.png",
+    "title": "Hogwarts Legacy",
+    "description": "Explora el mundo mágico de Hogwarts en este RPG con misiones, magia y secretos por descubrir.",
+    "rating": 4
+  },
+  {
+    "id": "5",
+    "imgSrc": "/src/img/video-games/final_fantasy_xvi.png",
+    "title": "Final Fantasy XVI",
+    "description": "RPG de acción con una narrativa intensa, combates épicos y escenarios impresionantes.",
+    "rating": 4
+  },
+  {
+    "id": "6",
+    "imgSrc": "/src/img/video-games/minecraft_legends.png",
+    "title": "Minecraft Legends",
+    "description": "Aventura estratégica dentro del universo de Minecraft, con misiones cooperativas y enemigos clásicos.",
+    "rating": 4
+  },
+  {
+    "id": "7",
+    "imgSrc": "/src/img/video-games/cyberpunk_2077.png",
+    "title": "Cyberpunk 2077: Phantom Liberty",
+    "description": "Expansión que amplía la historia de V con nuevas misiones, zonas y personajes.",
+    "rating": 5
+  },
+  {
+    "id": "8",
+    "imgSrc": "/src/img/games/resident_evil_4_remake.png",
+    "title": "Resident Evil 4 Remake",
+    "description": "Reimaginación del clásico survival horror con gráficos mejorados y jugabilidad moderna.",
+    "rating": 5
+  }
+]
