@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Card from "../Card";
 import books from "../../data/books.json";
 
 export default function SectionBooks() {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
+  const navigate = useNavigate();
 
   const totalItems = Array.isArray(books) ? books.length : 0;
 
@@ -41,14 +43,19 @@ export default function SectionBooks() {
         </button>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
-          {visibleItems.map((m) => (
-            <Card
-              key={m.id}
-              imgSrc={m.imgSrc}
-              title={m.title}
-              description={m.description}
-              rating={m.rating}
-            />
+          {visibleItems.map((book) => (
+            <div
+              key={book.id}
+              className="cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => navigate(`/detail/libro/${book.id}`)}
+            >
+              <Card
+                imgSrc={book.imgSrc}
+                title={book.title}
+                description={book.description}
+                rating={book.rating}
+              />
+            </div>
           ))}
         </div>
 

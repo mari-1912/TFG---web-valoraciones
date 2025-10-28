@@ -1,10 +1,12 @@
 import { useState } from "react";
 import Card from "../Card";
 import movies from "../../data/movies.json";
+import { useNavigate } from "react-router-dom";
 
 export default function SectionMovies() {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
+  const navigate = useNavigate();
 
   const totalItems = Array.isArray(movies) ? movies.length : 0;
 
@@ -29,37 +31,47 @@ export default function SectionMovies() {
       <h3 className="text-2xl font-semibold mb-6">Películas</h3>
 
       <div className="relative">
+        {/* Botón anterior */}
         <button
           onClick={handlePrev}
           disabled={startIndex === 0}
           aria-label="Anterior"
-          className={`absolute left-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow ${
-            startIndex === 0 ? "opacity-50 cursor-not-allowed" : ""
+          className={`absolute left-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow transition ${
+            startIndex === 0
+              ? "opacity-50 cursor-not-allowed"
+              : "hover:bg-indigo-700"
           }`}
         >
           &#8592;
         </button>
 
+        {/* Carrusel */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
           {visibleItems.map((m) => (
-            <Card
+            <div
               key={m.id}
-              imgSrc={m.imgSrc}
-              title={m.title}
-              description={m.description}
-              rating={m.rating}
-            />
+              onClick={() => navigate(`/detail/pelicula/${m.id}`)}
+              className="cursor-pointer hover:scale-105 transform transition"
+            >
+              <Card
+                imgSrc={m.imgSrc}
+                title={m.title}
+                description={m.description}
+                rating={m.rating}
+              />
+            </div>
           ))}
         </div>
 
+        {/* Botón siguiente */}
         <button
           onClick={handleNext}
           disabled={startIndex + itemsPerPage >= totalItems}
           aria-label="Siguiente"
-          className={`absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow ${
+          className={`absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow transition ${
             startIndex + itemsPerPage >= totalItems
               ? "opacity-50 cursor-not-allowed"
-              : ""
+              : "hover:bg-indigo-700"
           }`}
         >
           &#8594;

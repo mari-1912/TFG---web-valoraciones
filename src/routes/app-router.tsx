@@ -20,7 +20,7 @@ export const RoutesComponent = () => {
       <Route path="/comunidad" element={<CommunityPage/>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegisterForm/>} />
-      <Route path="/detail/:id" element={<DetailPage />} />
+      <Route path="/detail/:type/:id" element={<DetailPage />} />
     </Routes>
   );
 };
