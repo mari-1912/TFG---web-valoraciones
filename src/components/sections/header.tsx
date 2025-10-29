@@ -1,8 +1,7 @@
 import { Search, CircleStar } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-// importa todos tus archivos JSON
 import moviesData from "../../data/movies.json";
 import booksData from "../../data/books.json";
 import seriesData from "../../data/series.json";
@@ -10,7 +9,6 @@ import videoGamesData from "../../data/video-games.json";
 import boardGamesData from "../../data/board-games.json";
 import discos from "../../data/music.json";
 
-// tipado base
 type Item = {
   id: string;
   title: string;
@@ -19,7 +17,6 @@ type Item = {
   rating?: number;
 };
 
-// mapeo de tipo -> dataset
 const datasets: Record<string, Item[]> = {
   pelicula: moviesData as Item[],
   libro: booksData as Item[],
@@ -46,7 +43,6 @@ export function Header() {
     let found: Item | null = null;
     let foundType: string | null = null;
 
-    // Buscar en todos los tipos
     for (const [type, items] of Object.entries(datasets)) {
       const match =
         items.find((item) => normalize(item.title) === q) ||
@@ -59,7 +55,6 @@ export function Header() {
     }
 
     if (found && foundType) {
-      // Navegar dinámicamente según el tipo
       navigate(`/detail/${foundType}/${found.id}`);
     } else {
       alert(`No se encontraron resultados para: "${query}"`);
@@ -67,58 +62,65 @@ export function Header() {
   };
 
   return (
-    <>
-      <h1
-        className="text-indigo-600 font-extrabold text-3xl cursor-pointer flex"
-        onClick={() => navigate("/")}
-      >
-        Opinify
-        <CircleStar />
-      </h1>
-
-      <nav className="hidden md:flex gap-8 text-gray-700 font-medium">
-        <a href="/inicio" className="hover:text-indigo-600 transition">
-          Inicio
-        </a>
-        <a href="/servicios" className="hover:text-indigo-600 transition">
-          Servicios
-        </a>
-        <a href="/listas" className="hover:text-indigo-600 transition">
-          Listas
-        </a>
-        <a href="/comunidad" className="hover:text-indigo-600 transition">
-          Comunidad
-        </a>
-      </nav>
-
-      <div className="flex items-center gap-4">
-        <input
-          type="search"
-          placeholder="Buscar..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          className="hidden md:block px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        />
-
-        <Search
-          onClick={handleSearch}
-          className="cursor-pointer hover:text-indigo-600 transition"
-        />
-
-        <button
-          onClick={() => navigate("/login")}
-          className="bg-indigo-600 text-white rounded px-4 py-2 hover:bg-indigo-700 transition"
+    <header className="w-full bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-md fixed top-0 left-0 z-50">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        {/* 🔹 Logo */}
+        <div
+          className="flex items-center gap-2 font-extrabold text-2xl cursor-pointer"
+          onClick={() => navigate("/")}
         >
-          Login
-        </button>
-        <button
-          onClick={() => navigate("/registro")}
-          className="bg-gray-200 rounded px-4 py-2 hover:bg-gray-300 transition"
-        >
-          Registro
-        </button>
+          Opinify
+          <CircleStar size={22} />
+        </div>
+
+        {/* 🔹 Navegación central */}
+        <nav className="hidden md:flex gap-8 font-medium">
+          <Link to="/inicio" className="hover:text-gray-200 transition">
+            Inicio
+          </Link>
+          <Link to="/servicios" className="hover:text-gray-200 transition">
+            Servicios
+          </Link>
+          <Link to="/listas" className="hover:text-gray-200 transition">
+            Listas
+          </Link>
+          <Link to="/comunidad" className="hover:text-gray-200 transition">
+            Comunidad
+          </Link>
+        </nav>
+
+        {/* 🔹 Buscador y botones */}
+        <div className="flex items-center gap-4">
+          <div className="relative hidden md:block">
+            <input
+              type="search"
+              placeholder="Buscar..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="px-4 py-2 rounded-md text-white placeholder-gray-200 bg-transparent border border-white border-opacity-40 hover:border-opacity-80 focus:border-opacity-100 focus:outline-none focus:ring-2 focus:ring-white/80 transition duration-200 ease-in-out"
+            />
+            <Search
+              onClick={handleSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-200 cursor-pointer hover:text-white transition"
+              size={18}
+            />
+          </div>
+
+          <button
+            onClick={() => navigate("/login")}
+            className="bg-transparent border border-white rounded px-4 py-2 hover:bg-white hover:text-indigo-600 transition cursor-pointer"
+          >
+            Login
+          </button>
+          <button
+            onClick={() => navigate("/registro")}
+            className="bg-transparent border border-white rounded px-4 py-2 hover:bg-white hover:text-indigo-600 transition cursor-pointer"
+          >
+            Registro
+          </button>
+        </div>
       </div>
-    </>
+    </header>
   );
 }

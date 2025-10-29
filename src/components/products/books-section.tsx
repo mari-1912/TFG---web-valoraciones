@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../Card";
 import books from "../../data/books.json";
-
+import { BookOpen } from "lucide-react";
 export default function SectionBooks() {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
@@ -28,8 +28,10 @@ export default function SectionBooks() {
 
   return (
     <section className="my-8 max-w-5xl mx-auto">
-      <h3 className="text-2xl font-semibold mb-6">Libros</h3>
-
+      <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+        <BookOpen className="text-purple-500" size={28} />
+        Libros
+      </h3>
       <div className="relative">
         <button
           onClick={handlePrev}

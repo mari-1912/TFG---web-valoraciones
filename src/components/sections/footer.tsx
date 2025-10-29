@@ -1,53 +1,63 @@
-import { Facebook, Twitter, Instagram } from "lucide-react";
-import { CircleStar } from "lucide-react";
+import { Facebook, Twitter, Instagram, CircleStar } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-800 text-gray-200 mt-12 w-full">
+    <footer className="bg-linear-to-r from-indigo-500 to-purple-600 text-white text-center px-6">
       <div className="max-w-7xl mx-auto px-6 py-10 grid md:grid-cols-3 gap-8">
         {/* Logo / Nombre */}
-        <div>
-          <h2 className="text-2xl font-bold text-indigo-500 flex">Opinify <CircleStar /></h2>
-          <p className="mt-2 text-gray-400">
+        <div className="flex flex-col items-center">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-1">
+            Opinify <CircleStar />
+          </h2>
+          <p className="mt-2 text-white-400">
             Descubre, valora y comparte tus experiencias de entretenimiento
             favoritas.
           </p>
         </div>
 
-        {/* Enlaces */}
+        {/* Enlaces internos */}
         <div>
           <h3 className="font-semibold mb-4">Enlaces</h3>
           <ul className="space-y-2">
             <li>
-              <a href="/inicio" className="hover:text-indigo-400 transition">
+              <Link to="/inicio" className="hover:text-indigo-400 transition">
                 Inicio
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/servicios" className="hover:text-indigo-400 transition">
+              <Link
+                to="/servicios"
+                className="hover:text-indigo-400 transition"
+              >
                 Servicios
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/listas" className="hover:text-indigo-400 transition">
+              <Link to="/listas" className="hover:text-indigo-400 transition">
                 Listas
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="/comunidad" className="hover:text-indigo-400 transition">
+              <Link
+                to="/comunidad"
+                className="hover:text-indigo-400 transition"
+              >
                 Comunidad
-              </a>
+              </Link>
             </li>
           </ul>
         </div>
 
-        {/* Redes sociales */}
-        <div>
+        {/* Redes sociales (externas) */}
+        <div className="flex flex-col items-center">
           <h3 className="font-semibold mb-4">Síguenos</h3>
           <div className="flex gap-4">
             <a
               href="https://www.facebook.com/"
               aria-label="Facebook"
+              target="_blank"
+              rel="noopener noreferrer"
               className="hover:text-indigo-400 transition"
             >
               <Facebook />
@@ -55,6 +65,8 @@ export default function Footer() {
             <a
               href="https://x.com/"
               aria-label="Twitter"
+              target="_blank"
+              rel="noopener noreferrer"
               className="hover:text-indigo-400 transition"
             >
               <Twitter />
@@ -62,6 +74,8 @@ export default function Footer() {
             <a
               href="https://www.instagram.com/"
               aria-label="Instagram"
+              target="_blank"
+              rel="noopener noreferrer"
               className="hover:text-indigo-400 transition"
             >
               <Instagram />
@@ -71,7 +85,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-gray-700 mt-6">
-        <p className="text-center py-4 text-gray-500 text-sm">
+        <p className="text-center py-4 text-white text-sm">
           &copy; 2025 Opinify. Todos los derechos reservados.
         </p>
       </div>

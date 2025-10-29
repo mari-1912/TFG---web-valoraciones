@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Card from "../Card";
 import music from "../../data/music.json";
+import { Disc3 } from "lucide-react";
 
 export default function SectionMusic() {
   const itemsPerPage = 4;
@@ -25,8 +26,10 @@ export default function SectionMusic() {
 
   return (
     <section className="my-8 max-w-5xl mx-auto">
-      <h3 className="text-2xl font-semibold mb-6">Discos</h3>
-
+      <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+        <Disc3 className="text-purple-500" size={28} />
+        Discos musicales
+      </h3>
       <div className="relative">
         <button
           onClick={handlePrev}

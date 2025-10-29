@@ -1,13 +1,13 @@
-import { Film, Tv, BookOpen, Gamepad, Disc3, Dices } from "lucide-react";
+import { Popcorn, Tv, BookOpen, Gamepad2, Disc3, Dices } from "lucide-react";
 import { Link } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { Header } from "../components/sections/header";
 
 const categorias = [
-  { name: "peliculas", icon: Film },
+  { name: "peliculas", icon: Popcorn },
   { name: "series", icon: Tv },
   { name: "libros", icon: BookOpen },
-  { name: "videojuegos", icon: Gamepad },
+  { name: "videojuegos", icon: Gamepad2 },
   { name: "juegos-de-mesa", icon: Dices },
   { name: "discos", icon: Disc3 },
 ];
@@ -28,8 +28,8 @@ export default function ListCategoriesPage() {
             <Link
               key={name}
               to={`/listas/${name}`}
-              className="bg-white text-indigo-700 font-semibold border-2 border-indigo-700 py-8 rounded-xl shadow-lg flex flex-col justify-center items-center
-                       hover:bg-indigo-700 hover:text-white transition cursor-pointer select-none"
+              className="bg-white text-indigo-700 font-semibold border-2 border-indigo-700 py-8 rounded-xl shadow-lg flex flex-col justify-center items-center text-center h-full
+                 hover:bg-indigo-700 hover:text-white transition cursor-pointer select-none"
             >
               <Icon size={64} className="mb-4" />
               <span className="text-lg tracking-wide capitalize">

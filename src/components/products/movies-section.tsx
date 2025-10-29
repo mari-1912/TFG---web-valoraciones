@@ -2,6 +2,7 @@ import { useState } from "react";
 import Card from "../Card";
 import movies from "../../data/movies.json";
 import { useNavigate } from "react-router-dom";
+import { Popcorn } from "lucide-react";
 
 export default function SectionMovies() {
   const itemsPerPage = 4;
@@ -28,7 +29,10 @@ export default function SectionMovies() {
 
   return (
     <section className="my-8 max-w-5xl mx-auto">
-      <h3 className="text-2xl font-semibold mb-6">Películas</h3>
+      <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+        <Popcorn className="text-purple-500" size={28} />
+        Películas
+      </h3>
 
       <div className="relative">
         {/* Botón anterior */}

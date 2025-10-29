@@ -1,7 +1,8 @@
 import { useParams } from "react-router-dom";
 import movies from "../data/movies.json";
 import books from "../data/books.json";
-import games from "../data/video-games.json";
+import videoGames from "../data/video-games.json";
+import series from "../data/series.json";
 import Footer from "../components/sections/footer";
 import { Header } from "../components/sections/header";
 // Si tienes más tipos (series, música, etc.), los puedes importar igual:
@@ -22,11 +23,11 @@ export function DetailPage() {
       dataset = books;
       break;
     case "videojuego":
-      dataset = games;
+      dataset = videoGames;
       break;
-    // case "serie":
-    //   dataset = series;
-    //   break;
+    case "serie":
+      dataset = series;
+      break;
     default:
       dataset = [];
   }

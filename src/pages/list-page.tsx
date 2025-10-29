@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import lists from "../data/lists.json";
 import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
+import genericListMovies from "../data/generic-list-movies.json";
 
 interface Lista {
   id: string;

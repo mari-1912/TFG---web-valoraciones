@@ -60,7 +60,7 @@ export default function ListTypePage() {
         <h2 className="text-2xl font-bold text-indigo-700 mb-8 text-center">
           Listas de {categoria?.replace(/-/g, " ")}
         </h2>
-
+        
         <section className="mb-12">
           <h3 className="text-xl font-semibold mb-4">Listas genéricas</h3>
           {listas.genericas.length === 0 && (
