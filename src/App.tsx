@@ -1,12 +1,12 @@
-import  HomePage  from "./pages/home-page"
-//import { AppRouter } from "./routes/app-router"
+import { BrowserRouter as Router } from "react-router-dom";
+import { RoutesComponent } from "./routes/app-router";
 
 function App() {
   return (
-    <div>
-      <HomePage/>
-    </div>
-  )
+    <Router>
+      <RoutesComponent />
+    </Router>
+  );
 }
 
-export default App
+export default App;

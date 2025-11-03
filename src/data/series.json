@@ -1,0 +1,58 @@
+[
+  {
+    "id": "1",
+    "imgSrc": "/src/img/series/adolescence.png",
+    "title": "Adolescence",
+    "description": "Explora las consecuencias del bullying online y la radicalización juvenil.",
+    "rating": 5
+  },
+  {
+    "id": "2",
+    "imgSrc": "/src/img/series/severance.png",
+    "title": "Severance",
+    "description": "Thriller laboral con un giro de ciencia ficción sobre memorias divididas.",
+    "rating": 5
+  },
+  {
+    "id": "3",
+    "imgSrc": "/src/img/series/thepitt.png",
+    "title": "The Pitt",
+    "description": "Drama de alto presupuesto que analiza conflictos personales y sociales.",
+    "rating": 4
+  },
+  {
+    "id": "4",
+    "imgSrc": "/src/img/series/zeroday.png",
+    "title": "Zero Day",
+    "description": "Serie de acción y thriller que sigue las aventuras de un hacker contra corporaciones.",
+    "rating": 4
+  },
+  {
+    "id": "5",
+    "imgSrc": "/src/img/series/the_white_lotus.png",
+    "title": "The White Lotus",
+    "description": "Comedia dramática que mezcla humor, drama y crítica social en un resort de lujo.",
+    "rating": 5
+  },
+  {
+    "id": "6",
+    "imgSrc": "/src/img/series/echoes.png",
+    "title": "Echoes",
+    "description": "Misterio y suspense alrededor de un caso de identidad duplicada y secretos familiares.",
+    "rating": 4
+  },
+  {
+    "id": "7",
+    "imgSrc": "/src/img/series/quantum_leap_2025.png",
+    "title": "Quantum Leap 2025",
+    "description": "Nueva temporada de la serie de ciencia ficción que mezcla viajes en el tiempo y dilemas éticos.",
+    "rating": 4
+  },
+  {
+    "id": "8",
+    "imgSrc": "/src/img/series/avalon.png",
+    "title": "Avalon",
+    "description": "Serie de fantasía épica con conflictos políticos y batallas legendarias.",
+    "rating": 5
+  }
+]

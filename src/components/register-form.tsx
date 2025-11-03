@@ -1,30 +1,100 @@
-// components/RegisterForm.tsx
-import React from "react";
+import { useState } from "react";
+import { registerUser } from "../services/auth-service";
+import { useNavigate } from "react-router-dom";
 
-type RegisterFormProps = {
-  onClose: () => void;
-};
 
-export default function RegisterForm({ onClose }: RegisterFormProps) {
+export default function RegisterForm() {
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [success, setSuccess] = useState(false);
+   const navigate = useNavigate();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const result = registerUser({ username, email, password });
+
+    setMessage(result.message);
+    setSuccess(result.success);
+
+    if (result.success) {
+      // ✅ Guardamos el estado de login
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("userRole", "usuario");
+      localStorage.setItem("currentUser", username);
+
+      setTimeout(() => {
+        navigate("/inicio"); // 👈 redirige al inicio
+      }, 1000);
+    }
+  };
+
   return (
-    <section className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-20 z-10">
-      <div className="auth-card relative animate-fade-in">
-        <button onClick={onClose} className="close-btn" aria-label="Cerrar">
-          ×
-        </button>
-        <h2 className="auth-card-title">Registrarse</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full"
+    >
+      <h2 className="text-2xl font-bold text-center text-indigo-600 mb-6">
+        Crear cuenta
+      </h2>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Nombre de usuario
+        </label>
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Correo electrónico
+        </label>
         <input
           type="email"
-          placeholder="Correo electrónico"
-          className="input-field"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Contraseña
+        </label>
         <input
           type="password"
-          placeholder="Contraseña"
-          className="input-field mb-4"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
-        <button className="submit-btn w-full mt-2">Crear cuenta</button>
       </div>
-    </section>
+
+      {message && (
+        <p
+          className={`text-center text-sm ${
+            success ? "text-green-600" : "text-red-600"
+          } mb-4`}
+        >
+          {message}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        className="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition"
+      >
+        Registrarme
+      </button>
+    </form>
   );
 }
