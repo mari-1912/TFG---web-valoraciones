@@ -1,8 +1,7 @@
 import { useParams } from "react-router-dom";
-import lists from "../data/lists.json";
 import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
-import genericListMovies from "../data/generic-list-movies.json";
+import genericList from "../data/generic-list.json";
 
 interface Lista {
   id: string;
@@ -24,7 +23,7 @@ interface ListCategoriesPage {
 export default function ListasPorCategoria() {
   const { categoria } = useParams();
   const listas = (categoria &&
-    (lists as ListCategoriesPage)[categoria]?.categorias) || {
+    (genericList as ListCategoriesPage)[categoria]?.categorias) || {
     genericas: [],
     personales: [],
   };

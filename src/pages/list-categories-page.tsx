@@ -1,4 +1,4 @@
-import { Popcorn, Tv, BookOpen, Gamepad2, Disc3, Dices } from "lucide-react";
+import { Popcorn, Tv, BookOpen, Gamepad2, /*Disc3, Dices*/ } from "lucide-react";
 import { Link } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { Header } from "../components/sections/header";
@@ -8,8 +8,8 @@ const categorias = [
   { name: "series", icon: Tv },
   { name: "libros", icon: BookOpen },
   { name: "videojuegos", icon: Gamepad2 },
-  { name: "juegos-de-mesa", icon: Dices },
-  { name: "discos", icon: Disc3 },
+  //{ name: "juegos-de-mesa", icon: Dices },
+  //{ name: "discos", icon: Disc3 },
 ];
 
 export default function ListCategoriesPage() {
