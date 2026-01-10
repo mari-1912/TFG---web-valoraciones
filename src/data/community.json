@@ -1,42 +1,38 @@
 [
   {
     "id": "1",
-    "user": "LauraG",
-    "avatar": "/src/img/users/laura.png",
-    "contentType": "película",
-    "title": "Inception",
-    "rating": 5,
-    "comment": "Una de las películas más inteligentes que he visto.",
-    "timestamp": "2025-10-25T15:30:00Z"
+    "user": "Customer",
+    "avatar": "",
+    "action": "comment",
+    "comment": "me gusta harry potter",
+    "contentType": "videojuego",
+    "title": "Hogwarts Legacy"
   },
   {
     "id": "2",
-    "user": "Carlos99",
-    "avatar": "/src/img/users/carlos.png",
-    "contentType": "libro",
-    "title": "1984",
-    "rating": 4,
-    "comment": "Orwell sigue siendo más actual que nunca.",
-    "timestamp": "2025-10-24T19:45:00Z"
+    "user": "Customer",
+    "avatar": "",
+    "action": "favorite",
+    "contentType": "película",
+    "title": "The Matrix"
   },
   {
     "id": "3",
-    "user": "BookLover",
-    "avatar": "/src/img/users/booklover.png",
-    "contentType": "serie",
-    "title": "The Last of Us",
-    "rating": 5,
-    "comment": "Increíble adaptación. Emocional y brutal.",
-    "timestamp": "2025-10-23T09:12:00Z"
+    "user": "Customer",
+    "avatar": "",
+    "action": "list_add",
+    "listName": "terror",
+    "contentType": "película",
+    "title": "Black Phone 2"
   },
   {
     "id": "4",
-    "user": "GamerX",
-    "avatar": "/src/img/users/gamerx.png",
-    "contentType": "videojuego",
-    "title": "Baldur’s Gate 3",
-    "rating": 5,
-    "comment": "Lo mejor que he jugado este año.",
-    "timestamp": "2025-10-22T20:00:00Z"
+    "user": "Customer",
+    "avatar": "",
+    "action": "rating",
+    "contentType": "serie",
+    "title": "Severance",
+    "rating": 3,
+    "comment": "Me encantó la ambientación y el aura misteriosa..."
   }
 ]

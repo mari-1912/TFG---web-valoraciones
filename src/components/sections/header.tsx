@@ -9,6 +9,20 @@ import videoGamesData from "../../data/video-games.json";
 import boardGamesData from "../../data/board-games.json";
 import discos from "../../data/music.json";
 
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuIndicator,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  NavigationMenuViewport,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
+
+import { useIsMobile } from "@/hooks/use-mobile";
+
 type Item = {
   id: string;
   title: string;
@@ -27,6 +41,7 @@ const datasets: Record<string, Item[]> = {
 };
 
 export function Header() {
+  const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
@@ -47,6 +62,7 @@ export function Header() {
       const match =
         items.find((item) => normalize(item.title) === q) ||
         items.find((item) => normalize(item.title).includes(q));
+
       if (match) {
         found = match;
         foundType = type;
@@ -62,35 +78,176 @@ export function Header() {
   };
 
   return (
-    <header className="w-full bg-linear-to-r from-indigo-500 to-purple-600 text-white shadow-md fixed top-0 left-0 z-50">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        {/* 🔹 Logo */}
+    <header className="fixed left-0 top-0 z-50 w-full [background-image:var(--gradient-primary)]">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 text-white">
+        {/* LOGO */}
         <div
-          className="flex items-center gap-2 font-extrabold text-2xl cursor-pointer"
+          className="flex cursor-pointer items-center gap-2 text-2xl font-extrabold"
           onClick={() => navigate("/")}
         >
           Opinify
           <CircleStar size={22} />
         </div>
 
-        {/* 🔹 Navegación central */}
-        <nav className="hidden md:flex gap-8 font-medium">
-          <Link to="/inicio" className="hover:text-gray-200 transition">
-            Inicio
-          </Link>
-          <Link to="/servicios" className="hover:text-gray-200 transition">
-            Servicios
-          </Link>
-          <Link to="/listas" className="hover:text-gray-200 transition">
-            Listas
-          </Link>
-          <Link to="/comunidad" className="hover:text-gray-200 transition">
-            Comunidad
-          </Link>
-        </nav>
+        {/* NAVIGATION MENU SHADCN */}
+        <NavigationMenu className="hidden md:flex">
+  <NavigationMenuList className="flex-wrap">
 
-        {/* 🔹 Buscador y botones */}
+    {/* INICIO — link directo */}
+    <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
+      <NavigationMenuLink
+        asChild
+        className={navigationMenuTriggerStyle()}
+      >
+        <Link to="/inicio">Home</Link>
+      </NavigationMenuLink>
+    </NavigationMenuItem>
+
+    {/* SERVICIOS — dropdown */}
+    <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
+      <NavigationMenuTrigger>Servicios</NavigationMenuTrigger>
+
+      <NavigationMenuContent
+        className="
+          rounded-lg
+          border border-[hsl(var(--color-border-subtle))]
+          bg-[hsl(var(--color-primary-strong))]
+          text-white
+          shadow-lg
+        "
+      >
+        <ul className="flex w-52 flex-col py-2">
+          <li>
+            <NavigationMenuLink
+              asChild
+              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+            >
+              <Link
+                to="/servicios/peliculas"
+                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+              >
+                Películas
+              </Link>
+            </NavigationMenuLink>
+          </li>
+
+          <li>
+            <NavigationMenuLink
+              asChild
+              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+            >
+              <Link
+                to="/servicios/series"
+                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+              >
+                Series
+              </Link>
+            </NavigationMenuLink>
+          </li>
+
+          <li>
+            <NavigationMenuLink
+              asChild
+              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+            >
+              <Link
+                to="/servicios/libros"
+                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+              >
+                Libros
+              </Link>
+            </NavigationMenuLink>
+          </li>
+
+          <li>
+            <NavigationMenuLink
+              asChild
+              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+            >
+              <Link
+                to="/servicios/videojuegos"
+                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+              >
+                Videojuegos
+              </Link>
+            </NavigationMenuLink>
+          </li>
+        </ul>
+      </NavigationMenuContent>
+    </NavigationMenuItem>
+
+    {/* LISTAS — dropdown (idéntico a Servicios, solo cambian los enlaces) */}
+    <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
+      <NavigationMenuTrigger>Listas</NavigationMenuTrigger>
+
+      <NavigationMenuContent
+        className="
+          rounded-lg
+          border border-[hsl(var(--color-border-subtle))]
+          bg-[hsl(var(--color-primary-strong))]
+          text-white
+          shadow-lg
+        "
+      >
+        <ul className="flex w-52 flex-col py-2">
+          <li>
+            <NavigationMenuLink
+              asChild
+              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+            >
+              <Link
+                to="/listas"
+                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+              >
+                Genéricas
+              </Link>
+            </NavigationMenuLink>
+          </li>
+
+          <li>
+            <NavigationMenuLink
+              asChild
+              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+            >
+              <Link
+                to="/mis-listas"
+                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+              >
+                Creadas por mí
+              </Link>
+            </NavigationMenuLink>
+          </li>
+        </ul>
+      </NavigationMenuContent>
+    </NavigationMenuItem>
+
+    {/* COMUNIDAD — link directo */}
+    <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
+      <NavigationMenuLink
+        asChild
+        className={navigationMenuTriggerStyle()}
+      >
+        <Link to="/comunidad">Comunidad</Link>
+      </NavigationMenuLink>
+    </NavigationMenuItem>
+    <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
+      <NavigationMenuLink
+        asChild
+        className={navigationMenuTriggerStyle()}
+      >
+        <Link to="/comunidad">Sobre Nosotros</Link>
+      </NavigationMenuLink>
+    </NavigationMenuItem>
+  </NavigationMenuList>
+
+  <NavigationMenuIndicator />
+  <NavigationMenuViewport />
+</NavigationMenu>
+
+
+        {/* BUSCADOR + BOTONES */}
         <div className="flex items-center gap-4">
+          {/* Buscador */}
           <div className="relative hidden md:block">
             <input
               type="search"
@@ -98,24 +255,27 @@ export function Header() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="px-4 py-2 rounded-md text-white placeholder-gray-200 bg-transparent border border-white border-opacity-40 hover:border-opacity-80 focus:border-opacity-100 focus:outline-none focus:ring-2 focus:ring-white/80 transition duration-200 ease-in-out"
+              className="rounded-md border border-white/40 bg-transparent px-4 py-2 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
             />
             <Search
               onClick={handleSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-200 cursor-pointer hover:text-white transition"
               size={18}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-indigo-200 transition hover:text-white"
             />
           </div>
 
+          {/* Botón Login */}
           <button
             onClick={() => navigate("/login")}
-            className="bg-transparent border border-white rounded px-4 py-2 hover:bg-white hover:text-indigo-600 transition cursor-pointer"
+            className="cursor-pointer rounded border border-white px-4 py-2 text-sm font-medium transition hover:bg-white hover:text-indigo-600"
           >
             Login
           </button>
+
+          {/* Botón Registro */}
           <button
             onClick={() => navigate("/registro")}
-            className="bg-transparent border border-white rounded px-4 py-2 hover:bg-white hover:text-indigo-600 transition cursor-pointer"
+            className="cursor-pointer rounded border border-white px-4 py-2 text-sm font-medium transition hover:bg-white hover:text-indigo-600"
           >
             Registro
           </button>
