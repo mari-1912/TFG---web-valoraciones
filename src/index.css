@@ -1,77 +1,160 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+@import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------- */
+/* 1) Design tokens base  */
+/* ---------------------- */
 @layer base {
+  :root {
+    /* Backgrounds (light) */
+    --color-bg: 264 100% 99%;
+    --color-bg-soft: 270 100% 98%;
+    --color-surface: 270 40% 96%;
+    --color-surface-elevated: 270 40% 94%;
+
+    /* Bordes y líneas */
+    --color-border-subtle: 270 30% 88%;
+    --color-border-strong: 270 40% 70%;
+
+    /* Texto */
+    --color-text: 258 24% 16%;
+    --color-text-soft: 258 16% 40%;
+    --color-text-muted: 258 14% 55%;
+
+    /* Primario morado (Y2K vibes) */
+    --color-primary: 268 84% 62%;
+    --color-primary-soft: 270 95% 75%;
+    --color-primary-strong: 270 100% 50%;
+
+    /* Acentos (rosa/lila Y2K) */
+    --color-accent: 295 86% 65%;
+    --color-accent-soft: 295 92% 82%;
+    --color-accent-strong: 305 100% 55%;
+
+    /* Estado */
+    --color-success: 145 63% 48%;
+    --color-warning: 40 96% 55%;
+    --color-danger: 0 84% 63%;
+
+    /* Efectos Y2K (guardamos la "forma" del shadow aquí) */
+    --y2k-shadow-soft: 0 18px 40px rgba(80, 15, 120, 0.15);
+    --y2k-shadow-strong: 0 18px 45px rgba(120, 30, 180, 0.35);
+
+    --radius-lg-y2k: 1.5rem;
+    --radius-xl-y2k: 2rem;
+
+    /* Gradiente “neón” Y2K (fondo elegante, un poco más oscuro) */
+    --gradient-primary:
+      radial-gradient(circle at 0% 0%, rgba(120, 70, 255, 0.35) 0%, transparent 55%),
+      radial-gradient(circle at 100% 0%, rgba(255, 80, 200, 0.30) 0%, transparent 55%),
+      linear-gradient(135deg, #2b1248, #5b21ff, #e000ff);
+  }
+
+  .dark {
+    /* Backgrounds (dark) */
+    --color-bg: 258 52% 8%;
+    --color-bg-soft: 258 46% 10%;
+    --color-surface: 260 40% 14%;
+    --color-surface-elevated: 260 40% 18%;
+
+    /* Bordes y líneas */
+    --color-border-subtle: 260 30% 24%;
+    --color-border-strong: 270 45% 40%;
+
+    /* Texto */
+    --color-text: 0 0% 98%;
+    --color-text-soft: 280 10% 80%;
+    --color-text-muted: 280 8% 65%;
+
+    /* Primario morado (más neón en dark) */
+    --color-primary: 270 100% 72%;
+    --color-primary-soft: 270 90% 65%;
+    --color-primary-strong: 270 100% 78%;
+
+    /* Acentos */
+    --color-accent: 300 93% 72%;
+    --color-accent-soft: 300 90% 80%;
+    --color-accent-strong: 310 100% 70%;
+
+    /* Estado */
+    --color-success: 145 63% 55%;
+    --color-warning: 45 96% 60%;
+    --color-danger: 0 84% 68%;
+
+    /* Efectos Y2K (más fuertes en dark) */
+    /*--y2k-shadow-soft: 0 20px 45px rgba(0, 0, 0, 0.65);
+    --y2k-shadow-strong: 0 25px 60px rgba(0, 0, 0, 0.9);*/
+
+    --radius-lg-y2k: 1.6rem;
+    --radius-xl-y2k: 2.2rem;
+
+    --gradient-primary:
+      radial-gradient(circle at 0% 0%, rgba(180, 132, 255, 0.35) 0, transparent 55%),
+      radial-gradient(circle at 100% 0%, rgba(255, 122, 229, 0.28) 0, transparent 55%),
+      linear-gradient(135deg, #4c1d95, #7c3aed, #f472ff);
+  }
+
+  /* Estilos base del body, usando directamente las custom properties */
   body {
-    @apply bg-gray-50 min-h-screen font-sans;
+    background-color: hsl(var(--color-bg));
+    color: hsl(var(--color-text));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-@layer components {
-  .app-header {
-    @apply flex justify-between items-center max-w-5xl mx-auto py-4 px-6 border-b border-gray-300 mb-8;
-  }
+/* 🎨 Shadcn UI tokens — versioneados a tema neon morado */
+:root {
+  /* Fondo general del menú */
+  --background: 262 40% 10%; /* Morado oscuro elegante */
+  --foreground: 0 0% 100%;   /* Texto blanco */
 
-  .app-title {
-    @apply text-indigo-600 font-extrabold text-3xl;
-  }
+  /* Popover (dropdown) */
+  --popover: 262 38% 14%; /* Un poco más claro que el background */
+  --popover-foreground: 0 0% 100%;
 
-  .app-nav {
-    @apply flex gap-6 text-gray-700 font-medium cursor-pointer;
-  }
+  /* Muted (elementos secundarios) */
+  --muted: 262 30% 20%;
+  --muted-foreground: 262 20% 75%;
 
-  .app-nav li:hover {
-    @apply text-indigo-600;
-  }
+  /* Accent (hover, botones activos) */
+  --accent: 268 84% 62%; /* Tu color primario exacto */
+  --accent-foreground: 0 0% 100%;
 
-  .form-container {
-    @apply flex flex-col md:flex-row gap-8 max-w-5xl mx-auto;
-  }
+  /* Border & Ring (borde + outline) */
+  --border: 268 84% 62%; /* Borde brillante morado neon */
+  --ring: 295 92% 70%; /* Halo neón fucsia */
 
-  .form-box {
-    @apply bg-white p-8 rounded-md shadow-md w-full md:w-1/2 flex flex-col;
-  }
+  /* Card (no es obligatorio, pero shadcn lo usa en varios sitios) */
+  --card: 262 40% 12%;
+  --card-foreground: 0 0% 100%;
 
-  .form-title {
-    @apply text-gray-900 font-semibold text-xl mb-4;
-  }
-
-  .input-field {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-4;
-  }
-
-  .submit-btn {
-    @apply bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition font-semibold;
-  }
-
-  .services-section {
-    @apply mt-12 max-w-5xl mx-auto px-6;
-  }
-
-  .services-title {
-    @apply text-gray-800 font-semibold text-2xl mb-6;
-  }
-
-  .services-grid {
-    @apply grid grid-cols-2 md:grid-cols-4 gap-6;
-  }
-
-  .service-card {
-    @apply bg-indigo-50 text-indigo-700 font-semibold p-6 rounded-lg shadow-md flex items-center justify-center cursor-pointer hover:bg-indigo-100 transition;
-  }
-
-  .animate-fade-in {
-    @apply transition-opacity duration-300 opacity-100;
-  }
-
-  .auth-card {
-    @apply bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 border border-gray-100 ring-1 ring-indigo-100;
-  }
-
-  .auth-card-title {
-    @apply text-indigo-700 text-2xl font-bold mb-6 text-center tracking-tight;
-  }
-
-  .close-btn {
-    @apply absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold cursor-pointer transition;
-  }
+   /* Fondo general */
+   --background: var(--color-bg);
+   --foreground: var(--color-text);
+ 
+   /* Popover (dropdown del NavigationMenu) */
+   --popover: var(--color-surface-elevated);
+   --popover-foreground: var(--color-text);
+ 
+   /* Elementos secundarios */
+   --muted: var(--color-bg-soft);
+   --muted-foreground: var(--color-text-muted);
+ 
+   /* Accent (hover, item activo, botones del menú) */
+   --accent: var(--color-primary);
+   --accent-foreground: 0 0% 100%;
+ 
+   /* Bordes y halo de foco */
+   --border: var(--color-border-strong);
+   --ring: var(--color-primary);
+ 
+   /* Opcional: cards si algún componente los usa */
+   --card: var(--color-surface);
+   --card-foreground: var(--color-text);
+ 
 }
+
+

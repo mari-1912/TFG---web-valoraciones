@@ -1,5 +1,5 @@
 const API_KEY = import.meta.env.VITE_OMDB_KEY; // o process.env.REACT_APP_OMDB_KEY
-const BASE_URL = "https://www.omdbapi.com/";
+const BASE_URL = "https://tfg-web-valoraciones-back.onrender.com/peliculas/";
 
 export async function fetchMovies(search: string, signal?: AbortSignal) {
   const url = `${BASE_URL}?apikey=${API_KEY}&s=${encodeURIComponent(search)}&type=movie`;
@@ -8,7 +8,7 @@ export async function fetchMovies(search: string, signal?: AbortSignal) {
   const data = await res.json();
   if (data.Response === "False") throw new Error(data.Error || "Sin resultados");
   return data.Search;
-}
+} 
 
 export async function fetchMovieById(id: string, signal?: AbortSignal) {
   const url = `${BASE_URL}?apikey=${API_KEY}&i=${id}`;
@@ -18,3 +18,4 @@ export async function fetchMovieById(id: string, signal?: AbortSignal) {
   if (data.Response === "False") throw new Error(data.Error || "Película no encontrada");
   return data;
 }
+

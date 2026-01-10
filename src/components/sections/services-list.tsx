@@ -47,8 +47,6 @@ export function ServicesList() {
       <SectionSeries />
       <SectionBooks />
       <SectionVideoGames />
-      <SectionBoardGames />
-      <SectionMusic />
     </section>
   );
 }
