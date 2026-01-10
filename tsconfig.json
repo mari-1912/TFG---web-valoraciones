@@ -10,8 +10,10 @@
   ],
   "compilerOptions": {
     "moduleResolution": "node",
-    "types": [
-      "node"
-    ]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   }
 }

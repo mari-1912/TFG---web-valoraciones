@@ -1,19 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Card from "../Card";
-import videoGames from "../../data/video-games.json";
 import { useNavigate } from "react-router-dom";
 import { Gamepad2 } from "lucide-react";
+import { fetchVideoGames } from "../../services/fetchVideogames";
 
 export default function SectionVideoGames() {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
   const navigate = useNavigate();
+  const [games, setGames] = useState<any[]>([]);
 
-  const totalItems = Array.isArray(videoGames) ? videoGames.length : 0;
+  useEffect(() => {
+    const loadVideoGames = async () => {
+      try {
+        const data = await fetchVideoGames("", 20);
+        const items = Array.isArray(data) ? data : data?.items;
+        setGames(Array.isArray(items) ? items : []);
+      } catch (error) {
+        console.error("Error loading videogames", error);
+        setGames([]);
+      }
+    };
+
+    loadVideoGames();
+  }, []);
+
+  const totalItems = games.length;
 
   const visibleItems =
-    Array.isArray(videoGames) && totalItems > 0
-      ? videoGames.slice(startIndex, startIndex + itemsPerPage)
+    totalItems > 0
+      ? games.slice(startIndex, startIndex + itemsPerPage)
       : [];
 
   const handlePrev = () => {
@@ -22,7 +38,7 @@ export default function SectionVideoGames() {
 
   const handleNext = () => {
     setStartIndex((prev) =>
-      Math.min(prev + itemsPerPage, totalItems - itemsPerPage)
+      Math.min(prev + itemsPerPage, Math.max(totalItems - itemsPerPage, 0))
     );
   };
 
@@ -52,10 +68,15 @@ export default function SectionVideoGames() {
               className="cursor-pointer hover:scale-105 transform transition"
             >
               <Card
-                imgSrc={m.imgSrc}
-                title={m.title}
-                description={m.description}
-                rating={m.rating}
+                id={m.id}
+                titulo={m.titulo}
+                generos={m.generos}
+                anio_lanzamiento={m.anioLanzamiento}
+                portada={m.portada}
+                desarrollador={m.desarrollador}
+                duracion={m.duracion}
+                consolas={m.consolas}
+                plataforma={m.plataforma}
               />
             </div>
           ))}
