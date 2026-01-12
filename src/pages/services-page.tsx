@@ -1,45 +1,80 @@
-import { ServicesList } from "../components/sections/services-list";
+import { useMemo, useState } from "react";
+
+import SectionBooks from "../components/products/books-section";
+import SectionVideoGames from "../components/products/video-games-section";
+import SectionMovies from "../components/products/movies-section";
+import SectionSeries from "../components/products/series-section";
 import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 
-export default function ServicesPage() {
+import {
+  ServicesFilters,
+  type ServiceCategory,
+  type SortKey,
+  type DurationKey,
+  type DateKey,
+} from "../components/service-filters";
+
+export default function ServicesList() {
+  // -------------------------
+  // Estado de filtros
+  // -------------------------
+  const [category, setCategory] = useState<ServiceCategory>("peliculas");
+  const [sort, setSort] = useState<SortKey>("az");
+  const [genre, setGenre] = useState<string>("");
+  const [duration, setDuration] = useState<DurationKey>("all");
+  const [date, setDate] = useState<DateKey>("all");
+
+  // -------------------------
+  // Géneros por categoría (mock)
+  // Luego puedes sacarlos del backend o JSON
+  // -------------------------
+  const genres = useMemo(() => {
+    switch (category) {
+      case "peliculas":
+        return ["Acción", "Drama", "Comedia", "Ciencia ficción"];
+      case "series":
+        return ["Drama", "Thriller", "Comedia"];
+      case "videojuegos":
+        return ["Aventura", "RPG", "Estrategia"];
+      case "libros":
+        return ["Fantasía", "Romance", "Historia"];
+      default:
+        return [];
+    }
+  }, [category]);
+
+  // -------------------------
+  // Render
+  // -------------------------
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-gray-50 flex flex-col pt-10">
-        {/* Para móviles, puedes agregar un botón hamburguesa (icono) para el menú */}
+      <main className="bg-white min-h-screen pt-38">
+        <section className="flex flex-col gap-8">
+          {/* Filtros */}
+          <ServicesFilters
+            category={category}
+            onCategoryChange={setCategory}
+            sort={sort}
+            onSortChange={setSort}
+            genre={genre}
+            onGenreChange={setGenre}
+            duration={duration}
+            onDurationChange={setDuration}
+            date={date}
+            onDateChange={setDate}
+            genres={genres}
+          />
 
-        {/* Intro */}
-        <section className="max-w-5xl mx-auto text-center py-15 px-6">
-          <h1 className="text-4xl font-extrabold text-gray-800 mb-4 mt-4">
-            Nuestros Servicios
-          </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            En nuestra plataforma puedes valorar, descubrir y compartir tus
-            opiniones sobre tus películas, series, videojuegos, libros, discos y
-            juegos de mesa favoritos. Creamos una comunidad donde tus gustos
-            cuentan.
-          </p>
+          {/* Contenido según categoría */}
+          <div className="mx-auto w-full max-w-7xl px-6">
+            {category === "peliculas" && <SectionMovies />}
+            {category === "series" && <SectionSeries />}
+            {category === "libros" && <SectionBooks />}
+            {category === "videojuegos" && <SectionVideoGames />}
+          </div>
         </section>
-        {/* Servicios destacados */}
-        <ServicesList />
-        {/* CTA final 
-        <section className="bg-linear-to-r from-indigo-500 to-purple-600 text-white py-16 text-center px-6">
-          <h3 className="text-3xl font-bold mb-4">
-            ¿Listo para unirte a la comunidad?
-          </h3>
-          <p className="text-lg mb-6">
-            Crea tu perfil y empieza a valorar tus obras favoritas hoy mismo.
-          </p>
-          <a
-            href="/registro"
-            className="bg-white text-indigo-600 font-semibold px-6 py-3 rounded-full shadow hover:bg-gray-100 transition"
-          >
-            Crear cuenta
-          </a>
-        </section>
-        
-        */}
       </main>
       <Footer />
     </>

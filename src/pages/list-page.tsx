@@ -83,21 +83,8 @@ export default function ListasPorCategoria() {
     <>
       <Header />
 
-      <main className="pt-24 bg-white min-h-screen">
-        <div className="max-w-7xl mx-auto px-6">
-          {/* Breadcrumbs */}
-          <div className="text-sm text-gray-600 mb-4">
-            <Link to="/inicio" className="hover:text-gray-900">
-              Home
-            </Link>
-            <span className="mx-2">›</span>
-            <Link to="/listas" className="hover:text-gray-900">
-              Listas
-            </Link>
-            <span className="mx-2">›</span>
-            <span className="capitalize">{label}</span>
-          </div>
-
+      <main className="pt-36 bg-white min-h-screen">
+      <div className="max-w-7xl mx-auto px-6">
           {/* Izquierda + Hero derecha */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             <div>
