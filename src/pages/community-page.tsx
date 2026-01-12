@@ -163,14 +163,6 @@ export default function CommunityPage() {
 
       <main className="pt-24 bg-white min-h-screen">
         <div className="max-w-7xl mx-auto px-6">
-          {/* Breadcrumbs */}
-          <div className="text-sm text-gray-600 mb-4">
-            <Link to="/inicio" className="hover:text-gray-900">
-              Home
-            </Link>
-            <span className="mx-2">›</span>
-            <span>Comunidad</span>
-          </div>
 
           {/* TABLA CERRADA: borde completo + overflow hidden para que quede limpio */}
           <section className="border-2 border-indigo-600 overflow-hidden">

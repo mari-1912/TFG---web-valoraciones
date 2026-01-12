@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/navigation-menu";
 
 import { useIsMobile } from "@/hooks/use-mobile";
+import { AppBreadcrumb } from "../global-breadcrumb";
 
 type Item = {
   id: string;
@@ -95,131 +96,144 @@ export function Header() {
 
     {/* INICIO — link directo */}
     <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
-      <NavigationMenuLink
-        asChild
-        className={navigationMenuTriggerStyle()}
-      >
-        <Link to="/inicio">Home</Link>
-      </NavigationMenuLink>
-    </NavigationMenuItem>
+  <NavigationMenuLink
+    asChild
+    className={navigationMenuTriggerStyle()}
+  >
+    <Link to="/home">Home</Link>
+  </NavigationMenuLink>
+</NavigationMenuItem>
 
     {/* SERVICIOS — dropdown */}
-    <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
-      <NavigationMenuTrigger>Servicios</NavigationMenuTrigger>
+    {/* SERVICIOS — link a /servicios + botón para abrir dropdown */}
+<NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
+  <div className="flex items-center">
+    {/* Link clicable */}
+    <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+      <Link to="/servicios">Servicios</Link>
+    </NavigationMenuLink>
 
-      <NavigationMenuContent
-        className="
-          rounded-lg
-          border border-[hsl(var(--color-border-subtle))]
-          bg-[hsl(var(--color-primary-strong))]
-          text-white
-          shadow-lg
-        "
-      >
-        <ul className="flex w-52 flex-col py-2">
-          <li>
-            <NavigationMenuLink
-              asChild
-              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
-            >
-              <Link
-                to="/servicios/peliculas"
-                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
-              >
-                Películas
-              </Link>
-            </NavigationMenuLink>
-          </li>
+    {/* Flecha/trigger solo para desplegar */}
+    <NavigationMenuTrigger className="px-2" aria-label="Abrir menú de servicios" />
+  </div>
 
-          <li>
-            <NavigationMenuLink
-              asChild
-              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
-            >
-              <Link
-                to="/servicios/series"
-                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
-              >
-                Series
-              </Link>
-            </NavigationMenuLink>
-          </li>
+  <NavigationMenuContent
+    className="
+      rounded-lg
+      border border-[hsl(var(--color-border-subtle))]
+      bg-[hsl(var(--color-primary-strong))]
+      text-white
+      shadow-lg
+    "
+  >
+    <ul className="flex w-52 flex-col py-2">
+      <li>
+        <NavigationMenuLink asChild className="hover:bg-[hsl(var(--color-primary-soft))] text-white">
+          <Link
+            to="/servicios/peliculas"
+            className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+          >
+            Películas
+          </Link>
+        </NavigationMenuLink>
+      </li>
 
-          <li>
-            <NavigationMenuLink
-              asChild
-              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
-            >
-              <Link
-                to="/servicios/libros"
-                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
-              >
-                Libros
-              </Link>
-            </NavigationMenuLink>
-          </li>
+      <li>
+        <NavigationMenuLink asChild className="hover:bg-[hsl(var(--color-primary-soft))] text-white">
+          <Link
+            to="/servicios/series"
+            className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+          >
+            Series
+          </Link>
+        </NavigationMenuLink>
+      </li>
 
-          <li>
-            <NavigationMenuLink
-              asChild
-              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
-            >
-              <Link
-                to="/servicios/videojuegos"
-                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
-              >
-                Videojuegos
-              </Link>
-            </NavigationMenuLink>
-          </li>
-        </ul>
-      </NavigationMenuContent>
-    </NavigationMenuItem>
+      <li>
+        <NavigationMenuLink asChild className="hover:bg-[hsl(var(--color-primary-soft))] text-white">
+          <Link
+            to="/servicios/libros"
+            className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+          >
+            Libros
+          </Link>
+        </NavigationMenuLink>
+      </li>
 
-    {/* LISTAS — dropdown (idéntico a Servicios, solo cambian los enlaces) */}
-    <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
-      <NavigationMenuTrigger>Listas</NavigationMenuTrigger>
+      <li>
+        <NavigationMenuLink asChild className="hover:bg-[hsl(var(--color-primary-soft))] text-white">
+          <Link
+            to="/servicios/videojuegos"
+            className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+          >
+            Videojuegos
+          </Link>
+        </NavigationMenuLink>
+      </li>
+    </ul>
+  </NavigationMenuContent>
+</NavigationMenuItem>
 
-      <NavigationMenuContent
-        className="
-          rounded-lg
-          border border-[hsl(var(--color-border-subtle))]
-          bg-[hsl(var(--color-primary-strong))]
-          text-white
-          shadow-lg
-        "
-      >
-        <ul className="flex w-52 flex-col py-2">
-          <li>
-            <NavigationMenuLink
-              asChild
-              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
-            >
-              <Link
-                to="/listas"
-                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
-              >
-                Genéricas
-              </Link>
-            </NavigationMenuLink>
-          </li>
 
-          <li>
-            <NavigationMenuLink
-              asChild
-              className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
-            >
-              <Link
-                to="/mis-listas"
-                className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
-              >
-                Creadas por mí
-              </Link>
-            </NavigationMenuLink>
-          </li>
-        </ul>
-      </NavigationMenuContent>
-    </NavigationMenuItem>
+{/* LISTAS — texto clicable a /listas + dropdown */}
+<NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
+  <NavigationMenuTrigger>
+    <span
+      onClick={(e) => {
+        e.preventDefault(); // evita que abra/cierre el dropdown
+        e.stopPropagation(); // evita que el trigger reciba el click
+        navigate("/listas"); // navega a /listas
+      }}
+      className="cursor-pointer"
+    >
+      Listas
+    </span>
+  </NavigationMenuTrigger>
+
+  <NavigationMenuContent
+    className="
+      rounded-lg
+      border border-[hsl(var(--color-border-subtle))]
+      bg-[hsl(var(--color-primary-strong))]
+      text-white
+      shadow-lg
+    "
+  >
+    <ul className="flex w-52 flex-col py-2">
+      <li>
+        <NavigationMenuLink
+          asChild
+          className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+        >
+          <Link
+            to="/listas"
+            className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+          >
+            Genéricas
+          </Link>
+        </NavigationMenuLink>
+      </li>
+
+      <li>
+        <NavigationMenuLink
+          asChild
+          className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
+        >
+          <Link
+            to="/mis-listas"
+            className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
+          >
+            Creadas por mí
+          </Link>
+        </NavigationMenuLink>
+      </li>
+    </ul>
+  </NavigationMenuContent>
+</NavigationMenuItem>
+
+
+
+
 
     {/* COMUNIDAD — link directo */}
     <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
@@ -281,6 +295,8 @@ export function Header() {
           </button>
         </div>
       </div>
+      <AppBreadcrumb />
     </header>
+    
   );
 }
