@@ -1,5 +1,5 @@
 // src/services/fetchSeries.ts
-const API_BASE = "http://localhost:5000";
+const API_BASE = "https://tfg-web-valoraciones-back-i9b5.onrender.com";
 
 export async function fetchSeries(path: string = "") {
   const url = `${API_BASE}/series/${path}`.replace(/\/+$/, "/"); // asegura trailing "/"

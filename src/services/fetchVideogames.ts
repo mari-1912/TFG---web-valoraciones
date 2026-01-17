@@ -1,4 +1,4 @@
-const API = "http://localhost:5000";
+const API = "https://tfg-web-valoraciones-back-i9b5.onrender.com";
 
 export async function fetchVideoGames(q?: string, pageSize?: number) {
   const params = new URLSearchParams();
