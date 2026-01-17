@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 
 import SectionBooks from "../components/products/books-section";
 import SectionVideoGames from "../components/products/video-games-section";
@@ -26,13 +26,21 @@ export default function ServicesList() {
   const [duration, setDuration] = useState<DurationKey>("all");
   const [date, setDate] = useState<DateKey>("all");
   const { pathname } = useLocation();
+  const { categoria } = useParams<{ categoria?: ServiceCategory }>();
 
   useEffect(() => {
+    if (categoria) {
+      if (categoria === "peliculas") setCategory("peliculas");
+      if (categoria === "series") setCategory("series");
+      if (categoria === "libros") setCategory("libros");
+      if (categoria === "videojuegos") setCategory("videojuegos");
+      return;
+    }
     if (pathname === "/peliculas") setCategory("peliculas");
     if (pathname === "/series") setCategory("series");
     if (pathname === "/libros") setCategory("libros");
     if (pathname === "/videojuegos") setCategory("videojuegos");
-  }, [pathname]);
+  }, [categoria, pathname]);
 
   // -------------------------
   // Géneros por categoría (mock)
