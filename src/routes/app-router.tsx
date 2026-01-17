@@ -13,6 +13,11 @@ export const RoutesComponent = () => {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/home" element={<HomePage />} />
+      <Route path="/peliculas" element={<ServicesPage />} />
+      <Route path="/series" element={<ServicesPage />} />
+      <Route path="/libros" element={<ServicesPage />} />
+      <Route path="/videojuegos" element={<ServicesPage />} />
       <Route path="/inicio" element={<IndexPage />} />
       <Route path="/servicios" element={<ServicesPage />} />
       <Route path="/listas" element={<ListCategoriesPage  />} />

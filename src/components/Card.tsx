@@ -93,12 +93,12 @@ export default function Card(props: CardProps) {
   const fallbackDescription = `${generosTxt}${generosTxt ? " • " : ""}${anio_lanzamiento}`;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-lg transition">
+    <div className="bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-lg transition w-full max-w-[240px] mx-auto">
       {portada ? (
         <img
           src={portada}
           alt={titulo}
-          className="rounded-md mb-4 object-cover h-48 w-full"
+          className="rounded-md mb-4 w-full aspect-[2/3] object-cover"
           loading="lazy"
         />
       ) : null}
