@@ -13,7 +13,7 @@ export type FeaturedItem = {
     videojuego: FeaturedItem;
   };
   
-  const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+  const API_URL = import.meta.env.VITE_API_URL ?? "https://tfg-web-valoraciones-back-i9b5.onrender.com";
   
   export async function fetchFeaturedRandom(): Promise<FeaturedRandomResponse> {
     const res = await fetch(`${API_URL}/home/featured-random`, {
