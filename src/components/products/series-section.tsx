@@ -23,12 +23,21 @@ function normalizePlataformas(value?: string): string | string[] | undefined {
   return value;
 }
 
-export default function SectionSeries() {
+type SectionSeriesProps = {
+  compact?: boolean;
+  hideHeading?: boolean;
+};
+
+export default function SectionSeries({
+  compact = false,
+  hideHeading = false,
+}: SectionSeriesProps) {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
   const [seriesList, setSeriesList] = useState<SerieBackend[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const sectionClass = compact ? "my-0 max-w-none" : "my-8 max-w-5xl mx-auto";
 
   useEffect(() => {
     const load = async () => {
@@ -57,11 +66,13 @@ export default function SectionSeries() {
     setStartIndex((prev) => Math.min(prev + itemsPerPage, Math.max(totalItems - itemsPerPage, 0)));
 
   return (
-    <section className="my-8 max-w-5xl mx-auto">
-      <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-        <Tv className="text-purple-500" size={28} />
-        Series
-      </h3>
+    <section className={sectionClass}>
+      {!hideHeading ? (
+        <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+          <Tv className="text-purple-500" size={28} />
+          Series
+        </h3>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-gray-500">Cargando series…</p>

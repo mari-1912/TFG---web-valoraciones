@@ -84,7 +84,7 @@ export function Header() {
         {/* LOGO */}
         <div
           className="flex cursor-pointer items-center gap-2 text-2xl font-extrabold"
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/home")}
         >
           Opinify
           <CircleStar size={22} />

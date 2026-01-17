@@ -4,11 +4,20 @@ import { useNavigate } from "react-router-dom";
 import { Gamepad2 } from "lucide-react";
 import { fetchVideoGames } from "../../services/fetchVideogames";
 
-export default function SectionVideoGames() {
+type SectionVideoGamesProps = {
+  compact?: boolean;
+  hideHeading?: boolean;
+};
+
+export default function SectionVideoGames({
+  compact = false,
+  hideHeading = false,
+}: SectionVideoGamesProps) {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
   const navigate = useNavigate();
   const [games, setGames] = useState<any[]>([]);
+  const sectionClass = compact ? "my-0 max-w-none" : "my-8 max-w-5xl mx-auto";
 
   useEffect(() => {
     const loadVideoGames = async () => {
@@ -43,11 +52,13 @@ export default function SectionVideoGames() {
   };
 
   return (
-    <section className="my-8 max-w-5xl mx-auto">
-      <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-        <Gamepad2 className="text-purple-500" size={28} />
-        Videojuegos
-      </h3>
+    <section className={sectionClass}>
+      {!hideHeading ? (
+        <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+          <Gamepad2 className="text-purple-500" size={28} />
+          Videojuegos
+        </h3>
+      ) : null}
       <div className="relative">
         <button
           onClick={handlePrev}

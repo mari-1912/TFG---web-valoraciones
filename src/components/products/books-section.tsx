@@ -17,7 +17,15 @@ type Book = {
   precio?: number;
 };
 
-export default function SectionBooks() {
+type SectionBooksProps = {
+  compact?: boolean;
+  hideHeading?: boolean;
+};
+
+export default function SectionBooks({
+  compact = false,
+  hideHeading = false,
+}: SectionBooksProps) {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
   const navigate = useNavigate();
@@ -25,6 +33,9 @@ export default function SectionBooks() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const sectionClass = compact ? "my-0 max-w-none" : "my-8 max-w-5xl mx-auto";
+  const helperTextClass = compact ? "text-gray-500" : "text-white/70";
+  const errorTextClass = compact ? "text-red-500" : "text-red-400";
 
   useEffect(() => {
     let alive = true;
@@ -67,16 +78,18 @@ export default function SectionBooks() {
     );
 
   return (
-    <section className="my-8 max-w-5xl mx-auto">
-      <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-        <BookOpen className="text-purple-500" size={28} />
-        Libros
-      </h3>
+    <section className={sectionClass}>
+      {!hideHeading ? (
+        <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+          <BookOpen className="text-purple-500" size={28} />
+          Libros
+        </h3>
+      ) : null}
 
-      {loading && <div className="mx-12 text-white/70">Cargando…</div>}
-      {error && <div className="mx-12 text-red-400">Error: {error}</div>}
+      {loading && <div className={`mx-12 ${helperTextClass}`}>Cargando…</div>}
+      {error && <div className={`mx-12 ${errorTextClass}`}>Error: {error}</div>}
       {!loading && !error && totalItems === 0 && (
-        <div className="mx-12 text-white/70">No hay libros para mostrar.</div>
+        <div className={`mx-12 ${helperTextClass}`}>No hay libros para mostrar.</div>
       )}
 
       {!loading && !error && totalItems > 0 && (

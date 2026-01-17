@@ -253,34 +253,6 @@ useEffect(() => {
             </div>
           </div>
         </section>
-
-        {/* RECOMENDACIONES */}
-        <section className="space-y-6">
-          <div className="flex flex-col items-center text-center">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Échale un ojo a nuestras recomendaciones
-            </h2>
-
-            <p className="mt-2 text-sm text-gray-600 max-w-md">
-              Sugerencias personalizadas y tendencias para que siempre encuentres
-              algo nuevo.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {["Título 1", "Título 2"].map((t) => (
-              <div
-                key={t}
-                className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden"
-              >
-                <div className="h-40 bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
-                  IMAGEN
-                </div>
-                <div className="p-4 text-sm text-gray-700">{t}</div>
-              </div>
-            ))}
-          </div>
-        </section>
       </div>
 
       {/* FOOTER */}

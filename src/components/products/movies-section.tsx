@@ -5,11 +5,20 @@ import { Popcorn } from "lucide-react";
 import { fetchMovies } from "../../services/fetchMovies";
 import { Button } from "../ui/button";
 
-export default function SectionMovies() {
+type SectionMoviesProps = {
+  compact?: boolean;
+  hideHeading?: boolean;
+};
+
+export default function SectionMovies({
+  compact = false,
+  hideHeading = false,
+}: SectionMoviesProps) {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
   const navigate = useNavigate();
   const [movies, setMovies] = useState<any[]>([]);
+  const sectionClass = compact ? "my-0 max-w-none" : "my-8 max-w-5xl mx-auto";
 
   useEffect(() => {
     const loadMovies = async () => {
@@ -43,11 +52,13 @@ export default function SectionMovies() {
   };
 
   return (
-    <section className="my-8 max-w-5xl mx-auto">
-      <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-        <Popcorn className="text-purple-500" size={28} />
-        Películas
-      </h3>
+    <section className={sectionClass}>
+      {!hideHeading ? (
+        <h3 className="text-3xl font-extrabold mb-6 bg-linear-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+          <Popcorn className="text-purple-500" size={28} />
+          Películas
+        </h3>
+      ) : null}
 
       <div className="relative">
         <Button
@@ -67,7 +78,7 @@ export default function SectionMovies() {
           {visibleItems.map((m) => (
             <div
               key={m.id}
-              onClick={() => navigate(`/peliculas/${m.id}`)}
+              onClick={() => navigate(`/detail/pelicula/${m.id}`)}
               className="cursor-pointer hover:scale-105 transform transition"
             >
               <Card
