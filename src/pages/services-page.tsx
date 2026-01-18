@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import SectionBooks from "../components/products/books-section";
 import SectionVideoGames from "../components/products/video-games-section";
@@ -20,13 +20,14 @@ export default function ServicesList() {
   // -------------------------
   // Estado de filtros
   // -------------------------
-  const [category, setCategory] = useState<ServiceCategory>("peliculas");
+  const [category, setCategory] = useState<ServiceCategory | null>(null);
   const [sort, setSort] = useState<SortKey>("az");
   const [genre, setGenre] = useState<string>("");
   const [duration, setDuration] = useState<DurationKey>("all");
   const [date, setDate] = useState<DateKey>("all");
   const { pathname } = useLocation();
-  const { categoria } = useParams<{ categoria?: ServiceCategory }>();
+  const { categoria } = useParams<{ categoria?: string }>();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (categoria) {
@@ -34,6 +35,10 @@ export default function ServicesList() {
       if (categoria === "series") setCategory("series");
       if (categoria === "libros") setCategory("libros");
       if (categoria === "videojuegos") setCategory("videojuegos");
+      return;
+    }
+    if (pathname === "/servicios" || pathname === "/servicios/") {
+      setCategory(null);
       return;
     }
     if (pathname === "/peliculas") setCategory("peliculas");
@@ -72,7 +77,15 @@ export default function ServicesList() {
           {/* Filtros */}
           <ServicesFilters
             category={category}
-            onCategoryChange={setCategory}
+            onCategoryChange={(next) => {
+              if (next == null) {
+                setCategory(null);
+                navigate("/servicios");
+                return;
+              }
+              setCategory(next);
+              navigate(`/servicios/${next}`);
+            }}
             sort={sort}
             onSortChange={setSort}
             genre={genre}
@@ -86,6 +99,14 @@ export default function ServicesList() {
 
           {/* Contenido según categoría */}
           <div className="mx-auto w-full max-w-7xl px-6">
+            {category == null ? (
+              <>
+                <SectionMovies />
+                <SectionSeries />
+                <SectionBooks />
+                <SectionVideoGames />
+              </>
+            ) : null}
             {category === "peliculas" && <SectionMovies />}
             {category === "series" && <SectionSeries />}
             {category === "libros" && <SectionBooks />}

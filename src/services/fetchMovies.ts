@@ -1,5 +1,7 @@
 // src/services/fetchMovies.ts
-const API = "https://tfg-web-valoraciones-back-i9b5.onrender.com";
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  "https://tfg-web-valoraciones-back-i9b5.onrender.com";
 
 export async function fetchMovies(q?: string, pageSize?: number) {
   const params = new URLSearchParams();
@@ -13,7 +15,8 @@ export async function fetchMovies(q?: string, pageSize?: number) {
   }
 
   const query = params.toString();
-  const url = `${API}/peliculas${query ? `?${query}` : ""}`;
+  const base = `${API_URL}/peliculas/`.replace(/\/+$/, "/");
+  const url = `${base}${query ? `?${query}` : ""}`;
 
   const res = await fetch(url);
 

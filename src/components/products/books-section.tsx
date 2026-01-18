@@ -45,7 +45,7 @@ export default function SectionBooks({
         setLoading(true);
         setError(null);
 
-        const data = await fetchBooks();
+        const data = await fetchBooks("", 20);
         if (!alive) return;
 
         setBooks(Array.isArray(data) ? data : []);
