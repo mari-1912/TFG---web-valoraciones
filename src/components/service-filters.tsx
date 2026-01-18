@@ -6,8 +6,8 @@ export type DurationKey = "all" | "short" | "medium" | "long";
 export type DateKey = "all" | "2025" | "2024" | "2023" | "older";
 
 type Props = {
-  category: ServiceCategory;
-  onCategoryChange: (v: ServiceCategory) => void;
+  category: ServiceCategory | null;
+  onCategoryChange: (v: ServiceCategory | null) => void;
 
   sort: SortKey;
   onSortChange: (v: SortKey) => void;
@@ -51,28 +51,38 @@ export function ServicesFilters({
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => onCategoryChange("peliculas")}
+            onClick={() =>
+              onCategoryChange(category === "peliculas" ? null : "peliculas")
+            }
             className={`${tabBase} ${category === "peliculas" ? tabActive : tabIdle}`}
           >
             Películas
           </button>
           <button
             type="button"
-            onClick={() => onCategoryChange("series")}
+            onClick={() =>
+              onCategoryChange(category === "series" ? null : "series")
+            }
             className={`${tabBase} ${category === "series" ? tabActive : tabIdle}`}
           >
             Series
           </button>
           <button
             type="button"
-            onClick={() => onCategoryChange("videojuegos")}
+            onClick={() =>
+              onCategoryChange(
+                category === "videojuegos" ? null : "videojuegos"
+              )
+            }
             className={`${tabBase} ${category === "videojuegos" ? tabActive : tabIdle}`}
           >
             Videojuegos
           </button>
           <button
             type="button"
-            onClick={() => onCategoryChange("libros")}
+            onClick={() =>
+              onCategoryChange(category === "libros" ? null : "libros")
+            }
             className={`${tabBase} ${category === "libros" ? tabActive : tabIdle}`}
           >
             Libros
