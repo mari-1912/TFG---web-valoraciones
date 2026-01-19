@@ -39,16 +39,56 @@ export default function SectionBooks({
 
   useEffect(() => {
     let alive = true;
-
     const loadBooks = async () => {
       try {
         setLoading(true);
-        setError(null);
-
+        setError(null)
         const data = await fetchBooks("", 20);
+        console.log("LIBROS BACKEND:", data);
         if (!alive) return;
-
-        setBooks(Array.isArray(data) ? data : []);
+        const items = Array.isArray(data)
+          ? data
+          : data?.items ??
+            data?.data ??
+            data?.results ??
+            data?.libros ??
+            data?.books ??
+            data?.data?.items ??
+            data?.data?.results ??
+            data?.data?.libros ??
+            data?.data?.books;
+        const normalized = Array.isArray(items)
+          ? items
+              .map((book: any) => ({
+                id: book?.id ?? book?._id,
+                titulo: book?.titulo ?? book?.title ?? book?.nombre,
+                generos:
+                  book?.generos ??
+                  book?.genero ??
+                  book?.genres ??
+                  book?.categoria ??
+                  "",
+                anio_lanzamiento:
+                  book?.anio_lanzamiento ??
+                  book?.anioLanzamiento ??
+                  book?.year ??
+                  book?.anio ??
+                  0,
+                portada:
+                  book?.portada ??
+                  book?.poster ??
+                  book?.image ??
+                  book?.imagen ??
+                  book?.cover ??
+                  "",
+                paginas: book?.paginas ?? book?.pages,
+                autor: book?.autor ?? book?.author,
+                editorial: book?.editorial ?? book?.publisher,
+                precio: book?.precio ?? book?.price,
+              }))
+              .filter((book) => book.id != null)
+          : [];
+        setBooks(normalized);
         setStartIndex(0);
       } catch (e) {
         if (!alive) return;
