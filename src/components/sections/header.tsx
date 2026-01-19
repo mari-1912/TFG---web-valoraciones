@@ -91,7 +91,7 @@ export function Header() {
         </div>
 
         {/* NAVIGATION MENU SHADCN */}
-        <NavigationMenu className="hidden md:flex">
+        <NavigationMenu className="hidden md:flex" /*</div>viewport={isMobile}*/>
   <NavigationMenuList className="flex-wrap">
 
     {/* INICIO — link directo */}
