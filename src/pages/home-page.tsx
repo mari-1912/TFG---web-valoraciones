@@ -4,7 +4,7 @@ import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import BackgroundImg from "@/img/bg-img.avif"
 import { useEffect, useState } from "react";
-import { fetchFeaturedRandom, type FeaturedRandomResponse, type FeaturedItem } from "../services/fetch-featured-random";
+import { fetchFeaturedRandom, type FeaturedRandomResponse } from "../services/fetch-featured-random";
 import FeaturedCard from "@/components/featured-card";
 import { fetchMostViewedWeek, type MostViewedWeekResponse } from "../services/fetch-most-viewed-week";
 import MostViewedCard from "@/components/most-viewed-card";

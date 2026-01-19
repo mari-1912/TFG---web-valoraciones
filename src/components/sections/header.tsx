@@ -21,7 +21,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 
-import { useIsMobile } from "@/hooks/use-mobile";
+//import { useIsMobile } from "@/hooks/use-mobile";
 import { AppBreadcrumb } from "../global-breadcrumb";
 
 type Item = {
@@ -42,7 +42,7 @@ const datasets: Record<string, Item[]> = {
 };
 
 export function Header() {
-  const isMobile = useIsMobile();
+  ///const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
 

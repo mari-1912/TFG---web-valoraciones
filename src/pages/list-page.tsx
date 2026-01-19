@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Popcorn, Tv, Gamepad2, BookOpen } from "lucide-react";
 
 import { Header } from "../components/sections/header";

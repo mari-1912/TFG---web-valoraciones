@@ -2,14 +2,17 @@ import { useState } from "react";
 import { registerUser } from "../services/auth-service";
 import { useNavigate } from "react-router-dom";
 
+type RegisterFormProps = {
+  onClose?: () => void;
+};
 
-export default function RegisterForm() {
+export default function RegisterForm({ onClose }: RegisterFormProps) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
-   const navigate = useNavigate();
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +29,7 @@ export default function RegisterForm() {
       localStorage.setItem("currentUser", username);
 
       setTimeout(() => {
+        onClose?.();
         navigate("/inicio"); // 👈 redirige al inicio
       }, 1000);
     }
