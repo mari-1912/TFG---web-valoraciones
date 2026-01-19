@@ -1,10 +1,12 @@
 type CardProps = {
   // ✅ comunes (contenidos)
-  id: number | string;
-  titulo: string;
-  generos: string | string[];
-  anio_lanzamiento: number;
+  id?: number | string;
+  titulo?: string;
+  title?: string;
+  generos?: string | string[];
+  anio_lanzamiento?: number;
   portada?: string;
+  imgSrc?: string;
 
   // ✅ UI (opcionales)
   rating?: number; // 0..5
@@ -39,9 +41,11 @@ function joinMaybe(value?: string | string[]) {
 export default function Card(props: CardProps) {
   const {
     titulo,
+    title,
     generos,
     anio_lanzamiento,
     portada,
+    imgSrc,
     rating,
     description,
 
@@ -62,6 +66,9 @@ export default function Card(props: CardProps) {
     duracion,
     consolas,
   } = props;
+
+  const resolvedTitle = titulo ?? title ?? "";
+  const resolvedCover = portada ?? imgSrc;
 
   const generosTxt = joinMaybe(generos);
   const plataformasTxt = joinMaybe(plataformas);
@@ -90,20 +97,23 @@ export default function Card(props: CardProps) {
   const metaLine = metaParts.join(" • ");
 
   // Si no te viene sinopsis “real”, usamos una descripción base coherente
-  const fallbackDescription = `${generosTxt}${generosTxt ? " • " : ""}${anio_lanzamiento}`;
+  const fallbackParts: string[] = [];
+  if (generosTxt) fallbackParts.push(generosTxt);
+  if (anio_lanzamiento != null) fallbackParts.push(String(anio_lanzamiento));
+  const fallbackDescription = fallbackParts.join(" • ");
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-lg transition w-full max-w-[240px] mx-auto">
-      {portada ? (
+      {resolvedCover ? (
         <img
-          src={portada}
-          alt={titulo}
+          src={resolvedCover}
+          alt={resolvedTitle}
           className="rounded-md mb-4 w-full aspect-[2/3] object-cover"
           loading="lazy"
         />
       ) : null}
 
-      <h4 className="text-lg font-semibold mb-1">{titulo}</h4>
+      <h4 className="text-lg font-semibold mb-1">{resolvedTitle}</h4>
 
       <p className="text-gray-600 text-sm mb-2 line-clamp-3">
         {description?.trim() ? description : fallbackDescription}

@@ -1,5 +1,3 @@
-import * as React from "react";
-
 export type ServiceCategory = "peliculas" | "series" | "videojuegos" | "libros";
 export type SortKey = "az" | "za" | "rating_high" | "rating_low" | "newest" | "oldest";
 export type DurationKey = "all" | "short" | "medium" | "long";
