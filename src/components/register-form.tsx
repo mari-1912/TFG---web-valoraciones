@@ -30,7 +30,7 @@ export default function RegisterForm({ onClose }: RegisterFormProps) {
 
       setTimeout(() => {
         onClose?.();
-        navigate("/inicio"); // 👈 redirige al inicio
+        navigate("/home");
       }, 1000);
     }
   };

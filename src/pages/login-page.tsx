@@ -15,8 +15,9 @@ export default function LoginPage() {
       // guardar estado simulado de sesión (solo frontend)
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("userRole", "admin");
+      localStorage.setItem("currentUser", "admin");
 
-      navigate("/inicio"); // o a donde quieras llevarlo tras login
+      navigate("/home"); // o a donde quieras llevarlo tras login
     } else {
       setError("Usuario o contraseña incorrectos.");
     }

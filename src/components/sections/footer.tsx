@@ -21,7 +21,7 @@ export default function Footer() {
           <h3 className="font-semibold mb-4">Enlaces</h3>
           <ul className="space-y-2">
             <li>
-              <Link to="/inicio" className="hover:text-indigo-400 transition">
+              <Link to="/home" className="hover:text-indigo-400 transition">
                 Inicio
               </Link>
             </li>
