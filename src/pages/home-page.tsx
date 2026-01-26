@@ -1,5 +1,5 @@
 import LoginForm from "../components/login-form";
-import RegisterPage from "../pages/register-page";
+import RegisterForm from "../components/register-form";
 import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import BackgroundImg from "@/img/bg-img.avif"
@@ -100,28 +100,11 @@ useEffect(() => {
       {/* Spacer: evita que el contenido se meta debajo del header fijo */}
       <div className="h-[64px] md:h-[72px]" />
 
-      {/* MODAL auth */}
-      {activeForm && (
-        <section className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4">
-          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl animate-fade-in">
-            <button
-              onClick={() => setActiveForm(null)}
-              className="absolute right-3 top-2 text-2xl leading-none text-gray-500 hover:text-gray-800"
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
-
-            <div className="p-6">
-              {activeForm === "login" && (
-                <LoginForm onClose={() => setActiveForm(null)} />
-              )}
-              {activeForm === "register" && (
-                <RegisterPage onClose={() => setActiveForm(null)} />
-              )}
-            </div>
-          </div>
-        </section>
+      {activeForm === "login" && (
+        <LoginForm onClose={() => setActiveForm(null)} />
+      )}
+      {activeForm === "register" && (
+        <RegisterForm onClose={() => setActiveForm(null)} />
       )}
 
       {/* CONTENIDO */}
