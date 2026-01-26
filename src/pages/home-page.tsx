@@ -1,5 +1,5 @@
 import LoginForm from "../components/login-form";
-import RegisterForm from "../components/register-form";
+import RegisterPage from "../pages/register-page";
 import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import BackgroundImg from "@/img/bg-img.avif"
@@ -117,7 +117,7 @@ useEffect(() => {
                 <LoginForm onClose={() => setActiveForm(null)} />
               )}
               {activeForm === "register" && (
-                <RegisterForm onClose={() => setActiveForm(null)} />
+                <RegisterPage onClose={() => setActiveForm(null)} />
               )}
             </div>
           </div>

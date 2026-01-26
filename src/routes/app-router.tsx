@@ -7,7 +7,7 @@ import ListCategoriesPage from "../pages/list-categories-page";
 import ListasPorCategoria from "../pages/list-page";
 import MyListsPage from "../pages/my-lists-page";
 import CommunityPage from "../pages/community-page";
-import RegisterForm from "../pages/register-page";
+import RegisterPage from "../pages/register-page";
 
 export const RoutesComponent = () => {
   return (
@@ -26,7 +26,7 @@ export const RoutesComponent = () => {
       <Route path="/mis-listas" element={<MyListsPage />} />
       <Route path="/comunidad" element={<CommunityPage/>} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/registro" element={<RegisterForm/>} />
+      <Route path="/registro" element={<RegisterPage/>} />
       <Route path="/detail/:type/:id" element={<DetailPage />} />
     </Routes>
   );
