@@ -1,57 +1,144 @@
-// src/services/authService.ts
+// src/services/auth-service.ts
 
-interface User {
+export type AuthUser = {
+  user_id: number;
+  email: string;
+  role: string;
+  username?: string; // (opcional si el backend lo devuelve en /auth/me)
+};
+
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+
+async function api(path: string, options: RequestInit = {}) {
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
+    credentials: "include", // <-- CLAVE: enviar/recibir cookies HttpOnly
+    ...options,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
+/**
+ * REGISTER real contra backend
+ * POST /auth/register  body: { email, username, password }
+ * -> backend setea cookie access_token y puede devolver { user, message }
+ */
+export async function registerUser(payload: {
   username: string;
   email: string;
   password: string;
-  role?: string;
-}
+}): Promise<{ success: boolean; message: string }> {
+  const { res, data } = await api("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
-export function registerUser(newUser: User): { success: boolean; message: string } {
-  const users = JSON.parse(localStorage.getItem("users") || "[]");
-
-  // Comprobar si ya existe un usuario con ese email
-  const existingUser = users.find((u: User) => u.email === newUser.email);
-  if (existingUser) {
-    return { success: false, message: "Ya existe una cuenta con ese correo." };
+  if (!res.ok) {
+    return {
+      success: false,
+      message: data?.message ?? "Registro fallido.",
+    };
   }
 
-  // Guardar el nuevo usuario
-  users.push(newUser);
-  localStorage.setItem("users", JSON.stringify(users));
-
-  return { success: true, message: "Registro exitoso." };
-}
-
-export function loginUser(email: string, password: string): { success: boolean; message: string; user?: User } {
-  const users = JSON.parse(localStorage.getItem("users") || "[]");
-  const user = users.find((u: User) => u.email === email && u.password === password);
-
-  if (!user) {
-    return { success: false, message: "Credenciales incorrectas." };
-  }
+  // Como el backend setea cookie, ya estás autenticado.
+  // Mantenemos localStorage para compatibilidad con el resto de la app.
+  const username = data?.user?.username ?? payload.username;
+  const role = (data?.user?.tipo ?? "base").toString().toLowerCase();
 
   localStorage.setItem("isLoggedIn", "true");
-  localStorage.setItem("userRole", user.role || "usuario");
-  localStorage.setItem("currentUser", user.username);
+  localStorage.setItem("userRole", role);
+  localStorage.setItem("currentUser", username);
 
-  return { success: true, message: "Inicio de sesión correcto.", user };
+  return { success: true, message: data?.message ?? "Registro exitoso." };
 }
 
-export function logoutUser() {
+/**
+ * LOGIN real contra backend
+ * POST /auth/login  body: { email, password }
+ * -> backend setea cookie access_token
+ */
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<{ success: boolean; message: string }> {
+  const { res, data } = await api("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!res.ok) {
+    return {
+      success: false,
+      message: data?.message ?? "Credenciales inválidas.",
+    };
+  }
+
+  // Cookie ya puesta: sincronizamos datos llamando a /auth/me
+  const me = await getMe();
+  if (me.success && me.user) {
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("userRole", (me.user.role ?? "base").toLowerCase());
+    localStorage.setItem(
+      "currentUser",
+      me.user.username ?? me.user.email ?? ""
+    );
+  } else {
+    // Aunque /me falle por lo que sea, consideramos login hecho
+    localStorage.setItem("isLoggedIn", "true");
+  }
+
+  return { success: true, message: data?.message ?? "Login correcto." };
+}
+
+/**
+ * LOGOUT real
+ * POST /auth/logout -> borra cookie
+ */
+export async function logoutUser(): Promise<void> {
+  await api("/auth/logout", { method: "POST" });
+
   localStorage.removeItem("isLoggedIn");
   localStorage.removeItem("userRole");
   localStorage.removeItem("currentUser");
+  localStorage.removeItem("rememberMe");
 }
 
+/**
+ * ME real
+ * GET /auth/me -> { user_id, email, role } (y opcional username)
+ */
+export async function getMe(): Promise<{
+  success: boolean;
+  user?: AuthUser;
+  message?: string;
+}> {
+  const { res, data } = await api("/auth/me", { method: "GET" });
 
-/*CUANDO ESTE EL BACK SE CAMBIA POR ALGO COMO ESTO:
-export async function registerUser(newUser: User) {
-  const response = await fetch("https://tuapi.com/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(newUser),
-  });
-  return await response.json();
+  if (!res.ok) {
+    // Si la cookie no es válida, limpiamos estado local
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("currentUser");
+    return { success: false, message: data?.message ?? "No autenticado." };
+  }
+
+  return { success: true, user: data as AuthUser };
 }
-*/
+
+/**
+ * Arranque: hace que tu app refleje la sesión real (cookie).
+ * Útil para recargas: si hay cookie válida, te marca isLoggedIn.
+ */
+export async function bootstrapAuth(): Promise<void> {
+  const me = await getMe();
+  if (me.success && me.user) {
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("userRole", (me.user.role ?? "base").toLowerCase());
+    localStorage.setItem(
+      "currentUser",
+      me.user.username ?? me.user.email ?? ""
+    );
+  }
+}

@@ -7,7 +7,7 @@ import ListCategoriesPage from "../pages/list-categories-page";
 import ListasPorCategoria from "../pages/list-page";
 import MyListsPage from "../pages/my-lists-page";
 import CommunityPage from "../pages/community-page";
-import RegisterForm from "../components/register-form";
+import RegisterForm from "../pages/register-page";
 
 export const RoutesComponent = () => {
   return (
