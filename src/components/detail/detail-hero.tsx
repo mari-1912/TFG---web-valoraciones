@@ -1,5 +1,4 @@
 type DetailHeroProps = {
-  type?: string;
   typeLabel: string;
   title: string;
   description: string;
@@ -9,26 +8,20 @@ type DetailHeroProps = {
   isYouTube: boolean;
   apiRatingLabel: string;
   ourRatingLabel: string;
-  yearLabel: string;
-  durationLabel: string;
-  pagesLabel: string;
-  genresText: string;
   hasOurRating: boolean;
   ourRating: number | null;
-  plataformasLabel: string;
-  bookMeta: {
-    author: string;
-    editorial: string;
-    isbn: string;
-    format: string;
-    language: string;
-    saga: string;
-  };
   meta: Array<{ label: string; value: string }>;
+  addLabel: string;
+  addDisabled?: boolean;
+  onAddToWatchlist?: () => void;
+  addMessage?: string | null;
+  markLabel: string;
+  markDisabled?: boolean;
+  onMarkWatched?: () => void;
+  markMessage?: string | null;
 };
 
 export function DetailHero({
-  type,
   typeLabel,
   title,
   description,
@@ -38,18 +31,18 @@ export function DetailHero({
   isYouTube,
   apiRatingLabel,
   ourRatingLabel,
-  yearLabel,
-  durationLabel,
-  pagesLabel,
-  genresText,
   hasOurRating,
   ourRating,
-  plataformasLabel,
-  bookMeta,
   meta,
+  addLabel,
+  addDisabled,
+  onAddToWatchlist,
+  addMessage,
+  markLabel,
+  markDisabled,
+  onMarkWatched,
+  markMessage,
 }: DetailHeroProps) {
-  const isBook = type === "libro";
-
   return (
     <section className="relative overflow-hidden rounded-3xl border border-gray-200 bg-neutral-900 text-white shadow-sm">
       {image ? (
@@ -102,12 +95,6 @@ export function DetailHero({
             <span className="rounded-full border border-yellow-400/40 px-3 py-1">
               Opinify {ourRatingLabel}
             </span>
-            <span className="rounded-full border border-white/20 px-3 py-1 text-gray-200">
-              Año {yearLabel}
-            </span>
-            <span className="rounded-full border border-white/20 px-3 py-1 text-gray-200">
-              {isBook ? `Páginas ${pagesLabel}` : `Duración ${durationLabel}`}
-            </span>
           </div>
 
           {hasOurRating ? (
@@ -120,51 +107,30 @@ export function DetailHero({
             <div className="text-sm text-gray-300">⭐ null</div>
           )}
 
-          {genresText ? (
-            <p className="text-xs uppercase tracking-widest text-gray-300">
-              {genresText}
-            </p>
-          ) : null}
-
           <p className="max-w-2xl text-sm leading-relaxed text-gray-200">
             {description?.trim() ? description : "Sin descripción disponible."}
           </p>
 
-          {isBook ? (
-            <div className="space-y-1 text-sm text-gray-200">
-              <p>
-                <span className="font-semibold text-white">Autor:</span>{" "}
-                {bookMeta.author}
-              </p>
-              <p>
-                <span className="font-semibold text-white">Editorial:</span>{" "}
-                {bookMeta.editorial}
-              </p>
-              <p>
-                <span className="font-semibold text-white">ISBN:</span>{" "}
-                {bookMeta.isbn}
-              </p>
-              <p>
-                <span className="font-semibold text-white">Formato:</span>{" "}
-                {bookMeta.format}
-              </p>
-              <p>
-                <span className="font-semibold text-white">Idioma:</span>{" "}
-                {bookMeta.language}
-              </p>
-              <p>
-                <span className="font-semibold text-white">
-                  Saga/Colección:
-                </span>{" "}
-                {bookMeta.saga}
-              </p>
+          {meta.length > 0 ? (
+            <div className="pt-4 border-t border-white/10">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-yellow-300">
+                Ficha técnica
+              </h2>
+              <dl className="mt-3 grid grid-cols-1 gap-3 text-sm text-gray-200 sm:grid-cols-2">
+                {meta.map((entry) => (
+                  <div
+                    key={`${entry.label}-${entry.value}`}
+                    className="rounded-lg border border-white/10 bg-black/40 px-3 py-2"
+                  >
+                    <dt className="text-[11px] uppercase tracking-wider text-gray-400">
+                      {entry.label}
+                    </dt>
+                    <dd className="mt-1 text-sm text-white">{entry.value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-          ) : (
-            <p className="text-sm text-gray-200">
-              <span className="font-semibold text-white">Plataformas:</span>{" "}
-              {plataformasLabel}
-            </p>
-          )}
+          ) : null}
         </div>
 
         <div className="space-y-3">
@@ -182,71 +148,77 @@ export function DetailHero({
             </p>
           </div>
 
-          <button className="w-full rounded-xl border border-yellow-400/70 px-4 py-3 text-sm font-semibold text-yellow-300 hover:bg-yellow-400/10">
-            + Añadir a la lista por ver
-          </button>
-          <div className="rounded-xl bg-black/70 p-3 text-xs text-gray-200">
-            <p>Año de salida: {yearLabel}</p>
-            <p>{isBook ? `Páginas: ${pagesLabel}` : `Duración: ${durationLabel}`}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        {canShowVideo ? (
-          <div
-            id="detail-video"
-            className="rounded-2xl border border-white/10 bg-black/60 p-5"
+          <button
+            type="button"
+            onClick={onAddToWatchlist}
+            disabled={addDisabled}
+            className={[
+              "w-full rounded-xl border border-yellow-400/70 px-4 py-3 text-sm font-semibold text-yellow-300",
+              addDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-yellow-400/10",
+            ].join(" ")}
           >
-            <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-yellow-300">
-              Video
-            </h2>
-            <div className="mt-4">
-              {videoUrl ? (
-                <div className="aspect-video w-full overflow-hidden rounded-xl bg-black/40">
-                  {isYouTube ? (
-                    <iframe
-                      src={videoUrl}
-                      title={`Video de ${title}`}
-                      className="h-full w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <video
-                      src={videoUrl}
-                      controls
-                      className="h-full w-full object-cover"
-                    >
-                      Tu navegador no soporta video.
-                    </video>
-                  )}
-                </div>
-              ) : (
-                <div className="aspect-video w-full rounded-xl bg-black/40 flex items-center justify-center text-gray-300">
-                  null
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
+            {addLabel}
+          </button>
+          {addMessage ? (
+            <p className="text-xs text-yellow-200">{addMessage}</p>
+          ) : null}
 
-        <div className="rounded-2xl border border-white/10 bg-black/60 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-yellow-300">
-            Ficha técnica
-          </h2>
-          {meta.length > 0 ? (
-            <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 text-sm text-gray-200">
-              {meta.map((entry) => (
-                <div key={`${entry.label}-${entry.value}`}>
-                  <dt className="font-medium text-white">{entry.label}</dt>
-                  <dd className="text-gray-300">{entry.value}</dd>
-                </div>
-              ))}
-            </dl>
+          <button
+            type="button"
+            onClick={onMarkWatched}
+            disabled={markDisabled}
+            className={[
+              "w-full rounded-xl border border-emerald-400/70 px-4 py-3 text-sm font-semibold text-emerald-200",
+              markDisabled
+                ? "cursor-not-allowed opacity-60"
+                : "hover:bg-emerald-400/10",
+            ].join(" ")}
+          >
+            {markLabel}
+          </button>
+          {markMessage ? (
+            <p className="text-xs text-emerald-200">{markMessage}</p>
           ) : null}
         </div>
       </div>
+
+      {canShowVideo ? (
+        <div
+          id="detail-video"
+          className="mt-8 w-full rounded-2xl border border-white/10 bg-black/80 p-5 shadow-xl"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-yellow-300">
+            Video
+          </h2>
+          <div className="mt-4">
+            {videoUrl ? (
+              <div className="aspect-video w-full overflow-hidden rounded-xl bg-black/40">
+                {isYouTube ? (
+                  <iframe
+                    src={videoUrl}
+                    title={`Video de ${title}`}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={videoUrl}
+                    controls
+                    className="h-full w-full object-cover"
+                  >
+                    Tu navegador no soporta video.
+                  </video>
+                )}
+              </div>
+            ) : (
+              <div className="aspect-video w-full rounded-xl bg-black/40 flex items-center justify-center text-gray-300">
+                null
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

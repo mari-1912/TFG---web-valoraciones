@@ -5,6 +5,13 @@ import { Header } from "../components/sections/header";
 import { DetailComments } from "../components/detail/detail-comments";
 import { DetailHero } from "../components/detail/detail-hero";
 import { DetailRelated } from "../components/detail/detail-related";
+import {
+  addToWatchlist,
+  addToWatchedList,
+  getCurrentUser,
+  isInWatchlist,
+  isInWatchedList,
+} from "../services/watchlist";
 import movies from "../data/movies.json";
 import books from "../data/books.json";
 import videoGames from "../data/video-games.json";
@@ -111,6 +118,10 @@ export function DetailPage() {
   const [remoteItem, setRemoteItem] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
+  const [watchedMessage, setWatchedMessage] = useState<string | null>(null);
+  const [inWatchlist, setInWatchlist] = useState(false);
+  const [inWatchedList, setInWatchedList] = useState(false);
 
   useEffect(() => {
     if (!type || !id) return;
@@ -148,6 +159,26 @@ export function DetailPage() {
   }, [type, id, stateItem, localItem]);
 
   const item = stateItem ?? localItem ?? remoteItem;
+  const resolvedId = item?.id ?? id;
+  const normalizedId = resolvedId != null ? String(resolvedId) : "";
+  const currentUser = getCurrentUser();
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+
+  useEffect(() => {
+    if (!type || !normalizedId) {
+      setInWatchlist(false);
+      return;
+    }
+    setInWatchlist(isInWatchlist(normalizedId, type, currentUser));
+  }, [type, normalizedId, currentUser]);
+
+  useEffect(() => {
+    if (!type || !normalizedId) {
+      setInWatchedList(false);
+      return;
+    }
+    setInWatchedList(isInWatchedList(normalizedId, type, currentUser));
+  }, [type, normalizedId, currentUser]);
   const comments = useMemo(() => {
     if (Array.isArray(item?.reviews) && item.reviews.length > 0) {
       return item.reviews.map((review: any, index: number) => ({
@@ -277,6 +308,60 @@ export function DetailPage() {
   if (consolasText) meta.push({ label: "Consolas", value: consolasText });
 
   const typeLabel = type ? TYPE_LABELS[type] ?? "Detalle" : "Detalle";
+  const addLabel = inWatchlist
+    ? "En tu lista por ver"
+    : "+ Añadir a la lista por ver";
+  const markLabel = inWatchedList ? "Marcada como vista" : "Marcar como vista";
+
+  const handleAddToWatchlist = () => {
+    if (!isLoggedIn) {
+      setWatchlistMessage("Inicia sesión para guardar en tu lista.");
+      return;
+    }
+    if (!type || !normalizedId || !item) return;
+    if (type !== "pelicula") {
+      setWatchlistMessage("Solo disponible para películas por ahora.");
+      return;
+    }
+    const result = addToWatchlist(
+      {
+        id: normalizedId,
+        type,
+        title,
+        image: image || undefined,
+      },
+      currentUser
+    );
+    setInWatchlist(true);
+    setWatchlistMessage(
+      result.added ? "Añadido a tu lista por ver." : "Ya estaba en tu lista."
+    );
+  };
+
+  const handleMarkAsWatched = () => {
+    if (!isLoggedIn) {
+      setWatchedMessage("Inicia sesión para guardar en tu lista.");
+      return;
+    }
+    if (!type || !normalizedId || !item) return;
+    if (type !== "pelicula") {
+      setWatchedMessage("Solo disponible para películas por ahora.");
+      return;
+    }
+    const result = addToWatchedList(
+      {
+        id: normalizedId,
+        type,
+        title,
+        image: image || undefined,
+      },
+      currentUser
+    );
+    setInWatchedList(true);
+    setWatchedMessage(
+      result.added ? "Añadida a películas vistas." : "Ya estaba en vistas."
+    );
+  };
 
   return (
     <>
@@ -295,7 +380,6 @@ export function DetailPage() {
       ) : (
             <div className="space-y-10">
               <DetailHero
-                type={type}
                 typeLabel={typeLabel}
                 title={title}
                 description={description}
@@ -305,22 +389,17 @@ export function DetailPage() {
                 isYouTube={isYouTube}
                 apiRatingLabel={apiRatingLabel}
                 ourRatingLabel={ourRatingLabel}
-                yearLabel={yearLabel}
-                durationLabel={durationLabel}
-                pagesLabel={pagesLabel}
-                genresText={genresText}
                 hasOurRating={hasOurRating}
                 ourRating={ourRating}
-                plataformasLabel={plataformasLabel}
-                bookMeta={{
-                  author: authorValue,
-                  editorial: editorialValue,
-                  isbn: isbnValue,
-                  format: formatValue,
-                  language: languageValue,
-                  saga: sagaValue,
-                }}
                 meta={meta}
+                addLabel={addLabel}
+                addDisabled={!item || !type || inWatchlist}
+                onAddToWatchlist={handleAddToWatchlist}
+                addMessage={watchlistMessage}
+                markLabel={markLabel}
+                markDisabled={!item || !type || inWatchedList}
+                onMarkWatched={handleMarkAsWatched}
+                markMessage={watchedMessage}
               />
 
               <DetailRelated type={type} />
