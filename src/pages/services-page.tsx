@@ -136,7 +136,7 @@ const normalizeServiceItems = (
         item?.rating ?? item?.avgRating ?? item?.valoracion ?? item?.puntuacion,
       );
 
-      return {
+      const normalized: ServiceListItem = {
         id: String(id),
         category,
         title: String(title),
@@ -149,6 +149,8 @@ const normalizeServiceItems = (
         rating,
         imgSrc: typeof image === "string" ? image : undefined,
       };
+
+      return normalized;
     })
     .filter((item): item is ServiceListItem => item != null);
 };

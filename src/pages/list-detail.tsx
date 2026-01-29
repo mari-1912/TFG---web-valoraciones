@@ -71,7 +71,7 @@ export default function ListDetail() {
 
 
   // Convertimos cada item en formato SectionList
-  const items: Item[] = list.items.map((i, idx) => ({
+  const items: Item[] = list.items.map((i) => ({
     id: i,
     imgSrc: "/placeholder.png",
     title: i,
@@ -90,5 +90,4 @@ export default function ListDetail() {
     </main>
   );
 }
-
 

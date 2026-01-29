@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type CarouselContextValue = {
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
   orientation: "horizontal" | "vertical";
   canScrollPrev: boolean;
   canScrollNext: boolean;

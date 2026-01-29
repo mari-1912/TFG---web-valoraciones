@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import type { ReactElement } from "react";
 import HomePage from "../pages/home-page";
 import ServicesPage from "../pages/services-page";
 import LoginPage from "../pages/login-page";
@@ -10,7 +11,7 @@ import ListsCategory from "../pages/list-categories-page";
 import ListDetail from "@/pages/list-detail";
 import AboutPage from "@/pages/about-page";
 
-function RequireAuth({ children }: { children: JSX.Element }) {
+function RequireAuth({ children }: { children: ReactElement }) {
   const location = useLocation();
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
