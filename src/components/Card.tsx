@@ -111,29 +111,35 @@ export default function Card(props: CardProps) {
           className="rounded-md mb-4 w-full aspect-[2/3] object-cover"
           loading="lazy"
         />
-      ) : null}
+      ) : (
+        <div className="rounded-md mb-4 w-full aspect-[2/3] bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Sin imagen
+        </div>
+      )}
 
-      <h4 className="text-lg font-semibold mb-1">{resolvedTitle}</h4>
+      <h4 className="text-lg font-semibold mb-1 line-clamp-2 min-h-[3rem]">
+        {resolvedTitle}
+      </h4>
 
-      <p className="text-gray-600 text-sm mb-2 line-clamp-3">
+      <p className="text-gray-600 text-sm mb-2 line-clamp-3 flex-1">
         {description?.trim() ? description : fallbackDescription}
       </p>
 
-      {metaLine ? (
-        <p className="text-gray-500 text-xs line-clamp-2">{metaLine}</p>
-      ) : null}
+      <p className="text-gray-500 text-xs line-clamp-2 min-h-[32px]">
+        {metaLine || "\u00A0"}
+      </p>
 
-      {typeof rating === "number" ? (
-        <div className="mt-2 text-yellow-500">
-          {Array(Math.round(rating))
-            .fill(0)
-            .map((_, i) => (
-              <span key={i} aria-label="star">
-                ⭐
-              </span>
-            ))}
-        </div>
-      ) : null}
+      <div className="mt-2 text-yellow-500 min-h-[20px]">
+        {typeof rating === "number"
+          ? Array(Math.round(rating))
+              .fill(0)
+              .map((_, i) => (
+                <span key={i} aria-label="star">
+                  ⭐
+                </span>
+              ))
+          : null}
+      </div>
     </div>
   );
 }
