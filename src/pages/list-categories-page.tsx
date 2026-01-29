@@ -1,45 +1,83 @@
-import { Popcorn, Tv, BookOpen, Gamepad2, /*Disc3, Dices*/ } from "lucide-react";
-import { Link } from "react-router-dom";
-import Footer from "../components/sections/footer";
-import { Header } from "../components/sections/header";
+import { useEffect, useState } from "react";
+import { ListCard, type Lista } from "@/components/lists/list-card";
+import PageLayout from "@/layouts/layout";
 
-const categorias = [
-  { name: "peliculas", icon: Popcorn },
-  { name: "series", icon: Tv },
-  { name: "libros", icon: BookOpen },
-  { name: "videojuegos", icon: Gamepad2 },
-  //{ name: "juegos-de-mesa", icon: Dices },
-  //{ name: "discos", icon: Disc3 },
-];
 
-export default function ListCategoriesPage() {
+type ListsCategoryProps = {
+  type: "nuestras" | "mis"; // tipo de listas
+};
+
+
+export default function ListsCategory({ type }: ListsCategoryProps) {
+  const [lists, setLists] = useState<Lista[]>([]);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+
+
+      // Simulación con mock
+      const mockLists: Lista[] =
+        type === "nuestras"
+          ? [
+              {
+                id: "1",
+                name: "Películas por ver",
+                description: "Lista de películas que recomendamos ver",
+                items: ["peliculas-1", "peliculas-2"],
+              },
+              {
+                id: "2",
+                name: "Películas vistas",
+                description: "Películas que ya hemos visto",
+                items: ["peliculas-3"],
+              },
+            ]
+          : [
+              {
+                id: "3",
+                name: "Mi lista de series",
+                description: "Series que quiero ver",
+                items: ["series-1"],
+              },
+            ];
+
+
+      // Simulamos retraso de fetch
+      await new Promise((r) => setTimeout(r, 300));
+      setLists(mockLists);
+      setLoading(false);
+    };
+
+
+    load();
+  }, [type]);
+
+
   return (
-    <>
-      <header className="mb-8 w-full max-w-7xl mx-auto flex justify-between items-center border-b border-gray-300 py-4 px-6">
-        <Header />
-        {/* Para móviles, puedes agregar un botón hamburguesa (icono) para el menú */}
-      </header>
-      <main className="min-h-screen bg-gray-50 px-10 py-20">
-        <h1 className="text-4xl font-extrabold text-indigo-700 mb-12 text-center tracking-wide">
-          Categorías de listas
+    <PageLayout>
+      <main className="min-h-screen bg-gray-50 px-6 py-12">
+        <h1 className="text-3xl font-bold text-indigo-700 mb-8 text-center">
+          {type === "nuestras" ? "Nuestras listas" : "Mis listas"}
         </h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10 max-w-7xl mx-auto">
-          {categorias.map(({ name, icon: Icon }) => (
-            <Link
-              key={name}
-              to={`/listas/${name}`}
-              className="bg-white text-indigo-700 font-semibold border-2 border-indigo-700 py-8 rounded-xl shadow-lg flex flex-col justify-center items-center text-center h-full
-                 hover:bg-indigo-700 hover:text-white transition cursor-pointer select-none"
-            >
-              <Icon size={64} className="mb-4" />
-              <span className="text-lg tracking-wide capitalize">
-                Listas de {name.replace(/-/g, " ")}
-              </span>
-            </Link>
-          ))}
-        </div>
+
+
+        {loading ? (
+          <p>Cargando listas...</p>
+        ) : lists.length === 0 ? (
+          <p>No hay listas disponibles.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {lists.map((lista) => (
+              <ListCard key={lista.id} lista={lista} />
+            ))}
+          </div>
+        )}
       </main>
-      <Footer />
-    </>
+    </PageLayout>
   );
 }
+
+
