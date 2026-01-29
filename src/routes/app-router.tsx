@@ -12,13 +12,7 @@ import ListDetail from "@/pages/list-detail";
 import AboutPage from "@/pages/about-page";
 
 function RequireAuth({ children }: { children: ReactElement }) {
-  const location = useLocation();
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-
-  if (!isLoggedIn) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
+  // Temporalmente sin guardas de login (solo entra a /login si se pulsa allí).
   return children;
 }
 
