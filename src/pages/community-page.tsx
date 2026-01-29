@@ -147,7 +147,7 @@ export default function CommunityPage() {
     return (
       <>
         <Header />
-        <main className="pt-24 min-h-screen flex items-center justify-center text-gray-600">
+        <main className="pt-28 md:pt-32 min-h-screen flex items-center justify-center text-gray-600">
           Cargando comunidad...
         </main>
         <Footer />
@@ -159,7 +159,7 @@ export default function CommunityPage() {
     <>
       <Header />
 
-      <main className="pt-24 bg-white min-h-screen">
+      <main className="pt-28 md:pt-32 bg-white min-h-screen">
         <div className="max-w-7xl mx-auto px-6">
 
           {/* TABLA CERRADA: borde completo + overflow hidden para que quede limpio */}

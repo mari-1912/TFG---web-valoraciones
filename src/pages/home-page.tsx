@@ -4,13 +4,16 @@ import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import BackgroundImg from "@/img/bg-img.avif"
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchFeaturedRandom, type FeaturedRandomResponse } from "../services/fetch-featured-random";
 import FeaturedCard from "@/components/featured-card";
 import { fetchMostViewedWeek, type MostViewedWeekResponse } from "../services/fetch-most-viewed-week";
 import MostViewedCard from "@/components/most-viewed-card";
+import LogoPng from "@/assets/logo1.png";
 
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const [activeForm, setActiveForm] = useState<"login" | "register" | null>(null);
 
   const [featured, setFeatured] = useState<FeaturedRandomResponse | null>(null);
@@ -125,7 +128,16 @@ useEffect(() => {
           {/* Texto bienvenida */}
           <div className="rounded-xl bg-white shadow-sm border border-gray-200 p-6 flex flex-col justify-center">
             <h1 className="text-2xl font-semibold text-gray-900">
-              Bienvenido a Opinify!
+              <span>Bienvenido a </span>
+              <span className="inline-flex items-center align-middle font-extrabold">
+                <img
+                  src={LogoPng}
+                  alt="Logo"
+                  className="h-7 w-7 object-contain"
+                />
+                <span className="text-[#e000ff]">pinify</span>
+              </span>
+              <span>!</span>
             </h1>
             <p className="mt-3 text-gray-600 leading-relaxed">
               Añade, descubre y valora películas, series, libros y más. Comparte
@@ -133,10 +145,16 @@ useEffect(() => {
             </p>
 
             <div className="mt-5 flex gap-3">
-              <button className="rounded-md bg-violet-700 px-4 py-2 text-sm font-medium text-white hover:bg-violet-800">
+              <button
+                onClick={() => navigate("/login")}
+                className="rounded-md bg-violet-700 px-4 py-2 text-sm font-medium text-white hover:bg-violet-800"
+              >
                 Descubrir
               </button>
-              <button className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button
+                onClick={() => navigate("/sobre-nosotros")}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
                 Saber más
               </button>
             </div>
@@ -145,8 +163,8 @@ useEffect(() => {
 
         {/* FILA CATEGORÍAS (4 mini cards) */}
         <section className="space-y-4">
-  <h2 className="text-center text-lg font-semibold text-gray-900">
-    Destacados aleatorios
+  <h2 className="text-center text-xl font-extrabold text-[#e000ff]">
+    ¡Nuestros destacados!
   </h2>
 
   {featuredLoading && (
@@ -170,8 +188,8 @@ useEffect(() => {
 
         {/* LO MÁS VISTO */}
         <section className="space-y-4">
-  <h2 className="text-center text-lg font-semibold text-gray-900">
-    ¡Lo más visto de la semana!
+        <h2 className="text-center text-xl font-extrabold text-[#e000ff]">
+        ¡Lo más visto de la semana!
   </h2>
 
   {mostViewedLoading && (
