@@ -1,6 +1,6 @@
-import { Search, Menu } from "lucide-react";
+import { Search, Menu, UserCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import LogoPng from "@/assets/logo1.png";
 import { logoutUser } from "@/services/auth-service";
 
@@ -55,8 +55,13 @@ export function Header() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("isLoggedIn") === "true";
   });
+  const [profileImage, setProfileImage] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("profileImage");
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
 
   const normalize = (s: string) =>
@@ -101,11 +106,27 @@ export function Header() {
       if (e.key === "isLoggedIn") {
         setIsLoggedIn(e.newValue === "true");
       }
+      if (e.key === "profileImage") {
+        setProfileImage(e.newValue);
+      }
     };
 
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    const handleProfileImageUpdate = () => {
+      setProfileImage(localStorage.getItem("profileImage"));
+    };
+    window.addEventListener("profile-image-updated", handleProfileImageUpdate);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("profile-image-updated", handleProfileImageUpdate);
+    };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsLoggedIn(localStorage.getItem("isLoggedIn") === "true");
+    setProfileImage(localStorage.getItem("profileImage"));
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -371,12 +392,31 @@ export function Header() {
 
 
           {isLoggedIn ? (
-            <button
-              onClick={handleLogout}
-              className="cursor-pointer rounded border border-white px-4 py-2 text-sm font-medium transition hover:bg-white hover:text-indigo-600"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleLogout}
+                className="cursor-pointer rounded border border-white px-4 py-2 text-sm font-medium transition hover:bg-white hover:text-indigo-600"
+              >
+                Logout
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/perfil")}
+                className="inline-flex cursor-pointer items-center justify-center rounded-full border border-white/70 p-2.5 text-white transition hover:bg-white hover:text-indigo-600"
+                aria-label="Perfil"
+                title="Perfil"
+              >
+                {profileImage ? (
+                  <img
+                    src={profileImage}
+                    alt="Perfil"
+                    className="h-6 w-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <UserCircle className="h-6 w-6" />
+                )}
+              </button>
+            </div>
           ) : (
             <>
               {/* Botón Login */}

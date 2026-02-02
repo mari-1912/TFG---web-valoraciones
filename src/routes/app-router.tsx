@@ -10,6 +10,7 @@ import ListsHome from "@/pages/lists-home";
 import ListsCategory from "../pages/list-categories-page";
 import ListDetail from "@/pages/list-detail";
 import AboutPage from "@/pages/about-page";
+import ProfilePage from "@/pages/profile-page";
 
 function RequireAuth({ children }: { children: ReactElement }) {
   // Temporalmente sin guardas de login (solo entra a /login si se pulsa allí).
@@ -129,6 +130,14 @@ export const RoutesComponent = () => {
       />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegisterPage />} />
+      <Route
+        path="/perfil"
+        element={
+          <RequireAuth>
+            <ProfilePage />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/detail/:type/:id"
         element={
