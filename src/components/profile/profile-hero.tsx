@@ -35,8 +35,8 @@ type ProfileHeroProps = {
   onRemoveCover: () => void;
   onToggleEdit: () => void;
   onBioChange: (value: string) => void;
-  avatarInputRef: RefObject<HTMLInputElement>;
-  coverInputRef: RefObject<HTMLInputElement>;
+  avatarInputRef: RefObject<HTMLInputElement | null>;
+  coverInputRef: RefObject<HTMLInputElement | null>;
   onAvatarChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onCoverChange: (event: ChangeEvent<HTMLInputElement>) => void;
 };

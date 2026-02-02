@@ -28,7 +28,7 @@ const COVER_OUTPUT_HEIGHT = 720;
 
 export default function ProfilePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState("");
+  const [username] = useState("");
   const [role, setRole] = useState("");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
