@@ -4,6 +4,7 @@ import { Header } from "@/components/sections/header";
 import Footer from "@/components/sections/footer";
 import { ProfileHero, type QuickStat } from "@/components/profile/profile-hero";
 import { ProfileStatsSection } from "@/components/profile/profile-stats-section";
+
 import {
   DEFAULT_TIMELINE,
   ProfileTimeline,
