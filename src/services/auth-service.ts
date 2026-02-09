@@ -56,16 +56,31 @@ export async function registerUser(payload: {
 
 /**
  * LOGIN real contra backend
- * POST /auth/login  body: { email, password }
+ * POST /auth/login  body: { email, password } (email acepta username o email)
  * -> backend setea cookie access_token
  */
 export async function loginUser(
-  email: string,
+  identifier: string,
   password: string
 ): Promise<{ success: boolean; message: string }> {
+  const normalized = identifier.trim();
+  const payload: Record<string, string> = {
+    password,
+    // Algunos backends usan un único campo para email/username.
+    identifier: normalized,
+    // Otros esperan "login" como campo unificado.
+    login: normalized,
+  };
+
+  if (normalized.includes("@")) {
+    payload.email = normalized;
+  } else {
+    payload.username = normalized;
+  }
+
   const { res, data } = await api("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
@@ -97,12 +112,16 @@ export async function loginUser(
  * POST /auth/logout -> borra cookie
  */
 export async function logoutUser(): Promise<void> {
-  await api("/auth/logout", { method: "POST" });
-
-  localStorage.removeItem("isLoggedIn");
-  localStorage.removeItem("userRole");
-  localStorage.removeItem("currentUser");
-  localStorage.removeItem("rememberMe");
+  try {
+    await api("/auth/logout", { method: "POST" });
+  } catch {
+    // En local puede fallar por CORS/red: aun así limpiamos estado.
+  } finally {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("rememberMe");
+  }
 }
 
 /**
