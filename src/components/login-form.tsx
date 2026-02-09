@@ -9,7 +9,6 @@ type LoginFormProps = {
 
 export default function LoginForm({ onClose }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-
   return (
     <section className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-20 z-10">
       <div className="auth-card relative animate-fade-in">
