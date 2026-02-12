@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, User } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, User } from "lucide-react";
 
 import { Header } from "@/components/sections/header";
 import Footer from "@/components/sections/footer";
 import { loginUser } from "@/services/auth-service";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await loginUser(email.trim(), password);
+      const result = await loginUser(identifier.trim(), password);
 
       if (!result.success) {
         setError(result.message);
@@ -60,16 +61,16 @@ export default function LoginPage() {
           </h1>
 
           <form onSubmit={handleSubmit} className="mt-10 space-y-6">
-            {/* EMAIL */}
+            {/* USERNAME OR EMAIL */}
             <div className="relative">
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="EMAIL"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="USUARIO O EMAIL"
                 className="h-[48px] w-full rounded-xl border border-violet-200 bg-white px-5 pr-12 text-sm font-semibold tracking-widest text-violet-700 placeholder-violet-500/70 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
-                autoComplete="email"
+                autoComplete="username"
               />
               <User className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-700" />
             </div>
@@ -77,7 +78,7 @@ export default function LoginPage() {
             {/* PASSWORD */}
             <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -85,7 +86,18 @@ export default function LoginPage() {
                 className="h-[48px] w-full rounded-xl border border-violet-200 bg-white px-5 pr-12 text-sm font-semibold tracking-widest text-violet-700 placeholder-violet-500/70 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
                 autoComplete="current-password"
               />
-              <Lock className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-700" />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-700 hover:text-gray-900"
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
             </div>
 
             <div className="flex items-center justify-between text-sm">
