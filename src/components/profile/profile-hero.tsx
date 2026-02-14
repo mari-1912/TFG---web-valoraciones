@@ -19,13 +19,14 @@ type ProfileHeroProps = {
   displayName: string;
   displayRole: string;
   bio: string;
-  isLoggedIn: boolean;
+  canEdit: boolean;
   isEditing: boolean;
   ratingsCount: number;
   averageRating: number;
   reviewsCount: number;
   quickStats: QuickStat[];
   avatarError?: string | null;
+  saveError?: string | null;
   coverError?: string | null;
   avatarUploading: boolean;
   coverUploading: boolean;
@@ -47,13 +48,14 @@ export function ProfileHero({
   displayName,
   displayRole,
   bio,
-  isLoggedIn,
+  canEdit,
   isEditing,
   ratingsCount,
   averageRating,
   reviewsCount,
   quickStats,
   avatarError,
+  saveError,
   coverError,
   avatarUploading,
   coverUploading,
@@ -87,12 +89,12 @@ export function ProfileHero({
               type="button"
               onClick={onAvatarClick}
               className={`flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 transition ${
-                isLoggedIn && isEditing
+                canEdit && isEditing
                   ? "cursor-pointer hover:bg-white/15"
                   : "cursor-default"
               }`}
               aria-label="Cambiar foto de perfil"
-              title={isLoggedIn && isEditing ? "Cambiar foto" : "Perfil"}
+              title={canEdit && isEditing ? "Cambiar foto" : "Perfil"}
             >
               {profileImage ? (
                 <img
@@ -131,7 +133,7 @@ export function ProfileHero({
               </div>
 
               <div className="mt-3 max-w-md">
-                {isLoggedIn && isEditing ? (
+              {canEdit && isEditing ? (
                   <textarea
                     value={bio}
                     onChange={(event) =>
@@ -146,7 +148,7 @@ export function ProfileHero({
                     {bio || "Añade una breve descripción sobre ti."}
                   </p>
                 )}
-                {isLoggedIn && isEditing && (
+                {canEdit && isEditing && (
                   <p className="mt-1 text-[11px] text-white/50">
                     {bio.length}/140 caracteres
                   </p>
@@ -189,7 +191,7 @@ export function ProfileHero({
                 </div>
               </div>
 
-              {isLoggedIn && isEditing && (
+              {canEdit && isEditing && (
                 <p className="mt-2 text-xs text-white/60">
                   Pulsa la foto para cambiarla
                 </p>
@@ -200,52 +202,48 @@ export function ProfileHero({
             </div>
           </div>
 
-          {isLoggedIn ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={onToggleEdit}
-                className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700"
-              >
-                {isEditing ? "Cerrar edición" : "Editar"}
-              </button>
-              {isEditing && (
-                <>
-                  <button
-                    type="button"
-                    onClick={onCoverClick}
-                    className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700"
-                  >
-                    Cambiar portada
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onRemoveCover}
-                    disabled={!coverImage || coverUploading}
-                    className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {coverUploading ? "Procesando..." : "Eliminar portada"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onRemoveAvatar}
-                    disabled={!profileImage || avatarUploading}
-                    className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {avatarUploading ? "Procesando..." : "Eliminar foto"}
-                  </button>
-                </>
-              )}
-            </div>
-          ) : (
-            <Link
-              to="/login"
-              className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700"
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={onToggleEdit}
+              disabled={!canEdit}
+              className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Iniciar sesión
-            </Link>
-          )}
+              {isEditing ? "Cerrar edición" : "Editar"}
+            </button>
+            {isEditing && (
+              <>
+                <button
+                  type="button"
+                  onClick={onCoverClick}
+                  className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700"
+                >
+                  Cambiar portada
+                </button>
+                <button
+                  type="button"
+                  onClick={onRemoveCover}
+                  disabled={!coverImage || coverUploading}
+                  className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {coverUploading ? "Procesando..." : "Eliminar portada"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onRemoveAvatar}
+                  disabled={!profileImage || avatarUploading}
+                  className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {avatarUploading ? "Procesando..." : "Eliminar foto"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        {saveError && (
+          <p className="mt-3 text-xs text-rose-200">{saveError}</p>
+        )}
 
         {coverError && (
           <p className="mt-4 text-xs text-rose-200 md:text-right">
