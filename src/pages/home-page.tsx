@@ -9,7 +9,7 @@ import { fetchFeaturedRandom, type FeaturedRandomResponse } from "../services/fe
 import FeaturedCard from "@/components/featured-card";
 import { fetchMostViewedWeek, type MostViewedWeekResponse } from "../services/fetch-most-viewed-week";
 import MostViewedCard from "@/components/most-viewed-card";
-import LogoPng from "@/assets/logo1.png";
+import LogoPng from "@/assets/LOGO.png";
 
 
 export default function HomePage() {
@@ -80,23 +80,6 @@ useEffect(() => {
       <header className="fixed top-0 left-0 w-full z-50 bg-violet-700 text-white">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <Header />
-
-          {/* Si tu Header NO incluye botones de auth, descomenta esto:
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveForm("login")}
-              className="rounded-md bg-white/15 px-3 py-1.5 text-sm hover:bg-white/20"
-            >
-              Iniciar sesión
-            </button>
-            <button
-              onClick={() => setActiveForm("register")}
-              className="rounded-md bg-white px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-50"
-            >
-              Registrarse
-            </button>
-          </div>
-          */}
         </div>
       </header>
 
@@ -133,9 +116,8 @@ useEffect(() => {
                 <img
                   src={LogoPng}
                   alt="Logo"
-                  className="h-7 w-7 object-contain"
+                  className="w-30 object-contain"
                 />
-                <span className="text-[#e000ff]">pinify</span>
               </span>
               <span>!</span>
             </h1>
@@ -201,7 +183,7 @@ useEffect(() => {
   )}
 
   {!mostViewedLoading && !mostViewedError && mostViewed && (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <MostViewedCard label="Película" item={mostViewed.pelicula ?? null} />
       <MostViewedCard label="Serie" item={mostViewed.serie ?? null} />
       <MostViewedCard label="Libro" item={mostViewed.libro ?? null} />

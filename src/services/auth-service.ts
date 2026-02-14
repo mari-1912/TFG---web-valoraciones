@@ -2,9 +2,9 @@
 
 export type AuthUser = {
   user_id: number;
-  email: string;
+  email?: string;
   role: string;
-  username?: string; // (opcional si el backend lo devuelve en /auth/me)
+  username?: string;
 };
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://tfg-web-valoraciones-back-i9b5.onrender.com";
@@ -126,14 +126,14 @@ export async function logoutUser(): Promise<void> {
 
 /**
  * ME real
- * GET /auth/me -> { user_id, email, role } (y opcional username)
+ * GET /usuarios/perfil -> { perfil: { userId, username, tipo, ... } }
  */
 export async function getMe(): Promise<{
   success: boolean;
   user?: AuthUser;
   message?: string;
 }> {
-  const { res, data } = await api("/auth/me", { method: "GET" });
+  const { res, data } = await api("/usuarios/perfil", { method: "GET" });
 
   if (!res.ok) {
     // Si la cookie no es válida, limpiamos estado local
@@ -143,7 +143,16 @@ export async function getMe(): Promise<{
     return { success: false, message: data?.message ?? "No autenticado." };
   }
 
-  return { success: true, user: data as AuthUser };
+  const perfil = data?.perfil ?? data ?? {};
+  return {
+    success: true,
+    user: {
+      user_id: Number(perfil.userId ?? perfil.user_id ?? 0),
+      email: perfil.email,
+      role: (perfil.tipo ?? perfil.role ?? "base").toString().toLowerCase(),
+      username: perfil.username,
+    },
+  };
 }
 
 /**

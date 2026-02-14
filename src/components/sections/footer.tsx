@@ -1,15 +1,18 @@
-import { Facebook, Twitter, Instagram, CircleStar } from "lucide-react";
+import { Facebook, Twitter, Instagram } from "lucide-react";
 import { Link } from "react-router-dom";
+import LogoPng from "@/assets/LOGO.png";
 
 export default function Footer() {
   return (
     <footer className="bg-linear-to-r from-indigo-500 to-purple-600 text-white text-center px-6">
-      <div className="max-w-7xl mx-auto px-6 py-10 grid md:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-6 py-3.5 grid md:grid-cols-3 gap-4">
         {/* Logo / Nombre */}
         <div className="flex flex-col items-center">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-1">
-            Opinify <CircleStar />
-          </h2>
+          <img
+            src={LogoPng}
+            alt="Logo Opinify"
+            className="h-10 w-auto object-contain"
+          />
           <p className="mt-2 text-white-400">
             Descubre, valora y comparte tus experiencias de entretenimiento
             favoritas.
@@ -19,7 +22,7 @@ export default function Footer() {
         {/* Enlaces internos */}
         <div>
           <h3 className="font-semibold mb-4">Enlaces</h3>
-          <ul className="space-y-2">
+          <ul className="grid grid-cols-2 gap-x-1 gap-y-1.5">
             <li>
               <Link to="/home" className="hover:text-indigo-400 transition">
                 Inicio
@@ -44,6 +47,14 @@ export default function Footer() {
                 className="hover:text-indigo-400 transition"
               >
                 Comunidad
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/sobre-nosotros"
+                className="hover:text-indigo-400 transition"
+              >
+                Sobre Nosotros
               </Link>
             </li>
           </ul>
@@ -84,8 +95,8 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-gray-700 mt-6">
-        <p className="text-center py-4 text-white text-sm">
+      <div className="border-t border-gray-700 mt-2">
+        <p className="text-center py-1.5 text-white text-sm">
           &copy; 2025 Opinify. Todos los derechos reservados.
         </p>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/sections/header";
 import Footer from "@/components/sections/footer";
 import { ProfileHero, type QuickStat } from "@/components/profile/profile-hero";
@@ -11,11 +11,15 @@ import {
   type TimelineItem,
 } from "@/components/profile/profile-timeline";
 import {
+  fetchMyProfile,
+  fetchUserProfile,
   removeProfileImage,
   removeProfileCover,
+  updateProfile,
   uploadProfileImage,
   uploadProfileCover,
 } from "@/services/profile-service";
+import { getMe } from "@/services/auth-service";
 
 const CROP_SIZE = 240;
 const OUTPUT_SIZE = 320;
@@ -27,8 +31,20 @@ const COVER_OUTPUT_HEIGHT = 720;
 
 
 export default function ProfilePage() {
+  const [searchParams] = useSearchParams();
+  const userIdParam = searchParams.get("userId");
+  const requestedUserId = useMemo(() => {
+    if (userIdParam === null) return null;
+    const parsed = Number(userIdParam);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [userIdParam]);
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
   const [role, setRole] = useState("");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
@@ -37,6 +53,9 @@ export default function ProfilePage() {
   const [ratingsCount, setRatingsCount] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
   const [reviewsCount, setReviewsCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [commentsCount, setCommentsCount] = useState(0);
   const [seriesCount, setSeriesCount] = useState(0);
   const [moviesCount, setMoviesCount] = useState(0);
   const [booksCount, setBooksCount] = useState(0);
@@ -78,61 +97,103 @@ export default function ProfilePage() {
   } | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setIsLoggedIn(localStorage.getItem("isLoggedIn") === "true");
-    setRole(localStorage.getItem("userRole") ?? "");
-    setProfileImage(localStorage.getItem("profileImage"));
-    setCoverImage(localStorage.getItem("profileCoverImage"));
-    setBio(localStorage.getItem("profileBio") ?? "");
-    const storedRatingsCount = Number(
-      localStorage.getItem("profileRatingsCount") ?? "0"
-    );
-    const storedAverageRating = Number(
-      localStorage.getItem("profileAverageRating") ?? "0"
-    );
-    const storedReviewsCount = Number(
-      localStorage.getItem("profileReviewsCount") ?? "0"
-    );
-    setRatingsCount(Number.isFinite(storedRatingsCount) ? storedRatingsCount : 0);
-    setAverageRating(
-      Number.isFinite(storedAverageRating) ? storedAverageRating : 0
-    );
-    setReviewsCount(Number.isFinite(storedReviewsCount) ? storedReviewsCount : 0);
-    const storedSeriesCount = Number(
-      localStorage.getItem("profileSeriesCount") ?? "0"
-    );
-    const storedMoviesCount = Number(
-      localStorage.getItem("profileMoviesCount") ?? "0"
-    );
-    const storedBooksCount = Number(
-      localStorage.getItem("profileBooksCount") ?? "0"
-    );
-    const storedGamesCount = Number(
-      localStorage.getItem("profileGamesCount") ?? "0"
-    );
-    setSeriesCount(Number.isFinite(storedSeriesCount) ? storedSeriesCount : 0);
-    setMoviesCount(Number.isFinite(storedMoviesCount) ? storedMoviesCount : 0);
-    setBooksCount(Number.isFinite(storedBooksCount) ? storedBooksCount : 0);
-    setGamesCount(Number.isFinite(storedGamesCount) ? storedGamesCount : 0);
+    let cancelled = false;
+    getMe()
+      .then((result) => {
+        if (cancelled) return;
+        setIsLoggedIn(result.success);
+        const user = result.user as
+          | { user_id?: number; userId?: number; id?: number }
+          | undefined;
+        setCurrentUserId(user?.user_id ?? user?.userId ?? user?.id ?? null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setIsLoggedIn(false);
+        setCurrentUserId(null);
+      });
 
-    const storedTimeline = localStorage.getItem("profileTimeline");
-    if (storedTimeline) {
-      try {
-        const parsed = JSON.parse(storedTimeline) as TimelineItem[];
-        setTimelineItems(Array.isArray(parsed) ? parsed : []);
-      } catch {
-        setTimelineItems([]);
-      }
-    } else {
-      setTimelineItems(DEFAULT_TIMELINE);
-    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (requestedUserId === null && !isLoggedIn) {
+      setProfileLoading(true);
+      setProfileError(null);
+      return;
+    }
+
+    setProfileLoading(true);
+    setProfileError(null);
+
+    const controller = new AbortController();
+
+    async function loadProfile() {
+      try {
+        const data =
+          requestedUserId === null
+            ? await fetchMyProfile(controller.signal)
+            : await fetchUserProfile(requestedUserId ?? 0, controller.signal);
+        if (controller.signal.aborted) return;
+
+        const perfil = data.perfil ?? {};
+        const stats = data.estadisticas ?? {};
+
+        if (requestedUserId === null) {
+          setIsLoggedIn(true);
+          setCurrentUserId((prev) => prev ?? perfil.userId ?? null);
+        }
+
+        setUsername(perfil.username ?? "");
+        setRole((perfil.tipo ?? "Base").toString());
+        setBio(perfil.descripcion ?? "");
+        setProfileImage(perfil.avatarUrl ?? null);
+        setCoverImage(perfil.bannerUrl ?? null);
+        setRatingsCount(stats.valoraciones ?? 0);
+        setAverageRating(stats.media ?? 0);
+        setReviewsCount(stats.comentarios ?? 0);
+        setFollowingCount(stats.siguiendo ?? 0);
+        setFollowersCount(stats.seguidores ?? 0);
+        setCommentsCount(stats.comentarios ?? 0);
+        setSeriesCount(stats.series ?? 0);
+        setMoviesCount(stats.peliculas ?? 0);
+        setBooksCount(stats.libros ?? 0);
+        setGamesCount(stats.videojuegos ?? 0);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setProfileError(
+          error instanceof Error
+            ? error.message
+            : "No se pudo cargar el perfil."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setProfileLoading(false);
+        }
+      }
+    }
+
+    loadProfile();
+
+    return () => controller.abort();
+  }, [requestedUserId, isLoggedIn]);
+
+  useEffect(() => {
+    setTimelineItems(DEFAULT_TIMELINE);
+  }, []);
+
+  const isOwnProfile =
+    requestedUserId === null ||
+    (currentUserId !== null && requestedUserId === currentUserId);
+  const canEdit = isOwnProfile;
+
+  useEffect(() => {
+    if (!canEdit) {
       setIsEditing(false);
     }
-  }, [isLoggedIn]);
+  }, [canEdit]);
 
   useEffect(() => {
     return () => {
@@ -145,9 +206,9 @@ export default function ProfilePage() {
   const displayRole = useMemo(() => role || "base", [role]);
 
   const quickStats: QuickStat[] = [
-    { label: "Siguiendo", value: 0 },
-    { label: "Seguidores", value: 0 },
-    { label: "Comentarios", value: 0 },
+    { label: "Siguiendo", value: followingCount },
+    { label: "Seguidores", value: followersCount },
+    { label: "Comentarios", value: commentsCount },
   ];
 
   const activityCards = [
@@ -157,8 +218,21 @@ export default function ProfilePage() {
     { title: "Videojuegos", value: gamesCount, unit: "totales" },
   ];
 
+  const handleToggleEdit = async () => {
+    if (!canEdit) return;
+    if (isEditing) {
+      setSaveError(null);
+      const result = await updateProfile({ descripcion: bio });
+      if (!result.success) {
+        setSaveError(result.message ?? "No se pudo actualizar el perfil.");
+        return;
+      }
+    }
+    setIsEditing((prev) => !prev);
+  };
+
   const handleAvatarClick = () => {
-    if (!isLoggedIn || !isEditing) return;
+    if (!canEdit || !isEditing) return;
     fileInputRef.current?.click();
   };
 
@@ -188,26 +262,14 @@ export default function ProfilePage() {
   };
 
   const applyProfileImage = (src: string | null) => {
-    try {
-      if (src) {
-        localStorage.setItem("profileImage", src);
-      } else {
-        localStorage.removeItem("profileImage");
-      }
-      setProfileImage(src);
-      window.dispatchEvent(new Event("profile-image-updated"));
-    } catch {
-      setAvatarError("No se pudo guardar la imagen localmente.");
-    }
+    setProfileImage(src);
+    window.dispatchEvent(
+      new CustomEvent("profile-image-updated", { detail: src })
+    );
   };
 
   const applyProfileBio = (value: string) => {
     setBio(value);
-    try {
-      localStorage.setItem("profileBio", value);
-    } catch {
-      setAvatarError("No se pudo guardar la descripción.");
-    }
   };
 
   const clampOffset = (
@@ -252,7 +314,7 @@ export default function ProfilePage() {
   const handleCropPointerDown = (
     event: React.PointerEvent<HTMLDivElement>
   ) => {
-    if (!isLoggedIn) return;
+    if (!canEdit) return;
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
     dragStateRef.current = {
@@ -363,7 +425,7 @@ export default function ProfilePage() {
   };
 
   const handleRemoveAvatar = async () => {
-    if (!isLoggedIn) return;
+    if (!canEdit) return;
     setAvatarUploading(true);
     setAvatarError(null);
 
@@ -381,7 +443,7 @@ export default function ProfilePage() {
   };
 
   const handleCoverClick = () => {
-    if (!isLoggedIn || !isEditing) return;
+    if (!canEdit || !isEditing) return;
     coverFileInputRef.current?.click();
   };
 
@@ -411,16 +473,7 @@ export default function ProfilePage() {
   };
 
   const applyCoverImage = (src: string | null) => {
-    try {
-      if (src) {
-        localStorage.setItem("profileCoverImage", src);
-      } else {
-        localStorage.removeItem("profileCoverImage");
-      }
-      setCoverImage(src);
-    } catch {
-      setCoverError("No se pudo guardar la portada localmente.");
-    }
+    setCoverImage(src);
   };
 
   const clampCoverOffset = (
@@ -465,7 +518,7 @@ export default function ProfilePage() {
   const handleCoverPointerDown = (
     event: React.PointerEvent<HTMLDivElement>
   ) => {
-    if (!isLoggedIn) return;
+    if (!canEdit) return;
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
     coverDragStateRef.current = {
@@ -587,7 +640,7 @@ export default function ProfilePage() {
   };
 
   const handleRemoveCover = async () => {
-    if (!isLoggedIn) return;
+    if (!canEdit) return;
     setCoverUploading(true);
     setCoverError(null);
 
@@ -608,19 +661,30 @@ export default function ProfilePage() {
     <main className="min-h-screen bg-white">
       <Header />
       <div className="h-24 md:h-28" />
+      {profileLoading && (
+        <div className="mx-auto max-w-6xl px-4 pb-4 text-sm text-gray-600">
+          Cargando perfil...
+        </div>
+      )}
+      {profileError && (
+        <div className="mx-auto max-w-6xl px-4 pb-4 text-sm text-rose-600">
+          {profileError}
+        </div>
+      )}
       <ProfileHero
         coverImage={coverImage}
         profileImage={profileImage}
         displayName={displayName}
         displayRole={displayRole}
         bio={bio}
-        isLoggedIn={isLoggedIn}
+        canEdit={canEdit}
         isEditing={isEditing}
         ratingsCount={ratingsCount}
         averageRating={averageRating}
         reviewsCount={reviewsCount}
         quickStats={quickStats}
         avatarError={avatarError}
+        saveError={saveError}
         coverError={coverError}
         avatarUploading={avatarUploading}
         coverUploading={coverUploading}
@@ -628,7 +692,7 @@ export default function ProfilePage() {
         onCoverClick={handleCoverClick}
         onRemoveAvatar={handleRemoveAvatar}
         onRemoveCover={handleRemoveCover}
-        onToggleEdit={() => setIsEditing((prev) => !prev)}
+        onToggleEdit={handleToggleEdit}
         onBioChange={applyProfileBio}
         avatarInputRef={fileInputRef}
         coverInputRef={coverFileInputRef}
@@ -637,44 +701,27 @@ export default function ProfilePage() {
       />
 
       <section className="mx-auto max-w-6xl px-4 py-10">
-        {!isLoggedIn ? (
-          <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-6">
-            <p className="text-sm text-gray-700">
-              Necesitas iniciar sesión para ver tu información completa y tus
-              listas.
-            </p>
-            <div className="mt-4">
-              <Link
-                to="/login"
-                className="inline-flex items-center rounded-md bg-violet-700 px-4 py-2 text-sm font-medium text-white hover:bg-violet-800"
-              >
-                Ir a login
-              </Link>
-            </div>
+        <>
+          <ProfileStatsSection cards={activityCards} />
+
+          <div className="mt-10 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Listas</h2>
+            <button
+              type="button"
+              className="text-sm font-medium text-violet-700 hover:text-violet-800"
+            >
+              Ver todo
+            </button>
           </div>
-        ) : (
-          <>
-            <ProfileStatsSection cards={activityCards} />
 
-            <div className="mt-10 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Listas</h2>
-              <button
-                type="button"
-                className="text-sm font-medium text-violet-700 hover:text-violet-800"
-              >
-                Ver todo
-              </button>
-            </div>
+          <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-white p-6 text-sm text-gray-600">
+            Aquí aparecerán tus listas guardadas y tus favoritos.
+          </div>
 
-            <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-white p-6 text-sm text-gray-600">
-              Aquí aparecerán tus listas guardadas y tus favoritos.
-            </div>
-
-            <div className="mt-10">
-              <ProfileTimeline items={timelineItems} />
-            </div>
-          </>
-        )}
+          <div className="mt-10">
+            <ProfileTimeline items={timelineItems} />
+          </div>
+        </>
       </section>
 
       {isCropOpen && previewUrl && (

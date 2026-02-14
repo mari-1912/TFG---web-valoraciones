@@ -1,15 +1,15 @@
 import { Search, Menu, UserCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import LogoPng from "@/assets/logo1.png";
+import LogoPng from "@/assets/LOGO.png";
 import { logoutUser } from "@/services/auth-service";
-
-import moviesData from "../../data/movies.json";
-import booksData from "../../data/books.json";
-import seriesData from "../../data/series.json";
-import videoGamesData from "../../data/video-games.json";
-import boardGamesData from "../../data/board-games.json";
-import discos from "../../data/music.json";
+import { fetchMyProfile } from "@/services/profile-service";
+import {
+  searchContents,
+  searchUsers,
+  type ContentSearchItem,
+  type UserSearchItem,
+} from "@/services/search-service";
 
 
 import {
@@ -20,7 +20,6 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-  NavigationMenuViewport,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 
@@ -29,74 +28,82 @@ import {
 import { AppBreadcrumb } from "../global-breadcrumb";
 
 
-type Item = {
-  id: string;
-  title: string;
-  description?: string;
-  imgSrc?: string;
-  rating?: number;
-};
-
-
-const datasets: Record<string, Item[]> = {
-  pelicula: moviesData as Item[],
-  libro: booksData as Item[],
-  serie: seriesData as Item[],
-  videojuego: videoGamesData as Item[],
-  juegoMesa: boardGamesData as Item[],
-  discos: discos as Item[],
-};
-
-
 export function Header() {
   ///const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
+  const [searchItems, setSearchItems] = useState<ContentSearchItem[]>([]);
+  const [searchUserResults, setSearchUserResults] = useState<UserSearchItem[]>(
+    []
+  );
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("isLoggedIn") === "true";
   });
-  const [profileImage, setProfileImage] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("profileImage");
-  });
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const MIN_QUERY_LENGTH = 2;
+  const SEARCH_DEBOUNCE_MS = 300;
 
+  const fetchSearchResults = async (
+    q: string,
+    signal?: AbortSignal
+  ): Promise<{
+    items: ContentSearchItem[];
+    users: UserSearchItem[];
+    error: string | null;
+  }> => {
+    const [itemsRes, usersRes] = await Promise.allSettled([
+      searchContents(q, signal),
+      searchUsers(q, signal),
+    ]);
 
-  const normalize = (s: string) =>
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
+    const items =
+      itemsRes.status === "fulfilled" ? itemsRes.value.items ?? [] : [];
+    const users =
+      usersRes.status === "fulfilled" ? usersRes.value.results ?? [] : [];
 
+    const error =
+      itemsRes.status === "rejected" && usersRes.status === "rejected"
+        ? "No se pudo buscar ahora mismo."
+        : null;
 
-  const handleSearch = () => {
-    const q = normalize(query.trim());
+    return { items, users, error };
+  };
+
+  const handleSearch = async () => {
+    const q = query.trim();
     if (!q) return;
 
+    setIsSearchOpen(true);
+    setSearchLoading(true);
+    setSearchError(null);
 
-    let found: Item | null = null;
-    let foundType: string | null = null;
+    const { items, users, error } = await fetchSearchResults(q);
+    setSearchItems(items);
+    setSearchUserResults(users);
+    setSearchError(error);
+    setSearchLoading(false);
 
-
-    for (const [type, items] of Object.entries(datasets)) {
-      const match =
-        items.find((item) => normalize(item.title) === q) ||
-        items.find((item) => normalize(item.title).includes(q));
-
-
-      if (match) {
-        found = match;
-        foundType = type;
-        break;
-      }
+    if (items[0]) {
+      navigate(`/detail/${items[0].tipo}/${items[0].id}`);
+      setIsSearchOpen(false);
+      setIsMobileMenuOpen(false);
+      return;
     }
 
+    if (users[0]) {
+      navigate(`/perfil?userId=${users[0].userId}`);
+      setIsSearchOpen(false);
+      setIsMobileMenuOpen(false);
+      return;
+    }
 
-    if (found && foundType) {
-      navigate(`/detail/${foundType}/${found.id}`);
-    } else {
+    if (!error) {
       alert(`No se encontraron resultados para: "${query}"`);
     }
   };
@@ -106,14 +113,15 @@ export function Header() {
       if (e.key === "isLoggedIn") {
         setIsLoggedIn(e.newValue === "true");
       }
-      if (e.key === "profileImage") {
-        setProfileImage(e.newValue);
-      }
     };
 
     window.addEventListener("storage", handleStorage);
-    const handleProfileImageUpdate = () => {
-      setProfileImage(localStorage.getItem("profileImage"));
+    const handleProfileImageUpdate = (event: Event) => {
+      const detail =
+        event instanceof CustomEvent ? (event.detail as string | null) : null;
+      if (typeof detail === "string" || detail === null) {
+        setProfileImage(detail);
+      }
     };
     window.addEventListener("profile-image-updated", handleProfileImageUpdate);
     return () => {
@@ -125,8 +133,59 @@ export function Header() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     setIsLoggedIn(localStorage.getItem("isLoggedIn") === "true");
-    setProfileImage(localStorage.getItem("profileImage"));
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setProfileImage(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetchMyProfile(controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setProfileImage(data.perfil?.avatarUrl ?? null);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setProfileImage(null);
+      });
+
+    return () => controller.abort();
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    const q = query.trim();
+
+    if (q.length < MIN_QUERY_LENGTH) {
+      setSearchItems([]);
+      setSearchUserResults([]);
+      setSearchError(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      setSearchError(null);
+      const { items, users, error } = await fetchSearchResults(
+        q,
+        controller.signal
+      );
+      if (controller.signal.aborted) return;
+      setSearchItems(items);
+      setSearchUserResults(users);
+      setSearchError(error);
+      setSearchLoading(false);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [query]);
 
   const handleLogout = async () => {
     try {
@@ -138,6 +197,118 @@ export function Header() {
   };
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  const openSearch = () => setIsSearchOpen(true);
+  const closeSearch = () => setIsSearchOpen(false);
+
+  const renderSearchResults = (onSelect?: () => void) => {
+    const hasItems = searchItems.length > 0;
+    const hasUsers = searchUserResults.length > 0;
+
+    if (searchLoading) {
+      return (
+        <div className="px-3 py-2 text-sm text-white/80">Buscando...</div>
+      );
+    }
+
+    if (searchError) {
+      return (
+        <div className="px-3 py-2 text-sm text-red-200">{searchError}</div>
+      );
+    }
+
+    if (!hasItems && !hasUsers) {
+      return (
+        <div className="px-3 py-2 text-sm text-white/80">
+          Sin resultados.
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {hasUsers && (
+          <div className="py-2">
+            <div className="px-3 pb-1 text-xs uppercase tracking-wide text-white/70">
+              Usuarios
+            </div>
+            <ul className="flex flex-col">
+              {searchUserResults.map((user) => {
+                const avatar = user.avatarUrl ?? user.avatarPath ?? "";
+                const letter = (user.username?.trim()?.[0] ?? "U").toUpperCase();
+                return (
+                  <li key={user.userId}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        navigate(`/perfil?userId=${user.userId}`);
+                        onSelect?.();
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-white/15"
+                    >
+                      {avatar ? (
+                        <img
+                          src={avatar}
+                          alt={user.username}
+                          className="h-7 w-7 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs font-semibold">
+                          {letter}
+                        </div>
+                      )}
+                      <span>{user.username}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {hasItems && (
+          <div className="py-2">
+            <div className="px-3 pb-1 text-xs uppercase tracking-wide text-white/70">
+              Items
+            </div>
+            <ul className="flex flex-col">
+              {searchItems.map((item) => (
+                <li key={`${item.tipo}-${item.id}`}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      navigate(`/detail/${item.tipo}/${item.id}`);
+                      onSelect?.();
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-white/15"
+                  >
+                    {item.portada ? (
+                      <img
+                        src={item.portada}
+                        alt={item.titulo}
+                        className="h-8 w-6 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-6 items-center justify-center rounded bg-white/20 text-[10px] uppercase tracking-wide">
+                        {item.tipo.slice(0, 2)}
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="leading-tight">{item.titulo}</span>
+                      <span className="text-xs text-white/70">
+                        {item.tipo}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </>
+    );
+  };
 
   const NavItems = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
@@ -333,37 +504,36 @@ export function Header() {
 
   return (
     <header className="fixed left-0 top-0 z-50 w-full [background-image:var(--gradient-primary)]">
-      <div className="flex w-full items-center justify-between px-6 py-4 text-white">
+      <div className="flex w-full items-center justify-between px-6 py-4 text-white lg:grid lg:min-w-0 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
         {/* LOGO */}
         <div
-          className="flex cursor-pointer items-center text-2xl font-extrabold"
+          className="flex cursor-pointer items-center text-2xl font-extrabold lg:justify-self-start"
           onClick={() => navigate("/home")}
         >
           <img
             src={LogoPng}
             alt="Logo"
-            className="h-12 w-12 object-contain"
+            className="w-32 object-contain"
           />
-          <span className="text-[#e000ff]">pinify</span>
         </div>
 
 
         {/* NAVIGATION MENU SHADCN */}
         <NavigationMenu
-          className="hidden lg:flex" /*</div>viewport={isMobile}*/
+          viewport={false}
+          className="hidden lg:flex lg:min-w-0 lg:justify-self-center" /*</div>viewport={isMobile}*/
         >
-          <NavigationMenuList className="flex-wrap">
+          <NavigationMenuList className="flex-wrap justify-center lg:max-w-full">
             <NavItems />
           </NavigationMenuList>
 
 
           <NavigationMenuIndicator />
-          <NavigationMenuViewport />
         </NavigationMenu>
 
 
         {/* BUSCADOR + BOTONES */}
-        <div className="flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-4 lg:ml-0 lg:min-w-0 lg:justify-end lg:justify-self-end">
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -374,20 +544,30 @@ export function Header() {
             <Menu className="h-5 w-5" />
           </button>
           {/* Buscador */}
-          <div className="relative hidden md:block">
+          <div className="relative hidden lg:block w-full max-w-[14rem] xl:max-w-[20rem]">
             <input
               type="search"
               placeholder="Buscar..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="rounded-md border border-white/40 bg-transparent px-4 py-2 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
+              onFocus={openSearch}
+              onBlur={() => window.setTimeout(closeSearch, 150)}
+              className="rounded-md border border-white/40 bg-transparent pl-10 pr-4 py-2 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
             />
             <Search
               onClick={handleSearch}
               size={18}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-indigo-200 transition hover:text-white"
+              className="absolute left-3 top-1/2 -translate-y-1/2 cursor-pointer text-indigo-200 transition hover:text-white"
             />
+            {isSearchOpen && query.trim().length >= MIN_QUERY_LENGTH && (
+              <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-[16rem] max-w-[28rem] overflow-hidden rounded-lg border border-white/20 bg-[hsl(var(--color-primary-strong))] text-white shadow-lg">
+                {renderSearchResults(() => {
+                  setIsSearchOpen(false);
+                  setIsMobileMenuOpen(false);
+                })}
+              </div>
+            )}
           </div>
 
 
@@ -402,7 +582,7 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => navigate("/perfil")}
-                className="inline-flex cursor-pointer items-center justify-center rounded-full border border-white/70 p-2.5 text-white transition hover:bg-white hover:text-indigo-600"
+                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/60 bg-white/15 text-white shadow-sm transition hover:bg-white/25"
                 aria-label="Perfil"
                 title="Perfil"
               >
@@ -410,7 +590,7 @@ export function Header() {
                   <img
                     src={profileImage}
                     alt="Perfil"
-                    className="h-6 w-6 rounded-full object-cover"
+                    className="h-8 w-8 rounded-full object-cover"
                   />
                 ) : (
                   <UserCircle className="h-6 w-6" />
@@ -448,21 +628,30 @@ export function Header() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="w-full rounded-md border border-white/40 bg-transparent px-4 py-2 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
+                onFocus={openSearch}
+                onBlur={() => window.setTimeout(closeSearch, 150)}
+                className="w-full rounded-md border border-white/40 bg-transparent pl-10 pr-4 py-2 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
               />
               <Search
                 onClick={handleSearch}
                 size={18}
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-indigo-200 transition hover:text-white"
+                className="absolute left-3 top-1/2 -translate-y-1/2 cursor-pointer text-indigo-200 transition hover:text-white"
               />
             </div>
           </div>
-          <NavigationMenu className="w-full">
-            <NavigationMenuList className="flex w-full flex-col gap-1">
+          {isSearchOpen && query.trim().length >= MIN_QUERY_LENGTH && (
+            <div className="mb-3 overflow-hidden rounded-lg border border-white/20 bg-[hsl(var(--color-primary-strong))] text-white shadow-lg">
+              {renderSearchResults(() => {
+                setIsSearchOpen(false);
+                setIsMobileMenuOpen(false);
+              })}
+            </div>
+          )}
+          <NavigationMenu viewport={false} className="w-full">
+            <NavigationMenuList className="grid w-full grid-cols-2 gap-x-1 gap-y-1.5">
               <NavItems onNavigate={closeMobileMenu} />
             </NavigationMenuList>
             <NavigationMenuIndicator />
-            <NavigationMenuViewport />
           </NavigationMenu>
         </div>
       )}
