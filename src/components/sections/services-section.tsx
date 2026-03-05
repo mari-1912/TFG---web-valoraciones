@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/carousel";
 import {
   ServicesFilters,
-  type DateKey,
   type DurationKey,
   type SortKey,
 } from "../service-filters";
@@ -89,7 +88,6 @@ export default function ServiceSection({
   const navigate = useNavigate();
   const [genre, setGenre] = React.useState<string>("");
   const [sort, setSort] = React.useState<SortKey>("none");
-  const [date, setDate] = React.useState<DateKey>("all");
   const [duration, setDuration] = React.useState<DurationKey>("all");
 
   const availableGenres = React.useMemo(() => {
@@ -107,13 +105,6 @@ export default function ServiceSection({
       .filter((s) =>
         matchesGenre((s as any).genre, genre),
       )
-      .filter((s) => {
-        if (date === "2025") return s.year === 2025;
-        if (date === "2024") return s.year === 2024;
-        if (date === "2023") return s.year === 2023;
-        if (date === "older") return s.year < 2023;
-        return true;
-      })
       .filter((s) => {
         if (!s.duration || duration === "all") return true;
         if (duration === "short") return s.duration <= 60;
@@ -133,7 +124,7 @@ export default function ServiceSection({
       if (sort === "oldest") return a.year - b.year;
       return 0;
     });
-  }, [items, genre, date, duration, sort]);
+  }, [items, genre, duration, sort]);
 
 
   // -------------------------
@@ -178,8 +169,6 @@ export default function ServiceSection({
               onGenreChange={setGenre}
               sort={sort}
               onSortChange={setSort}
-              date={date}
-              onDateChange={setDate}
               duration={duration}
               onDurationChange={setDuration}
               showFullFilters

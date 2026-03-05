@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 type DetailHeroProps = {
   typeLabel: string;
   title: string;
@@ -6,7 +8,7 @@ type DetailHeroProps = {
   canShowVideo: boolean;
   videoUrl: string;
   isYouTube: boolean;
-  apiRatingLabel: string;
+  apiRatingText: string;
   ourRatingLabel: string;
   hasOurRating: boolean;
   ourRating: number | null;
@@ -29,10 +31,8 @@ export function DetailHero({
   canShowVideo,
   videoUrl,
   isYouTube,
-  apiRatingLabel,
+  apiRatingText,
   ourRatingLabel,
-  hasOurRating,
-  ourRating,
   meta,
   addLabel,
   addDisabled,
@@ -43,18 +43,26 @@ export function DetailHero({
   onMarkWatched,
   markMessage,
 }: DetailHeroProps) {
+  const [showVideo, setShowVideo] = useState(false);
+  const videoRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showVideo) return;
+    videoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [showVideo]);
+
   return (
     <section className="relative overflow-hidden rounded-3xl border border-gray-200 bg-neutral-900 text-white shadow-sm">
       {image ? (
         <img
           src={image}
           alt={title}
-          className="absolute inset-0 h-full w-full object-cover opacity-40"
+          className="absolute inset-0 h-full w-full object-cover opacity-40 pointer-events-none"
         />
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
+        <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 via-neutral-900 to-black pointer-events-none" />
       )}
-      <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-transparent pointer-events-none" />
 
       <div className="relative z-10 grid gap-8 p-6 sm:p-8 lg:grid-cols-[220px_minmax(0,1fr)_240px]">
         <div className="space-y-4">
@@ -71,12 +79,13 @@ export function DetailHero({
           )}
 
           {canShowVideo ? (
-            <a
-              href="#detail-video"
+            <button
+              type="button"
+              onClick={() => setShowVideo(true)}
               className="flex items-center justify-center gap-2 rounded-full border border-yellow-400/80 px-4 py-2 text-sm font-semibold text-yellow-300 hover:bg-yellow-400/10"
             >
               ▶ Reproducir tráiler
-            </a>
+            </button>
           ) : null}
         </div>
 
@@ -90,22 +99,12 @@ export function DetailHero({
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-yellow-200">
             <span className="rounded-full border border-yellow-400/40 px-3 py-1">
-              API {apiRatingLabel}
+              ⭐ {apiRatingText}
             </span>
             <span className="rounded-full border border-yellow-400/40 px-3 py-1">
-              Opinify {ourRatingLabel}
+              ⭐ Opinify {ourRatingLabel}
             </span>
           </div>
-
-          {hasOurRating ? (
-            <div className="text-yellow-300 text-lg font-semibold">
-              {"⭐".repeat(
-                Math.max(0, Math.min(5, Math.round(ourRating ?? 0)))
-              )}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-300">⭐ null</div>
-          )}
 
           <p className="max-w-2xl text-sm leading-relaxed text-gray-200">
             {description?.trim() ? description : "Sin descripción disponible."}
@@ -134,20 +133,6 @@ export function DetailHero({
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-xl bg-black/70 p-4 text-center">
-            <p className="text-2xl font-semibold">{apiRatingLabel}</p>
-            <p className="text-xs uppercase tracking-widest text-gray-300">
-              Valoración API
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-black/70 p-4 text-center">
-            <p className="text-2xl font-semibold">{ourRatingLabel}</p>
-            <p className="text-xs uppercase tracking-widest text-gray-300">
-              Valoración Opinify
-            </p>
-          </div>
-
           <button
             type="button"
             onClick={onAddToWatchlist}
@@ -182,14 +167,25 @@ export function DetailHero({
         </div>
       </div>
 
-      {canShowVideo ? (
+      {canShowVideo && showVideo ? (
         <div
+          ref={videoRef}
           id="detail-video"
-          className="mt-8 w-full rounded-2xl border border-white/10 bg-black/80 p-5 shadow-xl"
+          className="relative z-10 mt-8 w-full rounded-2xl border border-white/10 bg-black/80 p-5 shadow-xl"
         >
-          <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-yellow-300">
-            Video
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-yellow-300">
+              Tráiler
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowVideo(false)}
+              className="rounded-full border border-yellow-400/60 bg-yellow-400/15 px-3 py-1 text-sm font-semibold text-yellow-200 transition hover:bg-yellow-400/30"
+              aria-label="Cerrar tráiler"
+            >
+              ✕
+            </button>
+          </div>
           <div className="mt-4">
             {videoUrl ? (
               <div className="aspect-video w-full overflow-hidden rounded-xl bg-black/40">

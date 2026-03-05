@@ -8,6 +8,70 @@ export type AuthUser = {
 };
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://tfg-web-valoraciones-back-i9b5.onrender.com";
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const REMEMBER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_ISSUED_AT_KEY = "sessionIssuedAt";
+const SESSION_EXPIRES_AT_KEY = "sessionExpiresAt";
+
+function resolveSessionTtl(remember: boolean) {
+  return remember ? REMEMBER_TTL_MS : SESSION_TTL_MS;
+}
+
+function getRememberPreference() {
+  return localStorage.getItem("rememberMe") === "true";
+}
+
+export function getSessionExpiry(): number | null {
+  const raw = localStorage.getItem(SESSION_EXPIRES_AT_KEY);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function isSessionValid(now = Date.now()): boolean {
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  if (!isLoggedIn) return false;
+  const expiresAt = getSessionExpiry();
+  if (!expiresAt) return false;
+  return expiresAt > now;
+}
+
+export function ensureSessionValid(now = Date.now()): boolean {
+  if (!isSessionValid(now)) {
+    clearSession({ preserveRemember: true });
+    return false;
+  }
+  return true;
+}
+
+function setSession(
+  user: { username?: string; role?: string },
+  options: { remember?: boolean; expiresAt?: number } = {}
+) {
+  const remember = options.remember ?? getRememberPreference();
+  const now = Date.now();
+  const ttl = resolveSessionTtl(remember);
+  const expiresAt =
+    options.expiresAt && options.expiresAt > now ? options.expiresAt : now + ttl;
+
+  localStorage.setItem("isLoggedIn", "true");
+  localStorage.setItem("userRole", (user.role ?? "base").toString().toLowerCase());
+  localStorage.setItem("currentUser", user.username ?? "");
+  localStorage.setItem(SESSION_ISSUED_AT_KEY, String(now));
+  localStorage.setItem(SESSION_EXPIRES_AT_KEY, String(expiresAt));
+  localStorage.setItem("rememberMe", remember ? "true" : "false");
+}
+
+function clearSession(options: { preserveRemember?: boolean } = {}) {
+  localStorage.removeItem("isLoggedIn");
+  localStorage.removeItem("userRole");
+  localStorage.removeItem("currentUser");
+  localStorage.removeItem(SESSION_ISSUED_AT_KEY);
+  localStorage.removeItem(SESSION_EXPIRES_AT_KEY);
+  if (!options.preserveRemember) {
+    localStorage.removeItem("rememberMe");
+  }
+}
 
 async function api(path: string, options: RequestInit = {}) {
   const res = await fetch(`${API_URL}${path}`, {
@@ -25,11 +89,14 @@ async function api(path: string, options: RequestInit = {}) {
  * POST /auth/register  body: { email, username, password }
  * -> backend setea cookie access_token y puede devolver { user, message }
  */
-export async function registerUser(payload: {
-  username: string;
-  email: string;
-  password: string;
-}): Promise<{ success: boolean; message: string }> {
+export async function registerUser(
+  payload: {
+    username: string;
+    email: string;
+    password: string;
+  },
+  options: { remember?: boolean } = {}
+): Promise<{ success: boolean; message: string }> {
   const { res, data } = await api("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -47,9 +114,7 @@ export async function registerUser(payload: {
   const username = data?.user?.username ?? payload.username;
   const role = (data?.user?.tipo ?? "base").toString().toLowerCase();
 
-  localStorage.setItem("isLoggedIn", "true");
-  localStorage.setItem("userRole", role);
-  localStorage.setItem("currentUser", username);
+  setSession({ username, role }, { remember: options.remember });
 
   return { success: true, message: data?.message ?? "Registro exitoso." };
 }
@@ -61,7 +126,8 @@ export async function registerUser(payload: {
  */
 export async function loginUser(
   identifier: string,
-  password: string
+  password: string,
+  remember = false
 ): Promise<{ success: boolean; message: string }> {
   const normalized = identifier.trim();
   const payload: Record<string, string> = {
@@ -93,15 +159,16 @@ export async function loginUser(
   // Cookie ya puesta: sincronizamos datos llamando a /auth/me
   const me = await getMe();
   if (me.success && me.user) {
-    localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("userRole", (me.user.role ?? "base").toLowerCase());
-    localStorage.setItem(
-      "currentUser",
-      me.user.username ?? me.user.email ?? ""
+    setSession(
+      {
+        role: (me.user.role ?? "base").toLowerCase(),
+        username: me.user.username ?? me.user.email ?? "",
+      },
+      { remember }
     );
   } else {
     // Aunque /me falle por lo que sea, consideramos login hecho
-    localStorage.setItem("isLoggedIn", "true");
+    setSession({ role: "base", username: normalized }, { remember });
   }
 
   return { success: true, message: data?.message ?? "Login correcto." };
@@ -117,10 +184,7 @@ export async function logoutUser(): Promise<void> {
   } catch {
     // En local puede fallar por CORS/red: aun así limpiamos estado.
   } finally {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("rememberMe");
+    clearSession();
   }
 }
 
@@ -137,9 +201,7 @@ export async function getMe(): Promise<{
 
   if (!res.ok) {
     // Si la cookie no es válida, limpiamos estado local
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("currentUser");
+    clearSession({ preserveRemember: true });
     return { success: false, message: data?.message ?? "No autenticado." };
   }
 
@@ -160,13 +222,24 @@ export async function getMe(): Promise<{
  * Útil para recargas: si hay cookie válida, te marca isLoggedIn.
  */
 export async function bootstrapAuth(): Promise<void> {
+  const hasLocalSession = localStorage.getItem("isLoggedIn") === "true";
+  if (!hasLocalSession) return;
+
+  const now = Date.now();
+  const expiresAt = getSessionExpiry();
+  if (!expiresAt || expiresAt <= now) {
+    clearSession({ preserveRemember: true });
+    return;
+  }
+
   const me = await getMe();
   if (me.success && me.user) {
-    localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("userRole", (me.user.role ?? "base").toLowerCase());
-    localStorage.setItem(
-      "currentUser",
-      me.user.username ?? me.user.email ?? ""
+    setSession(
+      {
+        role: (me.user.role ?? "base").toLowerCase(),
+        username: me.user.username ?? me.user.email ?? "",
+      },
+      { expiresAt }
     );
   }
 }

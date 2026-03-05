@@ -103,7 +103,7 @@ export default function Card(props: CardProps) {
   const fallbackDescription = fallbackParts.join(" • ");
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-lg transition w-full max-w-[240px] mx-auto">
+    <div className="bg-white rounded-lg shadow-md p-4 pb-1.5 flex flex-col cursor-pointer hover:shadow-lg transition w-full max-w-[240px] mx-auto">
       {resolvedCover ? (
         <img
           src={resolvedCover}
@@ -117,19 +117,19 @@ export default function Card(props: CardProps) {
         </div>
       )}
 
-      <h4 className="text-lg font-semibold mb-1 line-clamp-2 min-h-[3rem]">
+      <h4 className="text-lg font-semibold mb-1 line-clamp-3 leading-tight h-[4rem]">
         {resolvedTitle}
       </h4>
 
-      <p className="text-gray-600 text-sm mb-2 line-clamp-3 flex-1">
+      <p className="text-gray-600 text-sm mb-1 line-clamp-3 h-[3.75rem]">
         {description?.trim() ? description : fallbackDescription}
       </p>
 
-      <p className="text-gray-500 text-xs line-clamp-2 min-h-[32px]">
+      <p className="text-gray-500 text-xs line-clamp-1 h-[0.2rem]">
         {metaLine || "\u00A0"}
       </p>
 
-      <div className="mt-2 text-yellow-500 min-h-[20px]">
+      <div className="mt-0.5 text-yellow-500 h-[14px]">
         {typeof rating === "number"
           ? Array(Math.round(rating))
               .fill(0)

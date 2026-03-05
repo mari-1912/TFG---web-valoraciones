@@ -78,8 +78,7 @@ export function AppBreadcrumb() {
   const { pathname, state } = useLocation();
   const segments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
   const [remoteDetailName, setRemoteDetailName] = useState<string | null>(null);
-
-  if (!segments.length || HIDE_ON.has(segments[0])) return null;
+  const shouldHide = !segments.length || HIDE_ON.has(segments[0]);
 
   const detailInfo = useMemo(() => {
     if (segments[0] !== "detail" || segments.length < 3) return null;
@@ -145,6 +144,8 @@ export function AppBreadcrumb() {
       to: "/" + segments.slice(0, idx + 1).join("/"),
     }));
   })();
+
+  if (shouldHide) return null;
 
   return (
     <div className="w-full border-b border-gray-200 bg-white">

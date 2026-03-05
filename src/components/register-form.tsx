@@ -27,18 +27,20 @@ export default function RegisterForm({ onClose }: RegisterFormProps) {
     setLoading(true);
 
     try {
-      const result = await registerUser({
-        username: username.trim(),
-        email: email.trim(),
-        password,
-      });
+      const result = await registerUser(
+        {
+          username: username.trim(),
+          email: email.trim(),
+          password,
+        },
+        { remember }
+      );
 
       if (!result.success) {
         setError(result.message);
         return;
       }
 
-      localStorage.setItem("rememberMe", remember ? "true" : "false");
       setSuccess(result.message);
 
       setTimeout(() => {

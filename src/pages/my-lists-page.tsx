@@ -7,9 +7,10 @@ import {
   loadWatchlist,
   loadWatchedList,
 } from "../services/watchlist";
+import { isSessionValid } from "@/services/auth-service";
 
 export default function MyListsPage() {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  const isLoggedIn = isSessionValid();
   const currentUser = getCurrentUser();
   const displayUser = isLoggedIn ? currentUser : "invitado";
 

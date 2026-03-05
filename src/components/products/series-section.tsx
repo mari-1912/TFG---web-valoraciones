@@ -43,9 +43,51 @@ export default function SectionSeries({
     const load = async () => {
       setLoading(true);
       try {
-        const data = await fetchSeries();
+        const data = await fetchSeries("", 20);
         console.log("SERIES BACKEND (raw):", data);
-        setSeriesList(Array.isArray(data) ? (data as SerieBackend[]) : []);
+        const items = Array.isArray(data)
+          ? data
+          : data?.items ??
+            data?.data ??
+            data?.results ??
+            data?.series ??
+            data?.data?.items ??
+            data?.data?.results ??
+            data?.data?.series;
+        const normalized = Array.isArray(items)
+          ? items
+              .map((serie: any) => ({
+                id: serie?.id ?? serie?._id,
+                titulo: serie?.titulo ?? serie?.title ?? serie?.nombre,
+                generos:
+                  serie?.generos ??
+                  serie?.genero ??
+                  serie?.genres ??
+                  serie?.categoria ??
+                  "",
+                anio_lanzamiento:
+                  serie?.anio_lanzamiento ??
+                  serie?.anioLanzamiento ??
+                  serie?.year ??
+                  serie?.anio ??
+                  0,
+                portada:
+                  serie?.portada ??
+                  serie?.poster ??
+                  serie?.image ??
+                  serie?.imagen ??
+                  serie?.cover ??
+                  "",
+                plataformas:
+                  serie?.plataformas ??
+                  serie?.plataforma ??
+                  serie?.platforms ??
+                  serie?.platform ??
+                  "",
+              }))
+              .filter((serie) => serie.id != null)
+          : [];
+        setSeriesList(normalized);
       } catch (err) {
         console.error("Error loading series:", err);
         setSeriesList([]);

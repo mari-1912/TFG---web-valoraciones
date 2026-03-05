@@ -33,18 +33,20 @@ export default function RegisterPage() {
         return;
       }
 
-      const result = await registerUser({
-        username: username.trim(),
-        email: email.trim(),
-        password,
-      });
+      const result = await registerUser(
+        {
+          username: username.trim(),
+          email: email.trim(),
+          password,
+        },
+        { remember }
+      );
 
       if (!result.success) {
         setError(result.message);
         return;
       }
 
-      localStorage.setItem("rememberMe", remember ? "true" : "false");
       setSuccess(result.message);
 
       setTimeout(() => navigate("/home"), 200);
