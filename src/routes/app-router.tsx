@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import type { ReactElement } from "react";
 import HomePage from "../pages/home-page";
 import ServicesPage from "../pages/services-page";
@@ -11,9 +11,15 @@ import ListsCategory from "../pages/list-categories-page";
 import ListDetail from "@/pages/list-detail";
 import AboutPage from "@/pages/about-page";
 import ProfilePage from "@/pages/profile-page";
+import { ensureSessionValid } from "@/services/auth-service";
 
 function RequireAuth({ children }: { children: ReactElement }) {
-  // Temporalmente sin guardas de login (solo entra a /login si se pulsa allí).
+  const location = useLocation();
+  const isAuthed = ensureSessionValid();
+  if (!isAuthed) {
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" replace state={{ from }} />;
+  }
   return children;
 }
 

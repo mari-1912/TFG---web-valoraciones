@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, User } from "lucide-react";
 
 import { Header } from "@/components/sections/header";
@@ -17,6 +17,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromState = (
+    location.state as { from?: string | { pathname?: string } } | null
+  )?.from;
+  const from =
+    typeof fromState === "string"
+      ? fromState
+      : fromState?.pathname ?? "/home";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,17 +33,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await loginUser(identifier.trim(), password);
+      const result = await loginUser(identifier.trim(), password, remember);
 
       if (!result.success) {
         setError(result.message);
         return;
       }
 
-      localStorage.setItem("rememberMe", remember ? "true" : "false");
       setSuccess(result.message);
 
-      setTimeout(() => navigate("/home"), 200);
+      setTimeout(() => navigate(from), 200);
     } finally {
       setLoading(false);
     }

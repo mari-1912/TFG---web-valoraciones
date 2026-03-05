@@ -8,7 +8,22 @@ export type SortKey =
   | "newest"
   | "oldest";
 export type DurationKey = "all" | "short" | "medium" | "long";
-export type DateKey = "all" | "2025" | "2024" | "2023" | "older";
+export type SeasonKey = "all" | "1" | "2-3" | "4-6" | "7+";
+export type BookSeriesKey =
+  | "all"
+  | "autoconclusivo"
+  | "bilogia"
+  | "trilogia"
+  | "serie"
+  | "saga";
+export type PlatformKey =
+  | "all"
+  | "pc"
+  | "playstation"
+  | "xbox"
+  | "nintendo"
+  | "mobile"
+  | "other";
 
 
 type Props = {
@@ -27,9 +42,14 @@ type Props = {
   duration?: DurationKey;
   onDurationChange?: (v: DurationKey) => void;
 
+  seasons?: SeasonKey;
+  onSeasonsChange?: (v: SeasonKey) => void;
 
-  date?: DateKey;
-  onDateChange?: (v: DateKey) => void;
+  bookSeries?: BookSeriesKey;
+  onBookSeriesChange?: (v: BookSeriesKey) => void;
+
+  platform?: PlatformKey;
+  onPlatformChange?: (v: PlatformKey) => void;
 
 
   // Si quieres poblar géneros dinámicos según categoría
@@ -55,8 +75,12 @@ export function ServicesFilters({
   onGenreChange,
   duration,
   onDurationChange,
-  date,
-  onDateChange,
+  seasons,
+  onSeasonsChange,
+  bookSeries,
+  onBookSeriesChange,
+  platform,
+  onPlatformChange,
   genres = [],
   showFullFilters = false,
 }: Props) {
@@ -89,7 +113,7 @@ export function ServicesFilters({
 
       {/* ----------------- Filtros completos solo si showFullFilters ----------------- */}
       {showFullFilters && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-6">
           {sort && onSortChange && (
             <select
               value={sort}
@@ -123,7 +147,7 @@ export function ServicesFilters({
           )}
 
 
-          {duration && onDurationChange && (
+          {category === "peliculas" && duration && onDurationChange && (
             <select
               value={duration}
               onChange={(e) => onDurationChange(e.target.value as DurationKey)}
@@ -136,18 +160,50 @@ export function ServicesFilters({
             </select>
           )}
 
-
-          {date && onDateChange && (
+          {category === "series" && seasons && onSeasonsChange && (
             <select
-              value={date}
-              onChange={(e) => onDateChange(e.target.value as DateKey)}
+              value={seasons}
+              onChange={(e) => onSeasonsChange(e.target.value as SeasonKey)}
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
             >
-              <option value="all">Fecha</option>
-              <option value="2025">2025</option>
-              <option value="2024">2024</option>
-              <option value="2023">2023</option>
-              <option value="older">Anterior</option>
+              <option value="all">Temporadas</option>
+              <option value="1">1 temporada</option>
+              <option value="2-3">2-3 temporadas</option>
+              <option value="4-6">4-6 temporadas</option>
+              <option value="7+">7+ temporadas</option>
+            </select>
+          )}
+
+          {category === "libros" && bookSeries && onBookSeriesChange && (
+            <select
+              value={bookSeries}
+              onChange={(e) =>
+                onBookSeriesChange(e.target.value as BookSeriesKey)
+              }
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="all">Saga/Serie</option>
+              <option value="autoconclusivo">Autoconclusivo</option>
+              <option value="bilogia">Bilogia</option>
+              <option value="trilogia">Trilogia</option>
+              <option value="serie">Serie</option>
+              <option value="saga">Saga</option>
+            </select>
+          )}
+
+          {category === "videojuegos" && platform && onPlatformChange && (
+            <select
+              value={platform}
+              onChange={(e) => onPlatformChange(e.target.value as PlatformKey)}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="all">Plataforma</option>
+              <option value="pc">PC</option>
+              <option value="playstation">PlayStation</option>
+              <option value="xbox">Xbox</option>
+              <option value="nintendo">Nintendo</option>
+              <option value="mobile">Móvil</option>
+              <option value="other">Otras</option>
             </select>
           )}
         </div>
@@ -155,5 +211,4 @@ export function ServicesFilters({
     </section>
   );
 }
-
 
