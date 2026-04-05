@@ -292,6 +292,7 @@ export function DetailHero({
         </div>
       ) : null}
 
+      // Modal de puntuacion tipo IMDb
       {showRatingModal ? (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
