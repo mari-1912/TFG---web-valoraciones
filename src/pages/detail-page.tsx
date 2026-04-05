@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { DetailComments } from "../components/detail/detail-comments";
@@ -6,12 +6,13 @@ import { DetailHero } from "../components/detail/detail-hero";
 import { DetailRelated } from "../components/detail/detail-related";
 import { isSessionValid } from "@/services/auth-service";
 import {
-  addToWatchlist,
-  addToWatchedList,
-  getCurrentUser,
-  isInWatchlist,
-  isInWatchedList,
-} from "../services/watchlist";
+  type ContentStatus,
+  updateContentStatus,
+} from "../services/content-status";
+import {
+  deleteContentRating,
+  setContentRating,
+} from "../services/content-rating";
 import movies from "../data/movies.json";
 import books from "../data/books.json";
 import videoGames from "../data/video-games.json";
@@ -164,10 +165,14 @@ export function DetailPage() {
   const [remoteItem, setRemoteItem] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
-  const [watchedMessage, setWatchedMessage] = useState<string | null>(null);
-  const [inWatchlist, setInWatchlist] = useState(false);
-  const [inWatchedList, setInWatchedList] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<ContentStatus | null>(null);
+  const statusInitializedRef = useRef(false);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [ratingUpdating, setRatingUpdating] = useState(false);
+  const [ratingMessage, setRatingMessage] = useState<string | null>(null);
+  const ratingInitializedRef = useRef(false);
 
   useEffect(() => {
     if (!type || !id) return;
@@ -206,24 +211,45 @@ export function DetailPage() {
   const item = stateItem ?? localItem ?? remoteItem;
   const resolvedId = item?.id ?? id;
   const normalizedId = resolvedId != null ? String(resolvedId) : "";
-  const currentUser = getCurrentUser();
   const isLoggedIn = isSessionValid();
 
   useEffect(() => {
-    if (!type || !normalizedId) {
-      setInWatchlist(false);
-      return;
-    }
-    setInWatchlist(isInWatchlist(normalizedId, type, currentUser));
-  }, [type, normalizedId, currentUser]);
+    statusInitializedRef.current = false;
+    setCurrentStatus(null);
+    setStatusMessage(null);
+    ratingInitializedRef.current = false;
+    setUserRating(null);
+    setRatingMessage(null);
+  }, [normalizedId]);
 
   useEffect(() => {
-    if (!type || !normalizedId) {
-      setInWatchedList(false);
-      return;
+    if (!item || statusInitializedRef.current) return;
+    const candidate = pickString(item?.estado, item?.status, item?.userStatus);
+    if (
+      candidate === "watchlist" ||
+      candidate === "in_progress" ||
+      candidate === "completed" ||
+      candidate === "dropped"
+    ) {
+      setCurrentStatus(candidate);
     }
-    setInWatchedList(isInWatchedList(normalizedId, type, currentUser));
-  }, [type, normalizedId, currentUser]);
+    statusInitializedRef.current = true;
+  }, [item]);
+
+  useEffect(() => {
+    if (!item || ratingInitializedRef.current) return;
+    const candidate = parseRating(
+      item?.puntuacion_usuario ??
+        item?.valoracion_usuario ??
+        item?.userRating ??
+        item?.mi_puntuacion ??
+        item?.rating_user
+    );
+    if (candidate != null) {
+      setUserRating(candidate);
+    }
+    ratingInitializedRef.current = true;
+  }, [item]);
   const comments = useMemo(() => {
     if (Array.isArray(item?.reviews) && item.reviews.length > 0) {
       return item.reviews.map((review: any, index: number) => ({
@@ -501,59 +527,169 @@ export function DetailPage() {
   addMeta("Consolas", consolasText);
 
   const typeLabel = type ? TYPE_LABELS[type] ?? "Detalle" : "Detalle";
-  const addLabel = inWatchlist
-    ? "En tu lista por ver"
-    : "+ Añadir a la lista por ver";
-  const markLabel = inWatchedList ? "Marcada como vista" : "Marcar como vista";
-
-  const handleAddToWatchlist = () => {
-    if (!isLoggedIn) {
-      setWatchlistMessage("Inicia sesión para guardar en tu lista.");
-      return;
-    }
-    if (!type || !normalizedId || !item) return;
-    if (type !== "pelicula") {
-      setWatchlistMessage("Solo disponible para películas por ahora.");
-      return;
-    }
-    const result = addToWatchlist(
-      {
-        id: normalizedId,
-        type,
-        title,
-        image: image || undefined,
-      },
-      currentUser
-    );
-    setInWatchlist(true);
-    setWatchlistMessage(
-      result.added ? "Añadido a tu lista por ver." : "Ya estaba en tu lista."
-    );
+  const statusLabelsByType: Record<string, Record<ContentStatus, string>> = {
+    pelicula: {
+      watchlist: "Quiero ver",
+      in_progress: "Viendo",
+      completed: "Visto",
+      dropped: "Abandonado",
+    },
+    serie: {
+      watchlist: "Quiero ver",
+      in_progress: "Viendo",
+      completed: "Visto",
+      dropped: "Abandonado",
+    },
+    libro: {
+      watchlist: "Quiero leer",
+      in_progress: "Leyendo",
+      completed: "Leído",
+      dropped: "Abandonado",
+    },
+    videojuego: {
+      watchlist: "Quiero jugar",
+      in_progress: "Jugando",
+      completed: "Jugado",
+      dropped: "Abandonado",
+    },
+    "juego-mesa": {
+      watchlist: "Quiero jugar",
+      in_progress: "Jugando",
+      completed: "Jugado",
+      dropped: "Abandonado",
+    },
   };
 
-  const handleMarkAsWatched = () => {
+  const statusActiveLabelsByType: Record<
+    string,
+    Record<ContentStatus, string>
+  > = {
+    pelicula: {
+      watchlist: "Marcado para ver",
+      in_progress: "Marcado como viendo",
+      completed: "Marcado como visto",
+      dropped: "Marcado como abandonado",
+    },
+    serie: {
+      watchlist: "Marcado para ver",
+      in_progress: "Marcado como viendo",
+      completed: "Marcado como visto",
+      dropped: "Marcado como abandonado",
+    },
+    libro: {
+      watchlist: "Marcado para leer",
+      in_progress: "Marcado como leyendo",
+      completed: "Marcado como leído",
+      dropped: "Marcado como abandonado",
+    },
+    videojuego: {
+      watchlist: "Marcado para jugar",
+      in_progress: "Marcado como jugando",
+      completed: "Marcado como jugado",
+      dropped: "Marcado como abandonado",
+    },
+    "juego-mesa": {
+      watchlist: "Marcado para jugar",
+      in_progress: "Marcado como jugando",
+      completed: "Marcado como jugado",
+      dropped: "Marcado como abandonado",
+    },
+  };
+
+  const statusLabels =
+    (type && statusLabelsByType[type]) ?? statusLabelsByType.pelicula;
+  const statusActiveLabels =
+    (type && statusActiveLabelsByType[type]) ??
+    statusActiveLabelsByType.pelicula;
+
+  const statusOptions: Array<{ value: ContentStatus; label: string }> = [
+    {
+      value: "watchlist",
+      label: statusLabels.watchlist,
+      activeLabel: statusActiveLabels.watchlist,
+    },
+    {
+      value: "in_progress",
+      label: statusLabels.in_progress,
+      activeLabel: statusActiveLabels.in_progress,
+    },
+    {
+      value: "completed",
+      label: statusLabels.completed,
+      activeLabel: statusActiveLabels.completed,
+    },
+    {
+      value: "dropped",
+      label: statusLabels.dropped,
+      activeLabel: statusActiveLabels.dropped,
+    },
+  ];
+
+  const handleSetStatus = async (estado: ContentStatus) => {
     if (!isLoggedIn) {
-      setWatchedMessage("Inicia sesión para guardar en tu lista.");
+      setStatusMessage("Inicia sesión para guardar el estado.");
       return;
     }
-    if (!type || !normalizedId || !item) return;
-    if (type !== "pelicula") {
-      setWatchedMessage("Solo disponible para películas por ahora.");
+    if (!normalizedId) return;
+    setStatusUpdating(true);
+    setStatusMessage(null);
+    try {
+      await updateContentStatus(normalizedId, estado);
+      setCurrentStatus(estado);
+      setStatusMessage(null);
+    } catch (err) {
+      setStatusMessage(
+        err instanceof Error
+          ? err.message
+          : "No se pudo actualizar el estado."
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const handleSetRating = async (value: number) => {
+    if (!isLoggedIn) {
+      setRatingMessage("Inicia sesión para valorar.");
       return;
     }
-    const result = addToWatchedList(
-      {
-        id: normalizedId,
-        type,
-        title,
-        image: image || undefined,
-      },
-      currentUser
-    );
-    setInWatchedList(true);
-    setWatchedMessage(
-      result.added ? "Añadida a películas vistas." : "Ya estaba en vistas."
-    );
+    if (!normalizedId) return;
+    setRatingUpdating(true);
+    setRatingMessage(null);
+    try {
+      await setContentRating(normalizedId, value);
+      setUserRating(value);
+    } catch (err) {
+      setRatingMessage(
+        err instanceof Error
+          ? err.message
+          : "No se pudo guardar la valoración."
+      );
+    } finally {
+      setRatingUpdating(false);
+    }
+  };
+
+  const handleClearRating = async () => {
+    if (!isLoggedIn) {
+      setRatingMessage("Inicia sesión para valorar.");
+      return;
+    }
+    if (!normalizedId) return;
+    setRatingUpdating(true);
+    setRatingMessage(null);
+    try {
+      await deleteContentRating(normalizedId);
+      setUserRating(null);
+    } catch (err) {
+      setRatingMessage(
+        err instanceof Error
+          ? err.message
+          : "No se pudo eliminar la valoración."
+      );
+    } finally {
+      setRatingUpdating(false);
+    }
   };
 
   return (
@@ -584,14 +720,16 @@ export function DetailPage() {
                 hasOurRating={hasOurRating}
                 ourRating={ourRating}
                 meta={meta}
-                addLabel={addLabel}
-                addDisabled={!item || !type || inWatchlist}
-                onAddToWatchlist={handleAddToWatchlist}
-                addMessage={watchlistMessage}
-                markLabel={markLabel}
-                markDisabled={!item || !type || inWatchedList}
-                onMarkWatched={handleMarkAsWatched}
-                markMessage={watchedMessage}
+                statusOptions={statusOptions}
+                currentStatus={currentStatus}
+                statusUpdating={statusUpdating}
+                onSetStatus={handleSetStatus}
+                statusMessage={statusMessage}
+                userRating={userRating}
+                ratingUpdating={ratingUpdating}
+                onSetRating={handleSetRating}
+                onClearRating={handleClearRating}
+                ratingMessage={ratingMessage}
               />
 
               {(watchProviders?.flatrate?.length ||

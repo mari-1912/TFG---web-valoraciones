@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Star, X } from "lucide-react";
 
 type DetailHeroProps = {
   typeLabel: string;
@@ -13,14 +14,16 @@ type DetailHeroProps = {
   hasOurRating: boolean;
   ourRating: number | null;
   meta: Array<{ label: string; value: string }>;
-  addLabel: string;
-  addDisabled?: boolean;
-  onAddToWatchlist?: () => void;
-  addMessage?: string | null;
-  markLabel: string;
-  markDisabled?: boolean;
-  onMarkWatched?: () => void;
-  markMessage?: string | null;
+  statusOptions: Array<{ value: string; label: string; activeLabel?: string }>;
+  currentStatus?: string | null;
+  statusUpdating?: boolean;
+  onSetStatus?: (value: string) => void;
+  statusMessage?: string | null;
+  userRating?: number | null;
+  ratingUpdating?: boolean;
+  onSetRating?: (value: number) => void;
+  onClearRating?: () => void;
+  ratingMessage?: string | null;
 };
 
 export function DetailHero({
@@ -34,22 +37,37 @@ export function DetailHero({
   apiRatingText,
   ourRatingLabel,
   meta,
-  addLabel,
-  addDisabled,
-  onAddToWatchlist,
-  addMessage,
-  markLabel,
-  markDisabled,
-  onMarkWatched,
-  markMessage,
+  statusOptions,
+  currentStatus,
+  statusUpdating,
+  onSetStatus,
+  statusMessage,
+  userRating,
+  ratingUpdating,
+  onSetRating,
+  onClearRating,
+  ratingMessage,
 }: DetailHeroProps) {
   const [showVideo, setShowVideo] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [pendingRating, setPendingRating] = useState(0);
   const videoRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!showVideo) return;
     videoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [showVideo]);
+
+  const openRatingModal = () => {
+    setPendingRating(userRating ?? 0);
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = () => {
+    if (!pendingRating) return;
+    onSetRating?.(pendingRating);
+    setShowRatingModal(false);
+  };
 
   return (
     <section className="relative overflow-hidden rounded-3xl border border-gray-200 bg-neutral-900 text-white shadow-sm">
@@ -104,6 +122,11 @@ export function DetailHero({
             <span className="rounded-full border border-yellow-400/40 px-3 py-1">
               ⭐ Opinify {ourRatingLabel}
             </span>
+            {userRating != null ? (
+              <span className="rounded-full border border-blue-300/40 px-3 py-1 text-blue-200">
+                ⭐ Tu puntuación {userRating}/10
+              </span>
+            ) : null}
           </div>
 
           <p className="max-w-2xl text-sm leading-relaxed text-gray-200">
@@ -132,38 +155,91 @@ export function DetailHero({
           ) : null}
         </div>
 
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={onAddToWatchlist}
-            disabled={addDisabled}
-            className={[
-              "w-full rounded-xl border border-yellow-400/70 px-4 py-3 text-sm font-semibold text-yellow-300",
-              addDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-yellow-400/10",
-            ].join(" ")}
-          >
-            {addLabel}
-          </button>
-          {addMessage ? (
-            <p className="text-xs text-yellow-200">{addMessage}</p>
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            {statusOptions.map((option) => {
+              const isActive = option.value === currentStatus;
+              const tone =
+                option.value === "watchlist"
+                  ? "border-yellow-400/70 text-yellow-200"
+                  : option.value === "in_progress"
+                    ? "border-sky-400/70 text-sky-200"
+                    : option.value === "completed"
+                      ? "border-emerald-400/70 text-emerald-200"
+                      : "border-rose-400/70 text-rose-200";
+              const activeBg =
+                option.value === "watchlist"
+                  ? "bg-yellow-400/20"
+                  : option.value === "in_progress"
+                    ? "bg-sky-400/20"
+                    : option.value === "completed"
+                      ? "bg-emerald-400/20"
+                      : "bg-rose-400/20";
+              const hoverBg =
+                option.value === "watchlist"
+                  ? "hover:bg-yellow-400/10"
+                  : option.value === "in_progress"
+                    ? "hover:bg-sky-400/10"
+                    : option.value === "completed"
+                      ? "hover:bg-emerald-400/10"
+                      : "hover:bg-rose-400/10";
+              const buttonLabel =
+                isActive && option.activeLabel ? option.activeLabel : option.label;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onSetStatus?.(option.value)}
+                  disabled={statusUpdating}
+                  className={[
+                    "w-full rounded-xl border px-3 py-3 text-xs font-semibold uppercase tracking-wider transition",
+                    tone,
+                    isActive ? activeBg : hoverBg,
+                    statusUpdating ? "cursor-not-allowed opacity-60" : "",
+                  ].join(" ")}
+                >
+                  {buttonLabel}
+                </button>
+              );
+            })}
+          </div>
+          {statusMessage ? (
+            <p className="text-xs text-white/80">{statusMessage}</p>
           ) : null}
 
-          <button
-            type="button"
-            onClick={onMarkWatched}
-            disabled={markDisabled}
-            className={[
-              "w-full rounded-xl border border-emerald-400/70 px-4 py-3 text-sm font-semibold text-emerald-200",
-              markDisabled
-                ? "cursor-not-allowed opacity-60"
-                : "hover:bg-emerald-400/10",
-            ].join(" ")}
-          >
-            {markLabel}
-          </button>
-          {markMessage ? (
-            <p className="text-xs text-emerald-200">{markMessage}</p>
-          ) : null}
+          <div className="pt-2 border-t border-white/10">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-yellow-300">
+              Tu valoración
+            </p>
+            <button
+              type="button"
+              onClick={openRatingModal}
+              className="mt-3 w-full rounded-xl border border-yellow-400/60 px-4 py-3 text-sm font-semibold text-yellow-200 transition hover:bg-yellow-400/10"
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                <Star className="h-5 w-5" />
+                {userRating ? `Tu puntuación: ${userRating}/10` : "Puntuar"}
+              </span>
+            </button>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-yellow-200/80">
+                {userRating ? "Gracias por tu valoración." : "Sin valorar"}
+              </span>
+              {userRating != null ? (
+                <button
+                  type="button"
+                  onClick={onClearRating}
+                  disabled={ratingUpdating}
+                  className="text-xs font-semibold text-white/70 transition hover:text-white"
+                >
+                  Quitar
+                </button>
+              ) : null}
+            </div>
+            {ratingMessage ? (
+              <p className="mt-2 text-xs text-white/80">{ratingMessage}</p>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -212,6 +288,72 @@ export function DetailHero({
                 null
               </div>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {showRatingModal ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setShowRatingModal(false)}
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900 p-6 text-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowRatingModal(false)}
+              className="absolute right-4 top-4 rounded-full border border-white/20 p-1 text-white/70 transition hover:text-white"
+              aria-label="Cerrar valoración"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20 text-blue-200">
+                <Star className="h-6 w-6" fill="currentColor" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-yellow-300">
+                  Puntúame
+                </p>
+                <h3 className="text-xl font-semibold text-white">{title}</h3>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {Array.from({ length: 10 }, (_, index) => {
+                const value = index + 1;
+                const isActive = pendingRating >= value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setPendingRating(value)}
+                    disabled={ratingUpdating}
+                    className="rounded-full p-1 transition"
+                    aria-label={`Puntuación ${value}`}
+                  >
+                    <Star
+                      className={isActive ? "h-6 w-6 text-yellow-300" : "h-6 w-6 text-white/30"}
+                      fill={isActive ? "currentColor" : "none"}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={handleSubmitRating}
+              disabled={!pendingRating || ratingUpdating}
+              className={[
+                "mt-6 w-full rounded-full px-4 py-2 text-sm font-semibold transition",
+                !pendingRating || ratingUpdating
+                  ? "cursor-not-allowed bg-white/10 text-white/50"
+                  : "bg-white/10 text-white hover:bg-white/20",
+              ].join(" ")}
+            >
+              Puntuar
+            </button>
           </div>
         </div>
       ) : null}

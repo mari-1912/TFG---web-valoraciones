@@ -31,16 +31,80 @@ import {
 //import { useIsMobile } from "@/hooks/use-mobile";
 import { AppBreadcrumb } from "../global-breadcrumb";
 
+type ExternalType = "pelicula" | "serie" | "libro" | "videojuego";
+
+type SearchResultItem = ContentSearchItem & {
+  source?: "local" | "external";
+  externalId?: string | number;
+  provider?: string;
+};
+
+type ExternalSearchItem = {
+  externalId?: string | number;
+  titulo?: string;
+  title?: string;
+  aliases?: string[];
+  tipo?: string;
+  portada?: string;
+  anio_lanzamiento?: number;
+  anioLanzamiento?: number;
+};
+
+const API_URL = (
+  import.meta.env.VITE_API_URL ??
+  "https://tfg-web-valoraciones-back-i9b5.onrender.com"
+).replace(/\/+$/, "");
+
+const EXTERNAL_SEARCH_ENDPOINTS: Record<ExternalType, string> = {
+  pelicula: "peliculas/tmdb/search",
+  serie: "series/tmdb/search",
+  libro: "libros/google/search",
+  videojuego: "videojuegos/rawg/search",
+};
+
+const EXTERNAL_IMPORT_ENDPOINTS: Record<ExternalType, string> = {
+  pelicula: "peliculas/import/tmdb",
+  serie: "series/import/tmdb",
+  libro: "libros/import/google",
+  videojuego: "videojuegos/import/rawg",
+};
+
+const EXTERNAL_PROVIDER_LABEL: Record<ExternalType, string> = {
+  pelicula: "TMDB",
+  serie: "TMDB",
+  libro: "Google Books",
+  videojuego: "RAWG",
+};
+
+const normalizeText = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const buildApiUrl = (path: string) =>
+  `${API_URL}/${path.replace(/^\/+/, "")}`;
+
+const pickExternalTitle = (item: ExternalSearchItem) =>
+  (typeof item.titulo === "string" && item.titulo.trim()) ||
+  (typeof item.title === "string" && item.title.trim())
+    ? (item.titulo ?? item.title ?? "").trim()
+    : "";
+
+const getAliases = (item: ExternalSearchItem) =>
+  Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [];
+
 
 export function Header() {
   ///const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
-  const [searchItems, setSearchItems] = useState<ContentSearchItem[]>([]);
+  const [searchItems, setSearchItems] = useState<SearchResultItem[]>([]);
   const [searchUserResults, setSearchUserResults] = useState<UserSearchItem[]>(
     []
   );
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -67,7 +131,7 @@ export function Header() {
     videojuego: "Videojuegos",
     "juego-mesa": "Juegos de mesa",
   };
-  const groupContentItems = (items: ContentSearchItem[]) =>
+  const groupContentItems = (items: SearchResultItem[]) =>
     items.reduce(
       (acc, item) => {
         const key = item.tipo ?? "otros";
@@ -75,9 +139,9 @@ export function Header() {
         acc[key].push(item);
         return acc;
       },
-      {} as Record<string, ContentSearchItem[]>
+      {} as Record<string, SearchResultItem[]>
     );
-  const getOrderedTypes = (grouped: Record<string, ContentSearchItem[]>) => [
+  const getOrderedTypes = (grouped: Record<string, SearchResultItem[]>) => [
     ...CONTENT_TYPE_ORDER.filter((key) => grouped[key]?.length),
     ...Object.keys(grouped).filter(
       (key) => !CONTENT_TYPE_ORDER.includes(key)
@@ -89,11 +153,121 @@ export function Header() {
       .replace(/[-_]/g, " ")
       .replace(/\b\w/g, (char) => char.toUpperCase());
 
+  const scoreExternalMatch = (item: ExternalSearchItem, q: string) => {
+    const normalizedQuery = normalizeText(q);
+    const title = pickExternalTitle(item);
+    const normalizedTitle = normalizeText(title);
+    const aliases = getAliases(item).map((alias) => normalizeText(alias));
+
+    let score = 0;
+    if (normalizedTitle === normalizedQuery) score = 4;
+    else if (normalizedTitle.includes(normalizedQuery)) score = 2;
+
+    for (const alias of aliases) {
+      if (alias === normalizedQuery) score = Math.max(score, 3);
+      else if (alias.includes(normalizedQuery)) score = Math.max(score, 1);
+    }
+
+    return score;
+  };
+
+  const fetchExternalSearchResults = async (
+    endpoint: string,
+    q: string,
+    signal?: AbortSignal
+  ) => {
+    const attempt = async (param: "q" | "query") => {
+      const url = new URL(buildApiUrl(endpoint));
+      url.searchParams.set(param, q);
+      const res = await fetch(url.toString(), { signal });
+      if (!res.ok) return null;
+      const data = await res.json().catch(() => null);
+      const items = Array.isArray(data)
+        ? data
+        : data?.items ?? data?.results ?? data?.data ?? [];
+      return Array.isArray(items) ? items : [];
+    };
+
+    const primary = await attempt("q");
+    if (primary && primary.length > 0) return primary;
+    const fallback = await attempt("query");
+    return fallback ?? primary ?? [];
+  };
+
+  const searchExternalContents = async (
+    q: string,
+    signal?: AbortSignal
+  ): Promise<SearchResultItem[]> => {
+    const types: ExternalType[] = [
+      "pelicula",
+      "serie",
+      "libro",
+      "videojuego",
+    ];
+
+    const results = await Promise.all(
+      types.map(async (type) => {
+        const endpoint = EXTERNAL_SEARCH_ENDPOINTS[type];
+        const items = await fetchExternalSearchResults(
+          endpoint,
+          q,
+          signal
+        );
+        return items.map((item: ExternalSearchItem) => ({ type, item }));
+      })
+    );
+
+    const flattened = results.flat();
+    const scored = flattened
+      .map((candidate) => ({
+        type: candidate.type,
+        item: candidate.item,
+        score: scoreExternalMatch(candidate.item, q),
+      }))
+      .filter((entry) => entry.score > 0);
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20)
+      .map((entry) => {
+        const title = pickExternalTitle(entry.item);
+        return {
+          id: `external-${entry.type}-${entry.item.externalId ?? title}`,
+          tipo: (entry.item.tipo as string) ?? entry.type,
+          titulo: title || "Sin título",
+          portada: entry.item.portada ?? null,
+          puntuacion: null,
+          puntuacionApi: null,
+          source: "external",
+          externalId: entry.item.externalId,
+          provider: EXTERNAL_PROVIDER_LABEL[entry.type],
+        };
+      })
+      .filter((item) => item.externalId != null);
+  };
+
+  const importExternalItem = async (
+    type: ExternalType,
+    externalId: string | number
+  ) => {
+    const endpoint = EXTERNAL_IMPORT_ENDPOINTS[type];
+    const url = buildApiUrl(
+      `${endpoint}/${encodeURIComponent(String(externalId))}`
+    );
+    const res = await fetch(url, { method: "GET" });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`${res.status} ${text}`.trim());
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  };
+
   const fetchSearchResults = async (
     q: string,
     signal?: AbortSignal
   ): Promise<{
-    items: ContentSearchItem[];
+    items: SearchResultItem[];
     users: UserSearchItem[];
     error: string | null;
   }> => {
@@ -102,8 +276,13 @@ export function Header() {
       searchUsers(q, signal),
     ]);
 
-    const items =
-      itemsRes.status === "fulfilled" ? itemsRes.value.items ?? [] : [];
+    const localItems =
+      itemsRes.status === "fulfilled"
+        ? (itemsRes.value.items ?? []).map((item) => ({
+            ...item,
+            source: "local" as const,
+          }))
+        : [];
     const users =
       usersRes.status === "fulfilled" ? usersRes.value.results ?? [] : [];
 
@@ -112,7 +291,30 @@ export function Header() {
         ? "No se pudo buscar ahora mismo."
         : null;
 
-    return { items, users, error };
+    let externalItems: SearchResultItem[] = [];
+
+    if (!signal?.aborted && q.trim().length >= MIN_QUERY_LENGTH) {
+      try {
+        externalItems = await searchExternalContents(q, signal);
+      } catch (err) {
+        if ((err as { name?: string })?.name !== "AbortError") {
+          console.error("Error buscando en APIs externas:", err);
+        }
+      }
+    }
+
+    if (localItems.length > 0 && externalItems.length > 0) {
+      const seen = new Set(
+        localItems.map((item) =>
+          `${item.tipo}:${normalizeText(item.titulo)}`
+        )
+      );
+      externalItems = externalItems.filter(
+        (item) => !seen.has(`${item.tipo}:${normalizeText(item.titulo)}`)
+      );
+    }
+
+    return { items: [...localItems, ...externalItems], users, error };
   };
 
   const handleSearch = async () => {
@@ -128,24 +330,6 @@ export function Header() {
     setSearchUserResults(users);
     setSearchError(error);
     setSearchLoading(false);
-
-    if (items[0]) {
-      navigate(`/detail/${items[0].tipo}/${items[0].id}`);
-      setIsSearchOpen(false);
-      setIsMobileMenuOpen(false);
-      return;
-    }
-
-    if (users[0]) {
-      navigate(`/perfil?userId=${users[0].userId}`);
-      setIsSearchOpen(false);
-      setIsMobileMenuOpen(false);
-      return;
-    }
-
-    if (!error) {
-      alert(`No se encontraron resultados para: "${query}"`);
-    }
   };
 
   useEffect(() => {
@@ -251,6 +435,42 @@ export function Header() {
   const openSearch = () => setIsSearchOpen(true);
   const closeSearch = () => setIsSearchOpen(false);
 
+  const handleContentSelect = async (
+    item: SearchResultItem,
+    onSelect?: () => void
+  ) => {
+    if (item.source === "external" && item.externalId != null) {
+      setIsImporting(true);
+      try {
+        const imported = await importExternalItem(
+          item.tipo as ExternalType,
+          item.externalId
+        );
+        const importedItem = imported?.item ?? imported;
+        const importedId = importedItem?.id ?? importedItem?._id;
+
+        if (!importedId) {
+          alert("Se importó el título, pero no se pudo obtener su ID.");
+          return;
+        }
+
+        navigate(`/detail/${item.tipo}/${importedId}`, {
+          state: { item: importedItem },
+        });
+        onSelect?.();
+      } catch (err) {
+        console.error("Error importando:", err);
+        alert("No se pudo importar el título solicitado.");
+      } finally {
+        setIsImporting(false);
+      }
+      return;
+    }
+
+    navigate(`/detail/${item.tipo}/${item.id}`);
+    onSelect?.();
+  };
+
   const renderSearchResults = (onSelect?: () => void) => {
     const hasItems = searchItems.length > 0;
     const hasUsers = searchUserResults.length > 0;
@@ -337,10 +557,10 @@ export function Header() {
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
-                          navigate(`/detail/${item.tipo}/${item.id}`);
-                          onSelect?.();
+                          handleContentSelect(item, onSelect);
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-white/15"
+                        disabled={isImporting}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {item.portada ? (
                           <img
@@ -353,7 +573,7 @@ export function Header() {
                             {item.tipo.slice(0, 2)}
                           </div>
                         )}
-                        <div className="flex flex-col">
+                        <div className="flex flex-1 items-center justify-between gap-2">
                           <span className="leading-tight">{item.titulo}</span>
                         </div>
                       </button>
@@ -801,11 +1021,13 @@ export function Header() {
                           <button
                             type="button"
                             onClick={() => {
-                              navigate(`/detail/${item.tipo}/${item.id}`);
-                              setIsSearchDialogOpen(false);
-                              setIsSearchOpen(false);
+                              handleContentSelect(item, () => {
+                                setIsSearchDialogOpen(false);
+                                setIsSearchOpen(false);
+                              });
                             }}
-                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
+                            disabled={isImporting}
+                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {item.portada ? (
                               <img
@@ -818,7 +1040,9 @@ export function Header() {
                                 {item.tipo.slice(0, 2)}
                               </div>
                             )}
-                            <span className="leading-tight">{item.titulo}</span>
+                            <div className="flex flex-1 items-center justify-between gap-2">
+                              <span className="leading-tight">{item.titulo}</span>
+                            </div>
                           </button>
                         </li>
                       ))}
