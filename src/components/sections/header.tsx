@@ -238,7 +238,7 @@ export function Header() {
           portada: entry.item.portada ?? null,
           puntuacion: null,
           puntuacionApi: null,
-          source: "external",
+          source: "external" as const,
           externalId: entry.item.externalId,
           provider: EXTERNAL_PROVIDER_LABEL[entry.type],
         };
