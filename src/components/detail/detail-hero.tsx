@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Star, X } from "lucide-react";
+import type { ContentStatus } from "@/services/content-status";
 
 type DetailHeroProps = {
   typeLabel: string;
@@ -14,10 +15,14 @@ type DetailHeroProps = {
   hasOurRating: boolean;
   ourRating: number | null;
   meta: Array<{ label: string; value: string }>;
-  statusOptions: Array<{ value: string; label: string; activeLabel?: string }>;
-  currentStatus?: string | null;
+  statusOptions: Array<{
+    value: ContentStatus;
+    label: string;
+    activeLabel?: string;
+  }>;
+  currentStatus?: ContentStatus | null;
   statusUpdating?: boolean;
-  onSetStatus?: (value: string) => void;
+  onSetStatus?: (value: ContentStatus) => void;
   statusMessage?: string | null;
   userRating?: number | null;
   ratingUpdating?: boolean;

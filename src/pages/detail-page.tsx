@@ -596,13 +596,18 @@ export function DetailPage() {
     },
   };
 
+  const resolvedType = type && type.trim() ? type : "pelicula";
   const statusLabels =
-    (type && statusLabelsByType[type]) ?? statusLabelsByType.pelicula;
+    statusLabelsByType[resolvedType] ?? statusLabelsByType.pelicula;
   const statusActiveLabels =
-    (type && statusActiveLabelsByType[type]) ??
+    statusActiveLabelsByType[resolvedType] ??
     statusActiveLabelsByType.pelicula;
 
-  const statusOptions: Array<{ value: ContentStatus; label: string }> = [
+  const statusOptions: Array<{
+    value: ContentStatus;
+    label: string;
+    activeLabel: string;
+  }> = [
     {
       value: "watchlist",
       label: statusLabels.watchlist,
