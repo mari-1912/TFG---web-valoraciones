@@ -103,6 +103,26 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  a,
+  button,
+  [role="button"],
+  summary,
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* 🎨 Shadcn UI tokens — versioneados a tema neon morado */
@@ -156,5 +176,4 @@
    --card-foreground: var(--color-text);
  
 }
-
 

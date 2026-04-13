@@ -41,21 +41,32 @@ export const DEFAULT_TIMELINE: TimelineItem[] = [
 
 type ProfileTimelineProps = {
   items: TimelineItem[];
+  actionLabel?: string;
+  showAction?: boolean;
+  onAction?: () => void;
 };
 
-export function ProfileTimeline({ items }: ProfileTimelineProps) {
+export function ProfileTimeline({
+  items,
+  actionLabel = "Ver más",
+  showAction = false,
+  onAction,
+}: ProfileTimelineProps) {
   return (
     <section>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
           Actividad reciente
         </h2>
-        <button
-          type="button"
-          className="text-sm font-medium text-violet-700 hover:text-violet-800"
-        >
-          Ver todo
-        </button>
+        {showAction ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-sm font-medium text-violet-700 hover:text-violet-800"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
       </div>
 
       <div className="relative mt-4 pl-8">

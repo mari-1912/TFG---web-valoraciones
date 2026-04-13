@@ -1,0 +1,50 @@
+import { useEffect, useState } from "react";
+import { fetchMyProfile } from "@/services/profile-service";
+
+type UseDetailCurrentUserArgs = {
+  isLoggedIn: boolean;
+  refreshKey: string;
+};
+
+export function useDetailCurrentUser({
+  isLoggedIn,
+  refreshKey,
+}: UseDetailCurrentUserArgs) {
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUserAvatarUrl, setCurrentUserAvatarUrl] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCurrentUser = async () => {
+      if (!isLoggedIn) {
+        if (isMounted) {
+          setCurrentUserId(null);
+          setCurrentUserAvatarUrl(null);
+        }
+        return;
+      }
+      try {
+        const data = await fetchMyProfile();
+        if (!isMounted) return;
+        const perfil = data?.perfil ?? {};
+        setCurrentUserId(Number(perfil.userId ?? 0) || null);
+        setCurrentUserAvatarUrl(perfil.avatarUrl ?? null);
+      } catch {
+        if (isMounted) {
+          setCurrentUserId(null);
+          setCurrentUserAvatarUrl(null);
+        }
+      }
+    };
+
+    void loadCurrentUser();
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoggedIn, refreshKey]);
+
+  return { currentUserId, currentUserAvatarUrl };
+}

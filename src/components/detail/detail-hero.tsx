@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Star, X } from "lucide-react";
+import { Check, ChevronDown, ListPlus, Plus, Star, X } from "lucide-react";
 import type { ContentStatus } from "@/services/content-status";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type DetailHeroProps = {
+  contentListKey?: string;
   typeLabel: string;
   title: string;
   description: string;
@@ -22,7 +29,7 @@ type DetailHeroProps = {
   }>;
   currentStatus?: ContentStatus | null;
   statusUpdating?: boolean;
-  onSetStatus?: (value: ContentStatus) => void;
+  onSetStatus?: (value: ContentStatus | null) => void;
   statusMessage?: string | null;
   userRating?: number | null;
   ratingUpdating?: boolean;
@@ -31,7 +38,31 @@ type DetailHeroProps = {
   ratingMessage?: string | null;
 };
 
+type UserList = {
+  id: string;
+  name: string;
+};
+
+const DEFAULT_MOCK_LISTS: UserList[] = [
+  { id: "mock-favoritos", name: "Favoritos" },
+  { id: "mock-pendientes", name: "Pendientes" },
+  { id: "mock-plan-finde", name: "Plan finde" },
+];
+
+function normalizeStorageUser() {
+  if (typeof window === "undefined") return "anon";
+  const raw = localStorage.getItem("currentUser") ?? "";
+  const normalized = raw.trim().toLowerCase();
+  return normalized || "anon";
+}
+
+function normalizeContentListKey(contentListKey: string | undefined, title: string) {
+  const source = (contentListKey ?? title).trim().toLowerCase();
+  return source.replace(/\s+/g, "-");
+}
+
 export function DetailHero({
+  contentListKey,
   typeLabel,
   title,
   description,
@@ -56,12 +87,71 @@ export function DetailHero({
   const [showVideo, setShowVideo] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [pendingRating, setPendingRating] = useState(0);
+  const [userLists, setUserLists] = useState<UserList[]>([]);
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  const [isCreatingList, setIsCreatingList] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [newListError, setNewListError] = useState<string | null>(null);
   const videoRef = useRef<HTMLDivElement | null>(null);
+  const storageUser = normalizeStorageUser();
+  const normalizedListKey = normalizeContentListKey(contentListKey, title);
+  const listsStorageKey = `mock-user-lists:${storageUser}`;
+  const contentListsStorageKey = `mock-content-lists:${storageUser}:${normalizedListKey}`;
 
   useEffect(() => {
     if (!showVideo) return;
     videoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [showVideo]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const readUserLists = () => {
+      try {
+        const rawLists = localStorage.getItem(listsStorageKey);
+        if (!rawLists) {
+          localStorage.setItem(listsStorageKey, JSON.stringify(DEFAULT_MOCK_LISTS));
+          return DEFAULT_MOCK_LISTS;
+        }
+        const parsed = JSON.parse(rawLists);
+        if (!Array.isArray(parsed)) {
+          localStorage.setItem(listsStorageKey, JSON.stringify(DEFAULT_MOCK_LISTS));
+          return DEFAULT_MOCK_LISTS;
+        }
+        const normalized = parsed
+          .map((item) => {
+            if (!item || typeof item !== "object") return null;
+            const id = typeof item.id === "string" ? item.id.trim() : "";
+            const name = typeof item.name === "string" ? item.name.trim() : "";
+            if (!id || !name) return null;
+            return { id, name };
+          })
+          .filter((item): item is UserList => item != null);
+        if (!normalized.length) {
+          localStorage.setItem(listsStorageKey, JSON.stringify(DEFAULT_MOCK_LISTS));
+          return DEFAULT_MOCK_LISTS;
+        }
+        return normalized;
+      } catch {
+        return DEFAULT_MOCK_LISTS;
+      }
+    };
+
+    const nextLists = readUserLists();
+    setUserLists(nextLists);
+
+    try {
+      const rawSelected = localStorage.getItem(contentListsStorageKey);
+      const parsed = rawSelected ? JSON.parse(rawSelected) : [];
+      const validIds = Array.isArray(parsed)
+        ? parsed
+            .map((value) => (typeof value === "string" ? value : ""))
+            .filter((value) => value && nextLists.some((list) => list.id === value))
+        : [];
+      setSelectedListIds(validIds);
+    } catch {
+      setSelectedListIds([]);
+    }
+  }, [listsStorageKey, contentListsStorageKey]);
 
   const openRatingModal = () => {
     setPendingRating(userRating ?? 0);
@@ -73,6 +163,67 @@ export function DetailHero({
     onSetRating?.(pendingRating);
     setShowRatingModal(false);
   };
+
+  const currentStatusLabel = statusOptions.find(
+    (option) => option.value === currentStatus
+  )?.label;
+  const persistSelectedListIds = (nextIds: string[]) => {
+    if (typeof window === "undefined") return;
+    if (!nextIds.length) {
+      localStorage.removeItem(contentListsStorageKey);
+      return;
+    }
+    localStorage.setItem(contentListsStorageKey, JSON.stringify(nextIds));
+  };
+  const toggleListAssignment = (listId: string) => {
+    setSelectedListIds((prev) => {
+      const exists = prev.includes(listId);
+      const next = exists ? prev.filter((id) => id !== listId) : [...prev, listId];
+      persistSelectedListIds(next);
+      return next;
+    });
+  };
+  const handleCreateList = () => {
+    const normalizedName = newListName.trim();
+    if (!normalizedName) {
+      setNewListError("Escribe un nombre para la lista.");
+      return;
+    }
+    const duplicate = userLists.some(
+      (list) => list.name.toLowerCase() === normalizedName.toLowerCase()
+    );
+    if (duplicate) {
+      setNewListError("Ya existe una lista con ese nombre.");
+      return;
+    }
+    const created: UserList = {
+      id:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `mock-list-${Date.now()}`,
+      name: normalizedName,
+    };
+    const nextLists = [created, ...userLists];
+    setUserLists(nextLists);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(listsStorageKey, JSON.stringify(nextLists));
+    }
+    setSelectedListIds((prev) => {
+      const next = prev.includes(created.id) ? prev : [created.id, ...prev];
+      persistSelectedListIds(next);
+      return next;
+    });
+    setNewListName("");
+    setNewListError(null);
+    setIsCreatingList(false);
+  };
+  const selectedLists = userLists.filter((list) => selectedListIds.includes(list.id));
+  const listTriggerLabel =
+    selectedLists.length === 0
+      ? "Añadir a mi lista"
+      : selectedLists.length === 1
+      ? selectedLists[0].name
+      : `En ${selectedLists.length} listas`;
 
   return (
     <section className="relative overflow-hidden rounded-3xl border border-gray-200 bg-neutral-900 text-white shadow-sm">
@@ -161,52 +312,163 @@ export function DetailHero({
         </div>
 
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            {statusOptions.map((option) => {
-              const isActive = option.value === currentStatus;
-              const tone =
-                option.value === "watchlist"
-                  ? "border-yellow-400/70 text-yellow-200"
-                  : option.value === "in_progress"
-                    ? "border-sky-400/70 text-sky-200"
-                    : option.value === "completed"
-                      ? "border-emerald-400/70 text-emerald-200"
-                      : "border-rose-400/70 text-rose-200";
-              const activeBg =
-                option.value === "watchlist"
-                  ? "bg-yellow-400/20"
-                  : option.value === "in_progress"
-                    ? "bg-sky-400/20"
-                    : option.value === "completed"
-                      ? "bg-emerald-400/20"
-                      : "bg-rose-400/20";
-              const hoverBg =
-                option.value === "watchlist"
-                  ? "hover:bg-yellow-400/10"
-                  : option.value === "in_progress"
-                    ? "hover:bg-sky-400/10"
-                    : option.value === "completed"
-                      ? "hover:bg-emerald-400/10"
-                      : "hover:bg-rose-400/10";
-              const buttonLabel =
-                isActive && option.activeLabel ? option.activeLabel : option.label;
-              return (
+          <div className="space-y-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
-                  key={option.value}
                   type="button"
-                  onClick={() => onSetStatus?.(option.value)}
                   disabled={statusUpdating}
                   className={[
-                    "w-full rounded-xl border px-3 py-3 text-xs font-semibold uppercase tracking-wider transition",
-                    tone,
-                    isActive ? activeBg : hoverBg,
+                    "flex w-full items-center justify-between rounded-xl border border-yellow-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-yellow-200 transition",
+                    "hover:bg-yellow-400/10",
                     statusUpdating ? "cursor-not-allowed opacity-60" : "",
                   ].join(" ")}
                 >
-                  {buttonLabel}
+                  <span>{currentStatusLabel ?? "Marcar como"}</span>
+                  <ChevronDown className="h-4 w-4" />
                 </button>
-              );
-            })}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-[240px] space-y-2 rounded-2xl border border-white/10 bg-neutral-900/95 p-3 text-white shadow-2xl backdrop-blur"
+              >
+                {statusOptions.map((option) => {
+                  const isActive = option.value === currentStatus;
+                  const tone =
+                    option.value === "watchlist"
+                      ? "border-yellow-400/70 text-yellow-200"
+                      : option.value === "in_progress"
+                        ? "border-sky-400/70 text-sky-200"
+                        : option.value === "completed"
+                          ? "border-emerald-400/70 text-emerald-200"
+                          : "border-rose-400/70 text-rose-200";
+                  const activeBg =
+                    option.value === "watchlist"
+                      ? "bg-yellow-400/20"
+                      : option.value === "in_progress"
+                        ? "bg-sky-400/20"
+                        : option.value === "completed"
+                          ? "bg-emerald-400/20"
+                          : "bg-rose-400/20";
+                  const hoverBg =
+                    option.value === "watchlist"
+                      ? "hover:bg-yellow-400/10"
+                      : option.value === "in_progress"
+                        ? "hover:bg-sky-400/10"
+                        : option.value === "completed"
+                          ? "hover:bg-emerald-400/10"
+                          : "hover:bg-rose-400/10";
+                  return (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onSelect={() =>
+                        onSetStatus?.(
+                          option.value === currentStatus ? null : option.value
+                        )
+                      }
+                      disabled={statusUpdating}
+                      className={[
+                        "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
+                        tone,
+                        isActive ? activeBg : hoverBg,
+                        statusUpdating ? "cursor-not-allowed opacity-60" : "",
+                      ].join(" ")}
+                    >
+                      <span>{option.label}</span>
+                      {isActive ? (
+                        <Check className="h-4 w-4 text-white/80" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-yellow-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-yellow-200 transition hover:bg-yellow-400/10"
+                >
+                  <span>{listTriggerLabel}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-[260px] space-y-2 rounded-2xl border border-white/10 bg-neutral-900/95 p-3 text-white shadow-2xl backdrop-blur"
+              >
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-300/90">
+                  Mis listas
+                </p>
+                {userLists.map((list) => {
+                  const isSelected = selectedListIds.includes(list.id);
+                  return (
+                    <DropdownMenuItem
+                      key={list.id}
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        toggleListAssignment(list.id);
+                      }}
+                      className={[
+                        "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
+                        isSelected
+                          ? "border-yellow-400/70 bg-yellow-400/20 text-yellow-200"
+                          : "border-white/15 text-white/90 hover:bg-white/10",
+                      ].join(" ")}
+                    >
+                      <span>{list.name}</span>
+                      {isSelected ? <Check className="h-4 w-4 text-white/80" /> : null}
+                    </DropdownMenuItem>
+                  );
+                })}
+                <div className="mt-2 border-t border-white/10 pt-2">
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setIsCreatingList((prev) => !prev);
+                      setNewListError(null);
+                    }}
+                    className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/90 transition hover:bg-white/10"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Crear nueva lista
+                  </DropdownMenuItem>
+                  {isCreatingList ? (
+                    <div className="mt-2 rounded-xl border border-white/15 bg-black/30 p-2.5">
+                      <input
+                        type="text"
+                        value={newListName}
+                        onChange={(event) => {
+                          setNewListName(event.target.value);
+                          if (newListError) setNewListError(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleCreateList();
+                          }
+                        }}
+                        placeholder="Nombre de la lista"
+                        className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-yellow-300/70 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCreateList}
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-400/70 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-yellow-200 transition hover:bg-yellow-400/10"
+                      >
+                        <ListPlus className="h-4 w-4" />
+                        Crear y añadir
+                      </button>
+                      {newListError ? (
+                        <p className="mt-1 text-[11px] text-rose-300">{newListError}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
           </div>
           {statusMessage ? (
             <p className="text-xs text-white/80">{statusMessage}</p>

@@ -1,15 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Header } from "@/components/sections/header";
 import Footer from "@/components/sections/footer";
 import { ProfileHero, type QuickStat } from "@/components/profile/profile-hero";
 import { ProfileStatsSection } from "@/components/profile/profile-stats-section";
-
-import {
-  DEFAULT_TIMELINE,
-  ProfileTimeline,
-  type TimelineItem,
-} from "@/components/profile/profile-timeline";
+import { ProfileTimeline } from "@/components/profile/profile-timeline";
 import {
   fetchMyProfile,
   fetchUserProfile,
@@ -20,6 +14,14 @@ import {
   uploadProfileCover,
 } from "@/services/profile-service";
 import { getMe } from "@/services/auth-service";
+import {
+  buildTimelineFromLocalActivity,
+  buildTimelineFromPayload,
+  mergeTimelineRecords,
+  type TimelineRecord,
+} from "@/hooks/profile/profile-timeline-utils";
+import { useProfileTimelineView } from "@/hooks/profile/use-profile-timeline-view";
+import { useProfileFollow } from "@/hooks/profile/use-profile-follow";
 
 const CROP_SIZE = 240;
 const OUTPUT_SIZE = 320;
@@ -28,8 +30,6 @@ const COVER_CROP_WIDTH = 480;
 const COVER_CROP_HEIGHT = 220;
 const COVER_OUTPUT_WIDTH = 1280;
 const COVER_OUTPUT_HEIGHT = 720;
-
-
 export default function ProfilePage() {
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get("userId");
@@ -41,6 +41,7 @@ export default function ProfilePage() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [profileUserId, setProfileUserId] = useState<number | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export default function ProfilePage() {
   const [moviesCount, setMoviesCount] = useState(0);
   const [booksCount, setBooksCount] = useState(0);
   const [gamesCount, setGamesCount] = useState(0);
-  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
+  const [timelineRecords, setTimelineRecords] = useState<TimelineRecord[]>([]);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -145,6 +146,7 @@ export default function ProfilePage() {
           setIsLoggedIn(true);
           setCurrentUserId((prev) => prev ?? perfil.userId ?? null);
         }
+        setProfileUserId(Number(perfil.userId ?? requestedUserId ?? 0) || null);
 
         setUsername(perfil.username ?? "");
         setRole((perfil.tipo ?? "Base").toString());
@@ -161,13 +163,32 @@ export default function ProfilePage() {
         setMoviesCount(stats.peliculas ?? 0);
         setBooksCount(stats.libros ?? 0);
         setGamesCount(stats.videojuegos ?? 0);
+
+        const backendTimelineRecords = buildTimelineFromPayload(data);
+        const localTimelineRecords =
+          requestedUserId === null
+            ? [
+                ...buildTimelineFromLocalActivity(perfil.username ?? ""),
+                ...buildTimelineFromLocalActivity(
+                  (typeof window !== "undefined"
+                    ? localStorage.getItem("currentUser")
+                    : "") ?? ""
+                ),
+              ]
+            : [];
+
+        setTimelineRecords(
+          mergeTimelineRecords([...backendTimelineRecords, ...localTimelineRecords])
+        );
       } catch (error) {
         if (controller.signal.aborted) return;
+        setProfileUserId(null);
         setProfileError(
           error instanceof Error
             ? error.message
             : "No se pudo cargar el perfil."
         );
+        setTimelineRecords([]);
       } finally {
         if (!controller.signal.aborted) {
           setProfileLoading(false);
@@ -179,10 +200,6 @@ export default function ProfilePage() {
 
     return () => controller.abort();
   }, [requestedUserId, isLoggedIn]);
-
-  useEffect(() => {
-    setTimelineItems(DEFAULT_TIMELINE);
-  }, []);
 
   const isOwnProfile =
     requestedUserId === null ||
@@ -217,6 +234,24 @@ export default function ProfilePage() {
     { title: "Libros", value: booksCount, unit: "totales" },
     { title: "Videojuegos", value: gamesCount, unit: "totales" },
   ];
+  const {
+    timelineItems,
+    canToggleTimelineHistory,
+    timelineActionLabel,
+    handleToggleTimelineHistory,
+  } = useProfileTimelineView({
+    timelineRecords,
+    resetKey: requestedUserId,
+  });
+  const { isFollowingProfile, followMessage, handleToggleFollow } =
+    useProfileFollow({
+      canEdit,
+      isLoggedIn,
+      currentUserId,
+      profileUserId,
+      onFollowersDelta: (delta) =>
+        setFollowersCount((prev) => Math.max(0, prev + delta)),
+    });
 
   const handleToggleEdit = async () => {
     if (!canEdit) return;
@@ -659,15 +694,14 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-white">
-      <Header />
-      <div className="h-24 md:h-28" />
+      <div className="h-32 md:h-36" />
       {profileLoading && (
-        <div className="mx-auto max-w-6xl px-4 pb-4 text-sm text-gray-600">
+        <div className="mx-auto max-w-6xl px-4 pb-4 pt-3 text-sm text-gray-600">
           Cargando perfil...
         </div>
       )}
       {profileError && (
-        <div className="mx-auto max-w-6xl px-4 pb-4 text-sm text-rose-600">
+        <div className="mx-auto max-w-6xl px-4 pb-4 pt-3 text-sm text-rose-600">
           {profileError}
         </div>
       )}
@@ -694,6 +728,11 @@ export default function ProfilePage() {
         onRemoveCover={handleRemoveCover}
         onToggleEdit={handleToggleEdit}
         onBioChange={applyProfileBio}
+        showFollowAction={!canEdit && profileUserId != null}
+        isFollowing={isFollowingProfile}
+        followDisabled={!isLoggedIn || currentUserId == null}
+        onToggleFollow={handleToggleFollow}
+        followMessage={followMessage}
         avatarInputRef={fileInputRef}
         coverInputRef={coverFileInputRef}
         onAvatarChange={handleAvatarChange}
@@ -719,7 +758,12 @@ export default function ProfilePage() {
           </div>
 
           <div className="mt-10">
-            <ProfileTimeline items={timelineItems} />
+            <ProfileTimeline
+              items={timelineItems}
+              actionLabel={timelineActionLabel}
+              showAction={canToggleTimelineHistory}
+              onAction={handleToggleTimelineHistory}
+            />
           </div>
         </>
       </section>

@@ -1,18 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { DetailComments } from "../components/detail/detail-comments";
 import { DetailHero } from "../components/detail/detail-hero";
 import { DetailRelated } from "../components/detail/detail-related";
 import { isSessionValid } from "@/services/auth-service";
+import { type ContentStatus } from "../services/content-status";
 import {
-  type ContentStatus,
-  updateContentStatus,
-} from "../services/content-status";
-import {
-  deleteContentRating,
-  setContentRating,
-} from "../services/content-rating";
+  extractYear,
+  formatList,
+  getSessionUsername,
+  parseCount,
+  parseRating,
+  pickString,
+  toYouTubeEmbedUrl,
+} from "./detail-page.helpers";
+import { useDetailStatus } from "@/hooks/detail/use-detail-status";
+import { useDetailRating } from "@/hooks/detail/use-detail-rating";
+import { useDetailComments } from "@/hooks/detail/use-detail-comments";
+import { useDetailContent } from "@/hooks/detail/use-detail-content";
+import { useDetailCurrentUser } from "@/hooks/detail/use-detail-current-user";
 import movies from "../data/movies.json";
 import books from "../data/books.json";
 import videoGames from "../data/video-games.json";
@@ -46,109 +53,7 @@ const TYPE_LABELS: Record<string, string> = {
   "juego-mesa": "Juego de mesa",
 };
 
-const SAMPLE_COMMENTS = [
-  {
-    id: "sample-1",
-    user: "sara_92",
-    date: "hace 2 días",
-    rating: 4,
-    comment:
-      "Visualmente espectacular y con ritmo muy sólido. La volvería a ver sin problema.",
-  },
-  {
-    id: "sample-2",
-    user: "pablo_g",
-    date: "hace 1 semana",
-    rating: 5,
-    comment:
-      "Una historia que te engancha desde el minuto uno. Muy recomendable.",
-  },
-  {
-    id: "sample-3",
-    user: "lucia.book",
-    date: "ayer",
-    rating: 3,
-    comment:
-      "Me gustó la ambientación, aunque esperaba más profundidad en los personajes.",
-  },
-];
-
 const TMDB_IMG_BASE = "https://image.tmdb.org/t/p/";
-
-function formatList(value?: string | string[]) {
-  if (!value) return "";
-  if (Array.isArray(value)) return value.join(", ");
-  if (value.includes(";")) {
-    return value
-      .split(";")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .join(", ");
-  }
-  return value;
-}
-
-function parseRating(value: unknown) {
-  if (value == null) return null;
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") {
-    const cleaned = value.replace(",", ".");
-    const parsed = Number(cleaned);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-
-function parseCount(value: unknown) {
-  if (value == null) return null;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-  return parsed < 0 ? null : parsed;
-}
-
-function pickString(...values: Array<unknown>) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return "";
-}
-
-function extractYear(value?: string) {
-  if (!value) return null;
-  const match = value.match(/\d{4}/);
-  if (!match) return null;
-  const year = Number(match[0]);
-  return Number.isFinite(year) ? year : null;
-}
-
-function toYouTubeEmbedUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.replace("www.", "");
-    let videoId = "";
-
-    if (host === "youtu.be") {
-      videoId = parsed.pathname.slice(1);
-    } else if (host.endsWith("youtube.com")) {
-      if (parsed.pathname.startsWith("/watch")) {
-        videoId = parsed.searchParams.get("v") ?? "";
-      } else if (parsed.pathname.startsWith("/embed/")) {
-        videoId = parsed.pathname.split("/")[2] ?? "";
-      } else if (parsed.pathname.startsWith("/shorts/")) {
-        videoId = parsed.pathname.split("/")[2] ?? "";
-      }
-    }
-
-    if (!videoId) return url;
-    const start =
-      parsed.searchParams.get("start") ?? parsed.searchParams.get("t");
-    const startParam =
-      start && /^\d+$/.test(start) ? `?start=${start}` : "";
-    return `https://www.youtube.com/embed/${videoId}${startParam}`;
-  } catch {
-    return url;
-  }
-}
 
 export function DetailPage() {
   const { id, type } = useParams();
@@ -162,106 +67,27 @@ export function DetailPage() {
     return dataset.find((i) => String(i.id) === String(id)) ?? null;
   }, [type, id]);
 
-  const [remoteItem, setRemoteItem] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [statusUpdating, setStatusUpdating] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<ContentStatus | null>(null);
-  const statusInitializedRef = useRef(false);
-  const [userRating, setUserRating] = useState<number | null>(null);
-  const [ratingUpdating, setRatingUpdating] = useState(false);
-  const [ratingMessage, setRatingMessage] = useState<string | null>(null);
-  const ratingInitializedRef = useRef(false);
-
-  useEffect(() => {
-    if (!type || !id) return;
-
-    const endpoint = TYPE_ENDPOINTS[type];
-    if (!endpoint) return;
-
-    const controller = new AbortController();
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`${API_URL}/${endpoint}/${id}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`Error ${res.status}. ${text}`);
-        }
-        const data = await res.json();
-        setRemoteItem(data?.item ?? data);
-      } catch (err) {
-        if ((err as { name?: string })?.name === "AbortError") return;
-        setError(
-          err instanceof Error ? err.message : "Error cargando el detalle."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-    return () => controller.abort();
-  }, [type, id, stateItem, localItem]);
-
-  const item = stateItem ?? localItem ?? remoteItem;
-  const resolvedId = item?.id ?? id;
-  const normalizedId = resolvedId != null ? String(resolvedId) : "";
+  const { item, loading, error, normalizedId, normalizedType } =
+    useDetailContent({
+      id,
+      type,
+      stateItem,
+      localItem,
+      apiUrl: API_URL,
+      typeEndpoints: TYPE_ENDPOINTS,
+    });
+  const sessionUsername = getSessionUsername();
+  const statusCacheKey = normalizedId
+    ? `content-status:${sessionUsername}:${normalizedType}:${normalizedId}`
+    : "";
+  const ratingCacheKey = normalizedId
+    ? `content-rating:${sessionUsername}:${normalizedType}:${normalizedId}`
+    : "";
   const isLoggedIn = isSessionValid();
-
-  useEffect(() => {
-    statusInitializedRef.current = false;
-    setCurrentStatus(null);
-    setStatusMessage(null);
-    ratingInitializedRef.current = false;
-    setUserRating(null);
-    setRatingMessage(null);
-  }, [normalizedId]);
-
-  useEffect(() => {
-    if (!item || statusInitializedRef.current) return;
-    const candidate = pickString(item?.estado, item?.status, item?.userStatus);
-    if (
-      candidate === "watchlist" ||
-      candidate === "in_progress" ||
-      candidate === "completed" ||
-      candidate === "dropped"
-    ) {
-      setCurrentStatus(candidate);
-    }
-    statusInitializedRef.current = true;
-  }, [item]);
-
-  useEffect(() => {
-    if (!item || ratingInitializedRef.current) return;
-    const candidate = parseRating(
-      item?.puntuacion_usuario ??
-        item?.valoracion_usuario ??
-        item?.userRating ??
-        item?.mi_puntuacion ??
-        item?.rating_user
-    );
-    if (candidate != null) {
-      setUserRating(candidate);
-    }
-    ratingInitializedRef.current = true;
-  }, [item]);
-  const comments = useMemo(() => {
-    if (Array.isArray(item?.reviews) && item.reviews.length > 0) {
-      return item.reviews.map((review: any, index: number) => ({
-        id: review?.id ?? `review-${index}`,
-        user: pickString(review?.user, review?.usuario, review?.author) || "Usuario",
-        date: pickString(review?.date, review?.fecha) || "hace poco",
-        rating: parseRating(review?.rating) ?? null,
-        comment: pickString(review?.comment, review?.texto, review?.body),
-      }));
-    }
-    return SAMPLE_COMMENTS;
-  }, [item]);
+  const { currentUserId, currentUserAvatarUrl } = useDetailCurrentUser({
+    isLoggedIn,
+    refreshKey: normalizedId,
+  });
 
   const tmdbContent = item?.metadataApi?.tmdb?.content;
   const rawgContent = item?.metadataApi?.rawg?.content;
@@ -596,11 +422,10 @@ export function DetailPage() {
     },
   };
 
-  const resolvedType = type && type.trim() ? type : "pelicula";
   const statusLabels =
-    statusLabelsByType[resolvedType] ?? statusLabelsByType.pelicula;
+    statusLabelsByType[normalizedType] ?? statusLabelsByType.pelicula;
   const statusActiveLabels =
-    statusActiveLabelsByType[resolvedType] ??
+    statusActiveLabelsByType[normalizedType] ??
     statusActiveLabelsByType.pelicula;
 
   const statusOptions: Array<{
@@ -629,73 +454,51 @@ export function DetailPage() {
       activeLabel: statusActiveLabels.dropped,
     },
   ];
-
-  const handleSetStatus = async (estado: ContentStatus) => {
-    if (!isLoggedIn) {
-      setStatusMessage("Inicia sesión para guardar el estado.");
-      return;
-    }
-    if (!normalizedId) return;
-    setStatusUpdating(true);
-    setStatusMessage(null);
-    try {
-      await updateContentStatus(normalizedId, estado);
-      setCurrentStatus(estado);
-      setStatusMessage(null);
-    } catch (err) {
-      setStatusMessage(
-        err instanceof Error
-          ? err.message
-          : "No se pudo actualizar el estado."
-      );
-    } finally {
-      setStatusUpdating(false);
-    }
-  };
-
-  const handleSetRating = async (value: number) => {
-    if (!isLoggedIn) {
-      setRatingMessage("Inicia sesión para valorar.");
-      return;
-    }
-    if (!normalizedId) return;
-    setRatingUpdating(true);
-    setRatingMessage(null);
-    try {
-      await setContentRating(normalizedId, value);
-      setUserRating(value);
-    } catch (err) {
-      setRatingMessage(
-        err instanceof Error
-          ? err.message
-          : "No se pudo guardar la valoración."
-      );
-    } finally {
-      setRatingUpdating(false);
-    }
-  };
-
-  const handleClearRating = async () => {
-    if (!isLoggedIn) {
-      setRatingMessage("Inicia sesión para valorar.");
-      return;
-    }
-    if (!normalizedId) return;
-    setRatingUpdating(true);
-    setRatingMessage(null);
-    try {
-      await deleteContentRating(normalizedId);
-      setUserRating(null);
-    } catch (err) {
-      setRatingMessage(
-        err instanceof Error
-          ? err.message
-          : "No se pudo eliminar la valoración."
-      );
-    } finally {
-      setRatingUpdating(false);
-    }
-  };
+  const {
+    currentStatus,
+    statusUpdating,
+    statusMessage,
+    handleSetStatus,
+  } = useDetailStatus({
+    item,
+    isLoggedIn,
+    normalizedId,
+    statusCacheKey,
+    sessionUsername,
+    title,
+    statusOptions,
+  });
+  const {
+    userRating,
+    ratingUpdating,
+    ratingMessage,
+    handleSetRating,
+    handleClearRating,
+  } = useDetailRating({
+    item,
+    isLoggedIn,
+    normalizedId,
+    ratingCacheKey,
+    sessionUsername,
+    title,
+  });
+  const {
+    comments,
+    commentsError,
+    commentSubmitting,
+    deletingCommentId,
+    commentMessage,
+    handleCreateComment,
+    handleDeleteComment,
+  } = useDetailComments({
+    normalizedId,
+    isLoggedIn,
+    sessionUsername,
+    title,
+    currentUserId,
+    currentUserAvatarUrl,
+    apiUrl: API_URL,
+  });
 
   return (
     <>
@@ -713,6 +516,7 @@ export function DetailPage() {
           ) : (
             <div className="space-y-10">
               <DetailHero
+                contentListKey={`${normalizedType}:${normalizedId}`}
                 typeLabel={typeLabel}
                 title={title}
                 description={description}
@@ -856,9 +660,18 @@ export function DetailPage() {
                 </section>
               )}
 
-              <DetailRelated type={type} />
+              <DetailComments
+                comments={comments}
+                onCreateComment={handleCreateComment}
+                onDeleteComment={handleDeleteComment}
+                creatingComment={commentSubmitting}
+                deletingCommentId={deletingCommentId}
+                userRating={userRating}
+                createCommentMessage={commentMessage}
+                listErrorMessage={commentsError}
+              />
 
-              <DetailComments comments={comments} />
+              <DetailRelated type={type} />
             </div>
           )}
         </div>
