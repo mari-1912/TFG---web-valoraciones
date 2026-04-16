@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Card from "../Card";
 import { useNavigate } from "react-router-dom";
-import { Gamepad2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Gamepad2 } from "lucide-react";
 import { fetchVideoGames } from "../../services/fetchVideogames";
 
 type SectionVideoGamesProps = {
@@ -15,6 +15,7 @@ export default function SectionVideoGames({
 }: SectionVideoGamesProps) {
   const itemsPerPage = 4;
   const [startIndex, setStartIndex] = useState(0);
+  const compactScrollerRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const [games, setGames] = useState<any[]>([]);
   const sectionClass = compact ? "my-0 max-w-none" : "my-8 max-w-5xl mx-auto";
@@ -51,6 +52,16 @@ export default function SectionVideoGames({
     );
   };
 
+  const handleCompactScroll = (direction: "prev" | "next") => {
+    const scroller = compactScrollerRef.current;
+    if (!scroller) return;
+    const amount = Math.max(180, Math.floor(scroller.clientWidth * 0.8));
+    scroller.scrollBy({
+      left: direction === "next" ? amount : -amount,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <section className={sectionClass}>
       {!hideHeading ? (
@@ -59,53 +70,102 @@ export default function SectionVideoGames({
           Videojuegos
         </h3>
       ) : null}
-      <div className="relative">
-        <button
-          onClick={handlePrev}
-          disabled={startIndex === 0}
-          aria-label="Anterior"
-          className={`absolute left-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow ${
-            startIndex === 0 ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          &#8592;
-        </button>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
-          {visibleItems.map((m) => (
-            <div
-              key={m.id}
-              onClick={() => navigate(`/detail/videojuego/${m.id}`)}
-              className="cursor-pointer hover:scale-105 transform transition"
-            >
-              <Card
-                id={m.id}
-                titulo={m.titulo}
-                generos={m.generos}
-                anio_lanzamiento={m.anioLanzamiento}
-                portada={m.portada}
-                desarrollador={m.desarrollador}
-                duracion={m.duracion}
-                consolas={m.consolas}
-                plataforma={m.plataforma}
-              />
+      {compact ? (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => handleCompactScroll("prev")}
+            aria-label="Anterior"
+            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--color-primary))]/60 text-white shadow ring-1 ring-white/40 transition hover:bg-[hsl(var(--color-primary))]/70 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="sr-only">Anterior</span>
+          </button>
+          <div
+            ref={compactScrollerRef}
+            className="-mx-1 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <div className="flex w-max gap-4 px-1">
+              {games.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => navigate(`/detail/videojuego/${m.id}`)}
+                  className="w-[170px] shrink-0 cursor-pointer transition hover:scale-[1.02] sm:w-[210px]"
+                >
+                  <Card
+                    id={m.id}
+                    titulo={m.titulo}
+                    generos={m.generos}
+                    anio_lanzamiento={m.anioLanzamiento}
+                    portada={m.portada}
+                    desarrollador={m.desarrollador}
+                    duracion={m.duracion}
+                    consolas={m.consolas}
+                    plataforma={m.plataforma}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleCompactScroll("next")}
+            aria-label="Siguiente"
+            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--color-primary))]/60 text-white shadow ring-1 ring-white/40 transition hover:bg-[hsl(var(--color-primary))]/70 disabled:opacity-40"
+          >
+            <ChevronRight className="h-4 w-4" />
+            <span className="sr-only">Siguiente</span>
+          </button>
         </div>
+      ) : (
+        <div className="relative">
+          <button
+            onClick={handlePrev}
+            disabled={startIndex === 0}
+            aria-label="Anterior"
+            className={`absolute left-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow ${
+              startIndex === 0 ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            &#8592;
+          </button>
 
-        <button
-          onClick={handleNext}
-          disabled={startIndex + itemsPerPage >= totalItems}
-          aria-label="Siguiente"
-          className={`absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow ${
-            startIndex + itemsPerPage >= totalItems
-              ? "opacity-50 cursor-not-allowed"
-              : ""
-          }`}
-        >
-          &#8594;
-        </button>
-      </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
+            {visibleItems.map((m) => (
+              <div
+                key={m.id}
+                onClick={() => navigate(`/detail/videojuego/${m.id}`)}
+                className="cursor-pointer hover:scale-105 transform transition"
+              >
+                <Card
+                  id={m.id}
+                  titulo={m.titulo}
+                  generos={m.generos}
+                  anio_lanzamiento={m.anioLanzamiento}
+                  portada={m.portada}
+                  desarrollador={m.desarrollador}
+                  duracion={m.duracion}
+                  consolas={m.consolas}
+                  plataforma={m.plataforma}
+                />
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleNext}
+            disabled={startIndex + itemsPerPage >= totalItems}
+            aria-label="Siguiente"
+            className={`absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow ${
+              startIndex + itemsPerPage >= totalItems
+                ? "opacity-50 cursor-not-allowed"
+                : ""
+            }`}
+          >
+            &#8594;
+          </button>
+        </div>
+      )}
     </section>
   );
 }

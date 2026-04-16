@@ -30,10 +30,10 @@ export default function Footer() {
             </li>
             <li>
               <Link
-                to="/servicios"
+                to="/categorías"
                 className="hover:text-indigo-400 transition"
               >
-                Servicios
+                Categorías
               </Link>
             </li>
             <li>

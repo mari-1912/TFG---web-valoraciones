@@ -14,7 +14,7 @@ export default function AboutPage() {
             Sobre nosotros
           </h1>
           <p className="mt-4 text-gray-600 leading-relaxed">
-            En Pinify creemos que las mejores recomendaciones nacen de la
+            En Opinify creemos que las mejores recomendaciones nacen de la
             comunidad. Creamos un espacio donde descubrir, valorar y compartir
             opiniones sobre entretenimiento sea fácil, visual y honesto.
           </p>
@@ -80,7 +80,7 @@ export default function AboutPage() {
                 </h3>
               </div>
               <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                Estamos mejorando Pinify cada día. Si tienes sugerencias,
+                Estamos mejorando Opinify cada día. Si tienes sugerencias,
                 escríbenos y cuéntanos qué te gustaría ver.
               </p>
             </div>

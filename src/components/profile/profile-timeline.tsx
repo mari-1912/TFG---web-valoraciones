@@ -74,7 +74,7 @@ export function ProfileTimeline({
         <div className="space-y-4">
           {items.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-violet-200 bg-white p-6 text-sm text-gray-600">
-              Aquí aparecerán tus últimas valoraciones, comentarios y servicios
+              Aquí aparecerán tus últimas valoraciones, comentarios y categorías
               añadidos.
             </div>
           ) : (

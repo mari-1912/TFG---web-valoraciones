@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Card from "../Card";
 import { useNavigate } from "react-router-dom";
-import { Popcorn } from "lucide-react";
+import { ChevronLeft, ChevronRight, Popcorn } from "lucide-react";
 import { fetchMovies } from "../../services/fetchMovies";
 import { Button } from "../ui/button";
 
@@ -20,6 +20,7 @@ export default function SectionMovies({
   const [movies, setMovies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const compactScrollerRef = useRef<HTMLDivElement | null>(null);
   const sectionClass = compact ? "my-0 max-w-none" : "my-8 max-w-5xl mx-auto";
 
   useEffect(() => {
@@ -106,6 +107,16 @@ export default function SectionMovies({
     );
   };
 
+  const handleCompactScroll = (direction: "prev" | "next") => {
+    const scroller = compactScrollerRef.current;
+    if (!scroller) return;
+    const amount = Math.max(180, Math.floor(scroller.clientWidth * 0.8));
+    scroller.scrollBy({
+      left: direction === "next" ? amount : -amount,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <section className={sectionClass}>
       {!hideHeading ? (
@@ -125,56 +136,106 @@ export default function SectionMovies({
         </p>
       ) : null}
 
-      <div className="relative">
-        <Button
-          onClick={handlePrev}
-          disabled={startIndex === 0}
-          aria-label="Anterior"
-          className={`absolute left-0 top-1/2 -translate-y-1/2 bg-[hsl(var(--color-primary))] text-white rounded-full p-2 shadow transition ${
-            startIndex === 0
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-indigo-700"
-          }`}
-        >
-          &#8592;
-        </Button>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
-          {visibleItems.map((m) => (
-            <div
-              key={m.id}
-              onClick={() => navigate(`/detail/pelicula/${m.id}`)}
-              className="cursor-pointer hover:scale-105 transform transition"
-            >
-              <Card
-                id={m.id}
-                titulo={m.titulo}
-                generos={m.generos} // <- back manda string, Card lo soporta
-                anio_lanzamiento={m.anio_lanzamiento ?? 0}
-                portada={m.portada}
-                director={m.director}
-                duracion_min={m.duracion_min}
-                estudio={m.estudio}
-                plataforma={m.plataforma}
-                description={m.description}
-              />
+      {compact ? (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => handleCompactScroll("prev")}
+            aria-label="Anterior"
+            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--color-primary))]/60 text-white shadow ring-1 ring-white/40 transition hover:bg-[hsl(var(--color-primary))]/70 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="sr-only">Anterior</span>
+          </button>
+          <div
+            ref={compactScrollerRef}
+            className="-mx-1 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <div className="flex w-max gap-4 px-1">
+              {movies.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => navigate(`/detail/pelicula/${m.id}`)}
+                  className="w-[170px] shrink-0 cursor-pointer transition hover:scale-[1.02] sm:w-[210px]"
+                >
+                  <Card
+                    id={m.id}
+                    titulo={m.titulo}
+                    generos={m.generos}
+                    anio_lanzamiento={m.anio_lanzamiento ?? 0}
+                    portada={m.portada}
+                    director={m.director}
+                    duracion_min={m.duracion_min}
+                    estudio={m.estudio}
+                    plataforma={m.plataforma}
+                    description={m.description}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleCompactScroll("next")}
+            aria-label="Siguiente"
+            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--color-primary))]/60 text-white shadow ring-1 ring-white/40 transition hover:bg-[hsl(var(--color-primary))]/70 disabled:opacity-40"
+          >
+            <ChevronRight className="h-4 w-4" />
+            <span className="sr-only">Siguiente</span>
+          </button>
         </div>
+      ) : (
+        <div className="relative">
+          <Button
+            onClick={handlePrev}
+            disabled={startIndex === 0}
+            aria-label="Anterior"
+            className={`absolute left-0 top-1/2 -translate-y-1/2 bg-[hsl(var(--color-primary))] text-white rounded-full p-2 shadow transition ${
+              startIndex === 0
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-indigo-700"
+            }`}
+          >
+            &#8592;
+          </Button>
 
-        <button
-          onClick={handleNext}
-          disabled={startIndex + itemsPerPage >= totalItems}
-          aria-label="Siguiente"
-          className={`absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow transition ${
-            startIndex + itemsPerPage >= totalItems
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-indigo-700"
-          }`}
-        >
-          &#8594;
-        </button>
-      </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
+            {visibleItems.map((m) => (
+              <div
+                key={m.id}
+                onClick={() => navigate(`/detail/pelicula/${m.id}`)}
+                className="cursor-pointer hover:scale-105 transform transition"
+              >
+                <Card
+                  id={m.id}
+                  titulo={m.titulo}
+                  generos={m.generos} // <- back manda string, Card lo soporta
+                  anio_lanzamiento={m.anio_lanzamiento ?? 0}
+                  portada={m.portada}
+                  director={m.director}
+                  duracion_min={m.duracion_min}
+                  estudio={m.estudio}
+                  plataforma={m.plataforma}
+                  description={m.description}
+                />
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleNext}
+            disabled={startIndex + itemsPerPage >= totalItems}
+            aria-label="Siguiente"
+            className={`absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white rounded-full p-2 shadow transition ${
+              startIndex + itemsPerPage >= totalItems
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-indigo-700"
+            }`}
+          >
+            &#8594;
+          </button>
+        </div>
+      )}
     </section>
   );
 }

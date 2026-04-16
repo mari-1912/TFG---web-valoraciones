@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   deleteContentRating,
   setContentRating,
@@ -26,10 +26,8 @@ export function useDetailRating({
   const [userRating, setUserRating] = useState<number | null>(null);
   const [ratingUpdating, setRatingUpdating] = useState(false);
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
-  const ratingInitializedRef = useRef(false);
 
   useEffect(() => {
-    ratingInitializedRef.current = false;
     setUserRating(null);
     setRatingMessage(null);
     if (!normalizedId) return;
@@ -44,23 +42,26 @@ export function useDetailRating({
   }, [normalizedId, ratingCacheKey]);
 
   useEffect(() => {
-    if (!item || ratingInitializedRef.current) return;
+    if (!item) return;
     const candidate = parseRating(
       item?.puntuacion_usuario ??
         item?.valoracion_usuario ??
         item?.userRating ??
+        item?.personalRating ??
+        item?.miValoracion ??
+        item?.puntuacionPersonal ??
         item?.mi_puntuacion ??
         item?.rating_user ??
         item?.valoracion?.puntuacion ??
-        item?.valoracionUsuario?.puntuacion
+        item?.valoracionUsuario?.puntuacion ??
+        item?.valoracion_personal?.puntuacion
     );
-    if (candidate != null) {
-      setUserRating(candidate);
-      if (ratingCacheKey) {
-        localStorage.setItem(ratingCacheKey, String(candidate));
-      }
+    if (candidate == null) return;
+
+    setUserRating((prev) => (prev === candidate ? prev : candidate));
+    if (ratingCacheKey) {
+      localStorage.setItem(ratingCacheKey, String(candidate));
     }
-    ratingInitializedRef.current = true;
   }, [item, ratingCacheKey]);
 
   const handleSetRating = useCallback(
@@ -81,7 +82,7 @@ export function useDetailRating({
         appendProfileActivity(sessionUsername, {
           type: "rating",
           title: `Valoraste ${title}`,
-          detail: `${value}/5`,
+          detail: `${value}/10`,
           date: new Date().toISOString(),
         });
       } catch (err) {

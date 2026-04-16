@@ -1,7 +1,7 @@
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import type { ReactElement } from "react";
 import HomePage from "../pages/home-page";
-import ServicesPage from "../pages/services-page";
+import CategoriesPage from "../pages/categories-page";
 import LoginPage from "../pages/login-page";
 import { DetailPage } from "../pages/detail-page";
 import CommunityPage from "../pages/community-page";
@@ -23,6 +23,12 @@ function RequireAuth({ children }: { children: ReactElement }) {
   return children;
 }
 
+function LegacyServicesCategoryRedirect() {
+  const { categoria } = useParams();
+  const encodedCategory = encodeURIComponent(categoria ?? "");
+  return <Navigate to={`/categorías/${encodedCategory}`} replace />;
+}
+
 
 export const RoutesComponent = () => {
   return (
@@ -33,52 +39,62 @@ export const RoutesComponent = () => {
       <Route
         path="/peliculas"
         element={
-          <RequireAuth>
-            <ServicesPage />
+            <RequireAuth>
+            <CategoriesPage />
           </RequireAuth>
         }
       />
       <Route
         path="/series"
         element={
-          <RequireAuth>
-            <ServicesPage />
+            <RequireAuth>
+            <CategoriesPage />
           </RequireAuth>
         }
       />
       <Route
         path="/libros"
         element={
-          <RequireAuth>
-            <ServicesPage />
+            <RequireAuth>
+            <CategoriesPage />
           </RequireAuth>
         }
       />
       <Route
         path="/videojuegos"
         element={
-          <RequireAuth>
-            <ServicesPage />
+            <RequireAuth>
+            <CategoriesPage />
           </RequireAuth>
         }
+      />
+      <Route
+        path="/categorías/:categoria"
+        element={
+            <RequireAuth>
+            <CategoriesPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/categorias/:categoria"
+        element={<LegacyServicesCategoryRedirect />}
       />
       <Route
         path="/servicios/:categoria"
-        element={
-          <RequireAuth>
-            <ServicesPage />
-          </RequireAuth>
-        }
+        element={<LegacyServicesCategoryRedirect />}
       />
       <Route path="/inicio" element={<Navigate to="/home" replace />} />
       <Route
-        path="/servicios"
+        path="/categorías"
         element={
-          <RequireAuth>
-            <ServicesPage />
+            <RequireAuth>
+            <CategoriesPage />
           </RequireAuth>
         }
       />
+      <Route path="/categorias" element={<Navigate to="/categorías" replace />} />
+      <Route path="/servicios" element={<Navigate to="/categorías" replace />} />
       {/* Esta es la página principal de listas */}
       <Route
         path="/listas"

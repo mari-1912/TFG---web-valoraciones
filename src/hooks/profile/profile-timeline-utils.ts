@@ -52,7 +52,14 @@ function normalizeTimelineType(value: unknown): TimelineItem["type"] {
     return value;
   }
   const text = typeof value === "string" ? value.toLowerCase() : "";
-  if (text.includes("comment") || text.includes("coment")) return "comment";
+  if (
+    text.includes("comment") ||
+    text.includes("coment") ||
+    text.includes("reply") ||
+    text.includes("respuest")
+  ) {
+    return "comment";
+  }
   if (text.includes("rating") || text.includes("valor")) return "rating";
   if (text.includes("list")) return "list";
   return "service";
@@ -89,6 +96,7 @@ function collectActivityArrays(payload: any) {
 
   pushArray(root?.actividadReciente);
   pushArray(root?.actividad);
+  pushArray(root?.actividades);
   pushArray(root?.timeline);
   pushArray(root?.recentActivity);
   pushArray(root?.eventos);
@@ -98,6 +106,7 @@ function collectActivityArrays(payload: any) {
   pushArray(root?.estados, "service");
   pushArray(perfil?.actividadReciente);
   pushArray(perfil?.actividad);
+  pushArray(perfil?.actividades);
   pushArray(perfil?.timeline);
   pushArray(perfil?.comentarios, "comment");
   pushArray(perfil?.valoraciones, "rating");
@@ -111,10 +120,29 @@ function mapActivityRecord(record: any, index: number): TimelineRecord | null {
   const forcedType = record.__forcedType
     ? normalizeTimelineType(record.__forcedType)
     : null;
-  const inferredType =
+  const rawTypeValue =
+    record?.type ?? record?.tipo ?? record?.eventType ?? record?.accionTipo;
+  const normalizedTypeText =
+    typeof rawTypeValue === "string" ? rawTypeValue.toLowerCase() : "";
+  const isReplyLikeType =
+    normalizedTypeText.includes("reply") ||
+    normalizedTypeText.includes("respuest");
+  const hasParentReference =
+    record?.parentId != null ||
+    record?.parent_id != null ||
+    record?.comentarioPadreId != null;
+  const hasCommentPayload =
     record?.mensaje != null ||
     record?.comentario != null ||
-    record?.commentId != null
+    record?.textoComentario != null ||
+    record?.texto != null ||
+    record?.comment != null ||
+    record?.body != null ||
+    record?.commentId != null ||
+    record?.comentarioId != null ||
+    hasParentReference;
+  const inferredType =
+    hasCommentPayload
       ? "comment"
       : record?.puntuacion != null ||
           record?.rating != null ||
@@ -122,12 +150,7 @@ function mapActivityRecord(record: any, index: number): TimelineRecord | null {
         ? "rating"
         : record?.estado != null
           ? "service"
-          : normalizeTimelineType(
-              record?.type ??
-                record?.tipo ??
-                record?.eventType ??
-                record?.accionTipo
-            );
+          : normalizeTimelineType(rawTypeValue);
   const type = forcedType ?? inferredType;
 
   const contentTitle = pickString(
@@ -141,8 +164,14 @@ function mapActivityRecord(record: any, index: number): TimelineRecord | null {
   const rawMessage = pickString(
     record?.mensaje,
     record?.comentario,
+    record?.textoComentario,
     record?.texto,
-    record?.text
+    record?.text,
+    record?.comment,
+    record?.body,
+    record?.metadata?.textoComentario,
+    record?.metadata?.comment?.mensaje,
+    record?.metadata?.comentario?.mensaje
   );
   const rawStatus = statusLabel(record?.estado ?? record?.status);
   const rawRating = parseNumber(
@@ -165,7 +194,9 @@ function mapActivityRecord(record: any, index: number): TimelineRecord | null {
 
   if (!title) {
     if (type === "comment") {
-      title = `Comentaste${contentTitle ? ` en ${contentTitle}` : ""}`;
+      title = isReplyLikeType || hasParentReference
+        ? `Respondiste${contentTitle ? ` en ${contentTitle}` : ""}`
+        : `Comentaste${contentTitle ? ` en ${contentTitle}` : ""}`;
     } else if (type === "rating") {
       title = `Valoraste${contentTitle ? ` ${contentTitle}` : " un título"}`;
     } else if (type === "list") {
@@ -200,7 +231,9 @@ function mapActivityRecord(record: any, index: number): TimelineRecord | null {
   return {
     id: String(
       record?.id ??
+        record?.actividadId ??
         record?.commentId ??
+        record?.comentarioId ??
         record?.estadoId ??
         record?.valoracionId ??
         `timeline-${index}`

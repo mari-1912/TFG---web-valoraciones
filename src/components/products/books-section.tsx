@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../Card";
 import { fetchBooks } from "../../services/fetchBooks";
-import { BookOpen } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
 
 type Book = {
@@ -33,6 +33,7 @@ export default function SectionBooks({
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const compactScrollerRef = useRef<HTMLDivElement | null>(null);
   const sectionClass = compact ? "my-0 max-w-none" : "my-8 max-w-5xl mx-auto";
   const helperTextClass = compact ? "text-gray-500" : "text-white/70";
   const errorTextClass = compact ? "text-red-500" : "text-red-400";
@@ -117,6 +118,16 @@ export default function SectionBooks({
       Math.min(prev + itemsPerPage, Math.max(totalItems - itemsPerPage, 0))
     );
 
+  const handleCompactScroll = (direction: "prev" | "next") => {
+    const scroller = compactScrollerRef.current;
+    if (!scroller) return;
+    const amount = Math.max(180, Math.floor(scroller.clientWidth * 0.8));
+    scroller.scrollBy({
+      left: direction === "next" ? amount : -amount,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <section className={sectionClass}>
       {!hideHeading ? (
@@ -133,56 +144,105 @@ export default function SectionBooks({
       )}
 
       {!loading && !error && totalItems > 0 && (
-        <div className="relative">
-          {/* Botón anterior */}
-          <Button
-            onClick={handlePrev}
-            disabled={startIndex === 0}
-            aria-label="Anterior"
-            className={`absolute left-0 top-1/2 -translate-y-1/2 bg-[hsl(var(--color-primary))] text-white rounded-full p-2 shadow transition ${
-              startIndex === 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"
-            }`}
-          >
-            &#8592;
-          </Button>
-
-          {/* Carrusel */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
-            {visibleItems.map((book) => (
-              <div
-                key={book.id}
-                className="cursor-pointer hover:scale-105 transition-transform"
-                onClick={() => navigate(`/detail/libro/${book.id}`)}
-              >
-                <Card
-                  id={book.id}
-                  titulo={book.titulo}
-                  generos={book.generos}
-                  anio_lanzamiento={book.anio_lanzamiento}
-                  portada={book.portada}
-                  autor={book.autor}
-                  editorial={book.editorial}
-                  paginas={book.paginas}
-                  precio={book.precio}
-                />
+        compact ? (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => handleCompactScroll("prev")}
+              aria-label="Anterior"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--color-primary))]/60 text-white shadow ring-1 ring-white/40 transition hover:bg-[hsl(var(--color-primary))]/70 disabled:opacity-40"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="sr-only">Anterior</span>
+            </button>
+            <div
+              ref={compactScrollerRef}
+              className="-mx-1 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            >
+              <div className="flex w-max gap-4 px-1">
+                {books.map((book) => (
+                  <div
+                    key={book.id}
+                    className="w-[170px] shrink-0 cursor-pointer transition hover:scale-[1.02] sm:w-[210px]"
+                    onClick={() => navigate(`/detail/libro/${book.id}`)}
+                  >
+                    <Card
+                      id={book.id}
+                      titulo={book.titulo}
+                      generos={book.generos}
+                      anio_lanzamiento={book.anio_lanzamiento}
+                      portada={book.portada}
+                      autor={book.autor}
+                      editorial={book.editorial}
+                      paginas={book.paginas}
+                      precio={book.precio}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCompactScroll("next")}
+              aria-label="Siguiente"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--color-primary))]/60 text-white shadow ring-1 ring-white/40 transition hover:bg-[hsl(var(--color-primary))]/70 disabled:opacity-40"
+            >
+              <ChevronRight className="h-4 w-4" />
+              <span className="sr-only">Siguiente</span>
+            </button>
           </div>
+        ) : (
+          <div className="relative">
+            {/* Botón anterior */}
+            <Button
+              onClick={handlePrev}
+              disabled={startIndex === 0}
+              aria-label="Anterior"
+              className={`absolute left-0 top-1/2 -translate-y-1/2 bg-[hsl(var(--color-primary))] text-white rounded-full p-2 shadow transition ${
+                startIndex === 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700"
+              }`}
+            >
+              &#8592;
+            </Button>
 
-          {/* Botón siguiente */}
-          <Button
-            onClick={handleNext}
-            disabled={startIndex + itemsPerPage >= totalItems}
-            aria-label="Siguiente"
-            className={`absolute right-0 top-1/2 -translate-y-1/2 bg-[hsl(var(--color-primary))] text-white rounded-full p-2 shadow transition ${
-              startIndex + itemsPerPage >= totalItems
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-indigo-700"
-            }`}
-          >
-            &#8594;
-          </Button>
-        </div>
+            {/* Carrusel */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-hidden mx-12">
+              {visibleItems.map((book) => (
+                <div
+                  key={book.id}
+                  className="cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => navigate(`/detail/libro/${book.id}`)}
+                >
+                  <Card
+                    id={book.id}
+                    titulo={book.titulo}
+                    generos={book.generos}
+                    anio_lanzamiento={book.anio_lanzamiento}
+                    portada={book.portada}
+                    autor={book.autor}
+                    editorial={book.editorial}
+                    paginas={book.paginas}
+                    precio={book.precio}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Botón siguiente */}
+            <Button
+              onClick={handleNext}
+              disabled={startIndex + itemsPerPage >= totalItems}
+              aria-label="Siguiente"
+              className={`absolute right-0 top-1/2 -translate-y-1/2 bg-[hsl(var(--color-primary))] text-white rounded-full p-2 shadow transition ${
+                startIndex + itemsPerPage >= totalItems
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-indigo-700"
+              }`}
+            >
+              &#8594;
+            </Button>
+          </div>
+        )
       )}
     </section>
   );

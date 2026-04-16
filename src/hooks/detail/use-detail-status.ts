@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   type ContentStatus,
   updateContentStatus,
@@ -33,10 +33,8 @@ export function useDetailStatus({
   const [currentStatus, setCurrentStatus] = useState<ContentStatus | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const statusInitializedRef = useRef(false);
 
   useEffect(() => {
-    statusInitializedRef.current = false;
     setCurrentStatus(null);
     setStatusMessage(null);
     if (!normalizedId) return;
@@ -51,23 +49,25 @@ export function useDetailStatus({
   }, [normalizedId, statusCacheKey]);
 
   useEffect(() => {
-    if (!item || statusInitializedRef.current) return;
+    if (!item) return;
     const candidate = parseStoredStatus(
       pickString(
         item?.estado,
         item?.status,
         item?.userStatus,
+        item?.personalStatus,
+        item?.estadoPersonal,
         item?.estado?.estado,
-        item?.estadoUsuario?.estado
+        item?.estadoUsuario?.estado,
+        item?.estado_personal?.estado
       )
     );
-    if (candidate != null) {
-      setCurrentStatus(candidate);
-      if (statusCacheKey) {
-        localStorage.setItem(statusCacheKey, candidate);
-      }
+    if (candidate == null) return;
+
+    setCurrentStatus((prev) => (prev === candidate ? prev : candidate));
+    if (statusCacheKey) {
+      localStorage.setItem(statusCacheKey, candidate);
     }
-    statusInitializedRef.current = true;
   }, [item, statusCacheKey]);
 
   const handleSetStatus = useCallback(

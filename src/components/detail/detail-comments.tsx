@@ -1,14 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Ellipsis, ImagePlus, MessageCircleReply, Pencil, Star, Trash2, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Ellipsis,
+  ImagePlus,
+  MessageCircleReply,
+  Pencil,
+  Star,
+  ThumbsUp,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ImageCropModal } from "@/components/ui/image-crop-modal";
+import { createCroppedImage, type CropAreaPixels } from "@/lib/image-crop";
+import { formatRatingOutOfTen } from "@/pages/detail-page.helpers";
+
+const MAX_COMMENT_IMAGE_MB = 5;
+const COMMENT_IMAGE_OUTPUT_SIZE = 1080;
 
 export type DetailComment = {
   id: string;
+  numericId?: number | null;
+  parentId?: string | null;
+  repliesCount?: number;
   user: string;
   userId?: number | null;
   avatarUrl?: string | null;
@@ -17,18 +37,29 @@ export type DetailComment = {
   createdAtMs?: number | null;
   rating: number | null;
   ratingLabel?: string | null;
+  likeCount?: number;
+  isLikedByCurrentUser?: boolean;
   imageUrl?: string | null;
   comment: string;
 };
 
 type DetailCommentsProps = {
   comments: DetailComment[];
+  focusCommentId?: string | number | null;
+  focusCommentText?: string | null;
+  focusCommentUser?: string | null;
   onCreateComment?: (payload: {
     message: string;
     imageFile?: File | null;
+    parentId?: number | null;
   }) => Promise<void>;
+  onLikeComment?: (comment: DetailComment) => Promise<void>;
+  onEditComment?: (comment: DetailComment, message: string) => Promise<void>;
   onDeleteComment?: (comment: DetailComment) => Promise<void>;
+  canDeleteAnyComment?: boolean;
   creatingComment?: boolean;
+  editingCommentId?: string | null;
+  reactingCommentId?: string | null;
   deletingCommentId?: string | null;
   userRating?: number | null;
   createCommentMessage?: string | null;
@@ -37,9 +68,17 @@ type DetailCommentsProps = {
 
 export function DetailComments({
   comments,
+  focusCommentId,
+  focusCommentText,
+  focusCommentUser,
   onCreateComment,
+  onLikeComment,
+  onEditComment,
   onDeleteComment,
+  canDeleteAnyComment = false,
   creatingComment = false,
+  editingCommentId,
+  reactingCommentId,
   deletingCommentId,
   userRating,
   createCommentMessage,
@@ -47,30 +86,111 @@ export function DetailComments({
 }: DetailCommentsProps) {
   type SortMode = "recent" | "best" | "worst";
   const [draftComment, setDraftComment] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
   const [draftError, setDraftError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [failedAvatarIds, setFailedAvatarIds] = useState<Set<string>>(new Set());
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+  const [commentCropSourceUrl, setCommentCropSourceUrl] = useState<string | null>(
+    null
+  );
   const [failedCommentImageIds, setFailedCommentImageIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+  const [replyTarget, setReplyTarget] = useState<{
+    parentId: number;
+    username: string;
+  } | null>(null);
+  const [expandedReplyParents, setExpandedReplyParents] = useState<Set<string>>(
+    new Set()
+  );
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(
+    null
+  );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setDraftComment("");
+    setEditingId(null);
+    setEditingDraft("");
     setDraftError(null);
     setActionError(null);
+    setReplyTarget(null);
+    setExpandedReplyParents(new Set());
     setFailedAvatarIds(new Set());
     setFailedCommentImageIds(new Set());
   }, [comments]);
+
+  useEffect(() => {
+    const normalizedFocusId =
+      focusCommentId != null ? String(focusCommentId).trim() : "";
+    const normalizedFocusText =
+      typeof focusCommentText === "string"
+        ? focusCommentText.trim().replace(/\s+/g, " ").toLowerCase()
+        : "";
+    const normalizedFocusUser =
+      typeof focusCommentUser === "string"
+        ? focusCommentUser.trim().toLowerCase()
+        : "";
+
+    let target: DetailComment | undefined;
+    if (normalizedFocusId) {
+      target = comments.find((comment) => comment.id === normalizedFocusId);
+    }
+    if (!target && normalizedFocusText) {
+      const byText = comments.filter(
+        (comment) =>
+          comment.comment?.trim().replace(/\s+/g, " ").toLowerCase() ===
+          normalizedFocusText
+      );
+      if (byText.length && normalizedFocusUser) {
+        target = byText.find(
+          (comment) => comment.user?.trim().toLowerCase() === normalizedFocusUser
+        );
+      }
+      target ??= byText[0];
+    }
+    if (!target) return;
+
+    const targetParentId = target.parentId?.trim();
+    if (targetParentId) {
+      setExpandedReplyParents((prev) => new Set(prev).add(targetParentId));
+    }
+
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        const targetId = target?.id ?? normalizedFocusId;
+        const element = document.getElementById(`comment-${targetId}`);
+        if (!element) return;
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightedCommentId(targetId);
+        window.setTimeout(() => {
+          setHighlightedCommentId((current) =>
+            current === targetId ? null : current
+          );
+        }, 1800);
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  }, [comments, focusCommentId, focusCommentText, focusCommentUser]);
 
   useEffect(() => {
     return () => {
       if (selectedImagePreview) {
         URL.revokeObjectURL(selectedImagePreview);
       }
+      if (commentCropSourceUrl) {
+        URL.revokeObjectURL(commentCropSourceUrl);
+      }
     };
-  }, [selectedImagePreview]);
+  }, [selectedImagePreview, commentCropSourceUrl]);
 
   const sortedComments = useMemo(() => {
     const withIndex = comments.map((comment, index) => ({ comment, index }));
@@ -101,6 +221,85 @@ export function DetailComments({
     return withIndex.map((entry) => entry.comment);
   }, [comments, sortMode]);
 
+  const threadedComments = useMemo(() => {
+    const ids = new Set(sortedComments.map((comment) => comment.id));
+    const parents: DetailComment[] = [];
+    const repliesByParent = new Map<string, DetailComment[]>();
+
+    for (const comment of sortedComments) {
+      const parentId = comment.parentId?.trim() ?? "";
+      if (!parentId || !ids.has(parentId)) {
+        parents.push(comment);
+        continue;
+      }
+      const bucket = repliesByParent.get(parentId) ?? [];
+      bucket.push(comment);
+      repliesByParent.set(parentId, bucket);
+    }
+
+    for (const [, replies] of repliesByParent) {
+      replies.sort((a, b) => {
+        const aTs = a.createdAtMs ?? 0;
+        const bTs = b.createdAtMs ?? 0;
+        if (aTs === bTs) return a.id.localeCompare(b.id);
+        return aTs - bTs;
+      });
+    }
+
+    return parents.map((parent) => ({
+      parent,
+      replies: repliesByParent.get(parent.id) ?? [],
+    }));
+  }, [sortedComments]);
+
+  const clearSelectedImage = () => {
+    setSelectedImageFile(null);
+    setSelectedImagePreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
+
+  const closeCommentCropModal = () => {
+    setCommentCropSourceUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
+
+  const saveCommentCrop = async (cropAreaPixels: CropAreaPixels) => {
+    if (!commentCropSourceUrl) return;
+
+    const { blob } = await createCroppedImage({
+      imageSrc: commentCropSourceUrl,
+      cropAreaPixels,
+      outputWidth: COMMENT_IMAGE_OUTPUT_SIZE,
+      outputHeight: COMMENT_IMAGE_OUTPUT_SIZE,
+      type: "image/jpeg",
+      quality: 0.9,
+    });
+
+    const imageFile = new File([blob], `comentario-${Date.now()}.jpg`, {
+      type: blob.type || "image/jpeg",
+      lastModified: Date.now(),
+    });
+
+    const imagePreviewUrl = URL.createObjectURL(blob);
+    setSelectedImageFile(imageFile);
+    setSelectedImagePreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return imagePreviewUrl;
+    });
+    setDraftError(null);
+    closeCommentCropModal();
+  };
+
   const publishComment = async () => {
     const normalized = draftComment.trim();
     if (!normalized && !selectedImageFile) {
@@ -114,18 +313,13 @@ export function DetailComments({
       await onCreateComment({
         message: normalized,
         imageFile: selectedImageFile,
+        parentId: replyTarget?.parentId ?? null,
       });
       setDraftComment("");
       setDraftError(null);
       setActionError(null);
-      setSelectedImageFile(null);
-      if (selectedImagePreview) {
-        URL.revokeObjectURL(selectedImagePreview);
-      }
-      setSelectedImagePreview(null);
-      if (imageInputRef.current) {
-        imageInputRef.current.value = "";
-      }
+      setReplyTarget(null);
+      clearSelectedImage();
     } catch (err) {
       setDraftError(
         err instanceof Error
@@ -135,8 +329,283 @@ export function DetailComments({
     }
   };
 
+  const toggleReplies = (parentId: string) => {
+    setExpandedReplyParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(parentId)) {
+        next.delete(parentId);
+      } else {
+        next.add(parentId);
+      }
+      return next;
+    });
+  };
+
+  const startEditingComment = (comment: DetailComment) => {
+    setEditingId(comment.id);
+    setEditingDraft(comment.comment ?? "");
+    setActionError(null);
+  };
+
+  const cancelEditingComment = () => {
+    setEditingId(null);
+    setEditingDraft("");
+    setActionError(null);
+  };
+
+  const saveEditedComment = async (comment: DetailComment) => {
+    if (!onEditComment) return;
+
+    const normalized = editingDraft.trim();
+    if (!normalized) {
+      setActionError("El comentario no puede estar vacío.");
+      return;
+    }
+
+    try {
+      await onEditComment(comment, normalized);
+      cancelEditingComment();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "No se pudo editar el comentario."
+      );
+    }
+  };
+
+  const renderCommentCard = (comment: DetailComment, isReply = false) => {
+    const ownRatingValue =
+      comment.isOwn && userRating != null && Number.isFinite(userRating)
+        ? userRating
+        : null;
+    const isEditingCurrent = editingId === comment.id;
+    const isSavingCurrent = editingCommentId === comment.id;
+    const isReactingCurrent = reactingCommentId === comment.id;
+    const likeCount = Math.max(0, comment.likeCount ?? 0);
+    const normalizedCommentRatingLabel =
+      typeof comment.ratingLabel === "string" && comment.ratingLabel.trim()
+        ? comment.ratingLabel.trim()
+        : null;
+    const effectiveRatingLabel =
+      ownRatingValue != null
+        ? `${ownRatingValue}/10`
+        : normalizedCommentRatingLabel ?? formatRatingOutOfTen(comment.rating);
+    const articleClassName = isReply
+      ? "rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
+      : "rounded-xl border border-gray-200 bg-white p-4 shadow-sm";
+    const isHighlighted = highlightedCommentId === comment.id;
+
+    return (
+      <article
+        key={comment.id}
+        id={`comment-${comment.id}`}
+        className={`${articleClassName} ${isHighlighted ? "ring-2 ring-violet-300" : ""}`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700">
+            {comment.avatarUrl && !failedAvatarIds.has(comment.id) ? (
+              <img
+                src={comment.avatarUrl}
+                alt={comment.user}
+                className="h-10 w-10 rounded-full object-cover"
+                onError={() => {
+                  setFailedAvatarIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(comment.id);
+                    return next;
+                  });
+                }}
+              />
+            ) : (
+              (comment.user?.[0] ?? "U").toUpperCase()
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{comment.user}</p>
+            <p className="text-xs text-gray-500">{comment.date}</p>
+          </div>
+          <div className="ml-auto text-xs font-semibold text-yellow-500">
+            {effectiveRatingLabel ? (
+              <span className="inline-flex items-center gap-1">
+                <span>{effectiveRatingLabel}</span>
+                <Star className="h-3.5 w-3.5 fill-current" />
+              </span>
+            ) : (
+              "Sin rating"
+            )}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                aria-label="Opciones del comentario"
+              >
+                <Ellipsis className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg"
+            >
+              <DropdownMenuItem
+                onSelect={() => {
+                  const parentFromComment = Number(comment.parentId ?? 0);
+                  const targetParentId =
+                    Number.isFinite(parentFromComment) && parentFromComment > 0
+                      ? parentFromComment
+                      : Number(comment.numericId ?? 0);
+                  if (!Number.isFinite(targetParentId) || targetParentId <= 0) {
+                    setActionError("No se pudo identificar el comentario padre.");
+                    return;
+                  }
+                  setDraftComment(`@${comment.user} `);
+                  setReplyTarget({ parentId: targetParentId, username: comment.user });
+                  setExpandedReplyParents((prev) =>
+                    new Set(prev).add(String(targetParentId))
+                  );
+                  setActionError(null);
+                }}
+                className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
+              >
+                <MessageCircleReply className="h-4 w-4 text-gray-500" />
+                Responder
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={
+                  !comment.isOwn ||
+                  !onEditComment ||
+                  deletingCommentId === comment.id ||
+                  isSavingCurrent
+                }
+                onSelect={() => {
+                  startEditingComment(comment);
+                }}
+                className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
+              >
+                <Pencil className="h-4 w-4 text-gray-500" />
+                Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={
+                  (!(comment.isOwn || canDeleteAnyComment)) ||
+                  deletingCommentId === comment.id
+                }
+                onSelect={() => {
+                  if (!onDeleteComment) return;
+                  void (async () => {
+                    try {
+                      await onDeleteComment(comment);
+                      setActionError(null);
+                    } catch (err) {
+                      setActionError(
+                        err instanceof Error
+                          ? err.message
+                          : "No se pudo borrar el comentario."
+                      );
+                    }
+                  })();
+                }}
+                className="rounded-lg px-2.5 py-2 text-sm text-rose-600"
+              >
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                {deletingCommentId === comment.id ? "Borrando..." : "Eliminar"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {isEditingCurrent ? (
+          <div className="mt-3">
+            <textarea
+              value={editingDraft}
+              onChange={(event) => {
+                setEditingDraft(event.target.value);
+                if (actionError) setActionError(null);
+              }}
+              className="min-h-[90px] w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              placeholder="Edita tu comentario..."
+            />
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelEditingComment}
+                disabled={isSavingCurrent}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEditedComment(comment)}
+                disabled={isSavingCurrent}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSavingCurrent ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        ) : comment.comment ? (
+          <p className="mt-3 text-sm text-gray-600 line-clamp-4">{comment.comment}</p>
+        ) : !comment.imageUrl ? (
+          <p className="mt-3 text-sm text-gray-600">Sin comentario.</p>
+        ) : null}
+        {comment.imageUrl && !failedCommentImageIds.has(comment.id) ? (
+          <div className="mt-3">
+            <img
+              src={comment.imageUrl}
+              alt="Imagen del comentario"
+              className="h-36 w-full rounded-lg border border-gray-200 object-cover"
+              onError={() => {
+                setFailedCommentImageIds((prev) => {
+                  const next = new Set(prev);
+                  next.add(comment.id);
+                  return next;
+                });
+              }}
+            />
+          </div>
+        ) : null}
+        <div className="mt-3 flex items-center justify-end">
+          {likeCount > 0 ? (
+            <span className="mr-2 text-xs font-semibold text-gray-600">{likeCount}</span>
+          ) : null}
+          <button
+            type="button"
+            disabled={!onLikeComment || isReactingCurrent}
+            onClick={() => {
+              if (!onLikeComment) return;
+              void (async () => {
+                try {
+                  await onLikeComment(comment);
+                  setActionError(null);
+                } catch (err) {
+                  setActionError(
+                    err instanceof Error
+                      ? err.message
+                      : "No se pudo registrar el like."
+                  );
+                }
+              })();
+            }}
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              comment.isLikedByCurrentUser
+                ? "border-indigo-200 bg-indigo-100 text-indigo-700"
+                : "border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            aria-label="Dar like al comentario"
+          >
+            <ThumbsUp
+              className={`h-3.5 w-3.5 ${isReactingCurrent ? "animate-pulse" : ""}`}
+            />
+          </button>
+        </div>
+      </article>
+    );
+  };
+
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+    <>
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
           Comentarios de usuarios
@@ -188,20 +657,44 @@ export function DetailComments({
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
-              setSelectedImageFile(file);
+              if (!file) return;
 
-              if (selectedImagePreview) {
-                URL.revokeObjectURL(selectedImagePreview);
+              if (!file.type.startsWith("image/")) {
+                setDraftError("Selecciona una imagen válida.");
+                event.target.value = "";
+                return;
               }
 
-              if (file) {
-                setSelectedImagePreview(URL.createObjectURL(file));
-              } else {
-                setSelectedImagePreview(null);
+              if (file.size > MAX_COMMENT_IMAGE_MB * 1024 * 1024) {
+                setDraftError(
+                  `La imagen supera los ${MAX_COMMENT_IMAGE_MB}MB permitidos.`
+                );
+                event.target.value = "";
+                return;
               }
+
+              setCommentCropSourceUrl((current) => {
+                if (current) URL.revokeObjectURL(current);
+                return URL.createObjectURL(file);
+              });
+              setDraftError(null);
             }}
           />
         </div>
+        {replyTarget ? (
+          <div className="mx-auto mt-3 flex w-full max-w-4xl items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+            <span>
+              Respondiendo a <strong>@{replyTarget.username}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setReplyTarget(null)}
+              className="rounded-md border border-indigo-200 bg-white px-2 py-1 font-semibold text-indigo-700 transition hover:bg-indigo-100"
+            >
+              Cancelar respuesta
+            </button>
+          </div>
+        ) : null}
         {selectedImagePreview ? (
           <div className="mx-auto mt-3 w-full max-w-4xl">
             <div className="relative inline-block">
@@ -212,16 +705,7 @@ export function DetailComments({
             />
             <button
               type="button"
-              onClick={() => {
-                setSelectedImageFile(null);
-                if (selectedImagePreview) {
-                  URL.revokeObjectURL(selectedImagePreview);
-                }
-                setSelectedImagePreview(null);
-                if (imageInputRef.current) {
-                  imageInputRef.current.value = "";
-                }
-              }}
+              onClick={clearSelectedImage}
               className="absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100"
               aria-label="Quitar imagen"
             >
@@ -259,164 +743,77 @@ export function DetailComments({
         ) : null}
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 space-y-4">
         {listErrorMessage ? (
-          <p className="text-sm text-rose-600 sm:col-span-2 lg:col-span-3">
-            {listErrorMessage}
-          </p>
+          <p className="text-sm text-rose-600">{listErrorMessage}</p>
         ) : null}
-        {!listErrorMessage && sortedComments.length === 0 ? (
-          <p className="text-sm text-gray-500 sm:col-span-2 lg:col-span-3">
+        {!listErrorMessage && threadedComments.length === 0 ? (
+          <p className="text-sm text-gray-500">
             Aún no hay comentarios para este título.
           </p>
         ) : null}
-        {sortedComments.map((comment) => {
-          const ownRatingValue =
-            comment.isOwn &&
-            userRating != null &&
-            Number.isFinite(userRating)
-              ? userRating
-              : null;
-          const effectiveRatingLabel =
-            ownRatingValue != null ? `${ownRatingValue}/10` : comment.ratingLabel;
-          const effectiveStars =
-            ownRatingValue != null
-              ? Math.max(0, Math.min(5, Math.round(ownRatingValue / 2)))
-              : comment.rating != null
-                ? Math.max(0, Math.min(5, Math.round(comment.rating)))
-                : null;
-
+        {threadedComments.map(({ parent, replies }) => {
+          const isExpanded = expandedReplyParents.has(parent.id);
+          const totalReplies = Math.max(replies.length, parent.repliesCount ?? 0);
           return (
-            <article
-              key={comment.id}
-              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700">
-                  {comment.avatarUrl && !failedAvatarIds.has(comment.id) ? (
-                    <img
-                      src={comment.avatarUrl}
-                      alt={comment.user}
-                      className="h-10 w-10 rounded-full object-cover"
-                      onError={() => {
-                        setFailedAvatarIds((prev) => {
-                          const next = new Set(prev);
-                          next.add(comment.id);
-                          return next;
-                        });
-                      }}
-                    />
-                  ) : (
-                    (comment.user?.[0] ?? "U").toUpperCase()
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {comment.user}
-                  </p>
-                  <p className="text-xs text-gray-500">{comment.date}</p>
-                </div>
-                <div className="ml-auto text-xs font-semibold text-yellow-500">
-                  {effectiveRatingLabel || effectiveStars != null ? (
-                    <span className="inline-flex items-center gap-1">
-                      <span>
-                        {effectiveRatingLabel
-                          ? effectiveRatingLabel
-                          : "⭐".repeat(effectiveStars ?? 0)}
-                      </span>
-                      <Star className="h-3.5 w-3.5 fill-current" />
-                    </span>
-                  ) : (
-                    "Sin rating"
-                  )}
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-                      aria-label="Opciones del comentario"
-                    >
-                      <Ellipsis className="h-4 w-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg"
+            <div key={parent.id}>
+              {renderCommentCard(parent)}
+              {totalReplies > 0 ? (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleReplies(parent.id)}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
                   >
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        setDraftComment(`@${comment.user} `);
-                        setActionError(null);
-                      }}
-                      className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
-                    >
-                      <MessageCircleReply className="h-4 w-4 text-gray-500" />
-                      Responder
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!comment.isOwn}
-                      onSelect={() => {
-                        setActionError("Editar comentario estará disponible pronto.");
-                      }}
-                      className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
-                    >
-                      <Pencil className="h-4 w-4 text-gray-500" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!comment.isOwn || deletingCommentId === comment.id}
-                      onSelect={() => {
-                        if (!onDeleteComment) return;
-                        void (async () => {
-                          try {
-                            await onDeleteComment(comment);
-                            setActionError(null);
-                          } catch (err) {
-                            setActionError(
-                              err instanceof Error
-                                ? err.message
-                                : "No se pudo borrar el comentario."
-                            );
-                          }
-                        })();
-                      }}
-                      className="rounded-lg px-2.5 py-2 text-sm text-rose-600"
-                    >
-                      <Trash2 className="h-4 w-4 text-rose-500" />
-                      {deletingCommentId === comment.id ? "Borrando..." : "Eliminar"}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              {comment.comment ? (
-                <p className="mt-3 text-sm text-gray-600 line-clamp-4">
-                  {comment.comment}
-                </p>
-              ) : !comment.imageUrl ? (
-                <p className="mt-3 text-sm text-gray-600">Sin comentario.</p>
-              ) : null}
-              {comment.imageUrl && !failedCommentImageIds.has(comment.id) ? (
-                <div className="mt-3">
-                  <img
-                    src={comment.imageUrl}
-                    alt="Imagen del comentario"
-                    className="h-36 w-full rounded-lg border border-gray-200 object-cover"
-                    onError={() => {
-                      setFailedCommentImageIds((prev) => {
-                        const next = new Set(prev);
-                        next.add(comment.id);
-                        return next;
-                      });
-                    }}
-                  />
+                    {isExpanded ? (
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    )}
+                    {isExpanded ? "Ocultar respuestas" : "Ver respuestas"} ({totalReplies})
+                  </button>
                 </div>
               ) : null}
-            </article>
+              {totalReplies > 0 && isExpanded ? (
+                <div className="mt-3 space-y-3 border-l border-gray-200 pl-4 sm:pl-6">
+                  {replies.length > 0 ? (
+                    replies.map((reply) => renderCommentCard(reply, true))
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Hay respuestas, pero no se han cargado en este bloque.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </div>
     </section>
+      <ImageCropModal
+        open={Boolean(commentCropSourceUrl)}
+        imageSrc={commentCropSourceUrl}
+        title="Recortar imagen del comentario"
+        description="Ajusta la imagen antes de adjuntarla al comentario."
+        aspect={1}
+        cropShape="rect"
+        panelClassName="max-w-xl"
+        cropAreaClassName="h-[320px] w-full"
+        confirmLabel="Usar imagen"
+        savingLabel="Procesando..."
+        onClose={closeCommentCropModal}
+        onSave={async (cropAreaPixels) => {
+          try {
+            await saveCommentCrop(cropAreaPixels);
+          } catch (error) {
+            setDraftError(
+              error instanceof Error
+                ? error.message
+                : "No se pudo recortar la imagen."
+            );
+          }
+        }}
+      />
+    </>
   );
 }

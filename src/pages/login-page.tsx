@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, User } from "lucide-react";
 
 import { Header } from "@/components/sections/header";
@@ -18,13 +18,16 @@ export default function LoginPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const fromState = (
     location.state as { from?: string | { pathname?: string } } | null
   )?.from;
+  const fromQuery = searchParams.get("from");
+  const reason = searchParams.get("reason");
   const from =
     typeof fromState === "string"
       ? fromState
-      : fromState?.pathname ?? "/home";
+      : fromState?.pathname ?? (fromQuery?.trim() || "/home");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,6 +135,11 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
+            {!error && reason === "session-expired" ? (
+              <p className="text-center text-sm font-medium text-amber-700">
+                Tu sesión ha expirado. Inicia sesión de nuevo.
+              </p>
+            ) : null}
             {success && (
               <p className="text-center text-sm font-medium text-green-600">
                 {success}

@@ -4,6 +4,7 @@ import Footer from "../components/sections/footer";
 import { DetailComments } from "../components/detail/detail-comments";
 import { DetailHero } from "../components/detail/detail-hero";
 import { DetailRelated } from "../components/detail/detail-related";
+import { Skeleton } from "@/components/ui/skeleton";
 import { isSessionValid } from "@/services/auth-service";
 import { type ContentStatus } from "../services/content-status";
 import {
@@ -58,7 +59,28 @@ const TMDB_IMG_BASE = "https://image.tmdb.org/t/p/";
 export function DetailPage() {
   const { id, type } = useParams();
   const location = useLocation();
-  const stateItem = (location.state as { item?: any } | null)?.item ?? null;
+  const locationState = location.state as
+    | {
+        item?: any;
+        focusCommentId?: string | number | null;
+        focusCommentText?: string | null;
+        focusCommentUser?: string | null;
+      }
+    | null;
+  const stateItem = locationState?.item ?? null;
+  const focusCommentIdFromState = locationState?.focusCommentId ?? null;
+  const focusCommentTextFromState = locationState?.focusCommentText ?? null;
+  const focusCommentUserFromState = locationState?.focusCommentUser ?? null;
+  const focusCommentIdFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("commentId");
+  }, [location.search]);
+  const focusCommentTextFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("commentText");
+  }, [location.search]);
+  const focusCommentId = focusCommentIdFromQuery ?? focusCommentIdFromState;
+  const focusCommentText = focusCommentTextFromQuery ?? focusCommentTextFromState;
 
   const localItem = useMemo(() => {
     if (!type || !id) return null;
@@ -67,7 +89,7 @@ export function DetailPage() {
     return dataset.find((i) => String(i.id) === String(id)) ?? null;
   }, [type, id]);
 
-  const { item, loading, error, normalizedId, normalizedType } =
+  const { item, normalizedId, normalizedType } =
     useDetailContent({
       id,
       type,
@@ -84,7 +106,8 @@ export function DetailPage() {
     ? `content-rating:${sessionUsername}:${normalizedType}:${normalizedId}`
     : "";
   const isLoggedIn = isSessionValid();
-  const { currentUserId, currentUserAvatarUrl } = useDetailCurrentUser({
+  const { currentUserId, currentUserAvatarUrl, currentUserIsAdmin } =
+    useDetailCurrentUser({
     isLoggedIn,
     refreshKey: normalizedId,
   });
@@ -486,13 +509,18 @@ export function DetailPage() {
     comments,
     commentsError,
     commentSubmitting,
+    editingCommentId,
+    reactingCommentId,
     deletingCommentId,
     commentMessage,
     handleCreateComment,
+    handleLikeComment,
+    handleEditComment,
     handleDeleteComment,
   } = useDetailComments({
     normalizedId,
     isLoggedIn,
+    canDeleteAnyComment: currentUserIsAdmin,
     sessionUsername,
     title,
     currentUserId,
@@ -504,14 +532,27 @@ export function DetailPage() {
     <>
       <main className="min-h-screen bg-gray-50 px-6 pb-12 pt-32">
         <div className="mx-auto w-full max-w-none">
-          {loading && !item ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-              Cargando detalle…
-            </div>
-          ) : !item ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-gray-600">
-              <p>No se encontró el elemento solicitado.</p>
-              {error ? <p className="mt-2 text-sm text-gray-500">{error}</p> : null}
+          {!item ? (
+            <div className="space-y-6">
+              <section className="rounded-2xl border border-gray-200 bg-white p-6">
+                <div className="grid gap-6 md:grid-cols-[220px_1fr]">
+                  <Skeleton className="h-[300px] w-full rounded-2xl" />
+                  <div className="space-y-4">
+                    <Skeleton className="h-8 w-2/3" />
+                    <Skeleton className="h-4 w-1/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-[92%]" />
+                    <Skeleton className="h-10 w-44 rounded-xl" />
+                  </div>
+                </div>
+              </section>
+              <section className="rounded-2xl border border-gray-200 bg-white p-6">
+                <Skeleton className="h-6 w-40" />
+                <div className="mt-4 space-y-3">
+                  <Skeleton className="h-20 w-full rounded-xl" />
+                  <Skeleton className="h-20 w-full rounded-xl" />
+                </div>
+              </section>
             </div>
           ) : (
             <div className="space-y-10">
@@ -662,9 +703,17 @@ export function DetailPage() {
 
               <DetailComments
                 comments={comments}
+                focusCommentId={focusCommentId}
+                focusCommentText={focusCommentText}
+                focusCommentUser={focusCommentUserFromState}
                 onCreateComment={handleCreateComment}
+                onLikeComment={handleLikeComment}
+                onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
+                canDeleteAnyComment={currentUserIsAdmin}
                 creatingComment={commentSubmitting}
+                editingCommentId={editingCommentId}
+                reactingCommentId={reactingCommentId}
                 deletingCommentId={deletingCommentId}
                 userRating={userRating}
                 createCommentMessage={commentMessage}
