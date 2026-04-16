@@ -10,6 +10,7 @@ import FeaturedCard from "@/components/featured-card";
 import { fetchMostViewedWeek, type MostViewedWeekResponse } from "../services/fetch-most-viewed-week";
 import MostViewedCard from "@/components/most-viewed-card";
 import LogoPng from "@/assets/LOGO.png";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export default function HomePage() {
@@ -128,7 +129,7 @@ useEffect(() => {
 
             <div className="mt-5 flex gap-3">
               <button
-                onClick={() => navigate("/servicios")}
+                onClick={() => navigate("/categorías")}
                 className="rounded-md bg-violet-700 px-4 py-2 text-sm font-medium text-white hover:bg-violet-800"
               >
                 Descubrir
@@ -150,7 +151,15 @@ useEffect(() => {
   </h2>
 
   {featuredLoading && (
-    <p className="text-center text-sm text-gray-500">Cargando destacados…</p>
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={`featured-skeleton-${index}`} className="space-y-3 rounded-xl border border-violet-100 bg-white p-3">
+          <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      ))}
+    </div>
   )}
 
   {featuredError && (
@@ -175,7 +184,15 @@ useEffect(() => {
   </h2>
 
   {mostViewedLoading && (
-    <p className="text-center text-sm text-gray-500">Cargando lo más visto…</p>
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={`most-viewed-skeleton-${index}`} className="space-y-3 rounded-xl border border-violet-100 bg-white p-3">
+          <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      ))}
+    </div>
   )}
 
   {mostViewedError && (

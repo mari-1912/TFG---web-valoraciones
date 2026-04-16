@@ -2,6 +2,7 @@ import { fetchBooks } from "./fetchBooks";
 import { fetchMovies } from "./fetchMovies";
 import { fetchSeries } from "./fetchSeries";
 import { fetchVideoGames } from "./fetchVideogames";
+import { handleUnauthorizedResponse } from "./auth-service";
 
 export type ContentSearchItem = {
   id: number | string;
@@ -145,6 +146,7 @@ export async function searchContents(
       signal,
     }
   );
+  handleUnauthorizedResponse(res.status, `/contenidos/search?${params.toString()}`);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -227,6 +229,10 @@ export async function searchUsers(
       credentials: "include",
       signal,
     }
+  );
+  handleUnauthorizedResponse(
+    res.status,
+    `/usuarios/search?q=${encodeURIComponent(query)}`
   );
 
   if (!res.ok) {

@@ -1,3 +1,5 @@
+import { handleUnauthorizedResponse } from "@/services/auth-service";
+
 export type ContentStatus =
   | "watchlist"
   | "in_progress"
@@ -18,6 +20,7 @@ export async function updateContentStatus(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ estado }),
   });
+  handleUnauthorizedResponse(res.status, `/contenidos/${contenidoId}/estado`);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");

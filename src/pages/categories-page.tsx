@@ -20,6 +20,7 @@ import {
   type BookSeriesKey,
   type PlatformKey,
 } from "../components/service-filters";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type ServiceListItem = ServiceList & {
   imgSrc?: string;
@@ -592,7 +593,7 @@ const enrichMovieDates = async (
   });
 };
 
-export default function ServicesList() {
+export default function CategoriesPage() {
   const [category, setCategory] = useState<ServiceCategory | null>(null);
   const [sort, setSort] = useState<SortKey>("none");
   const [genre, setGenre] = useState<string>("");
@@ -607,6 +608,7 @@ export default function ServicesList() {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState<boolean>(false);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<{
     page: number;
@@ -697,14 +699,15 @@ export default function ServicesList() {
             );
           if (allAborted) return;
           if (!anySuccess) {
-            setError("No se pudieron cargar los servicios");
+            setError("No se pudieron cargar las categorías");
           }
         } catch (err) {
           if ((err as { name?: string })?.name === "AbortError") return;
           console.error("Error cargando servicios:", err);
-          setError("No se pudieron cargar los servicios");
+          setError("No se pudieron cargar las categorías");
         } finally {
           setLoading(false);
+          setHasLoadedOnce(true);
         }
         return;
       }
@@ -766,10 +769,11 @@ export default function ServicesList() {
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         console.error("Error cargando servicios:", err);
-        setError("No se pudieron cargar los servicios");
+        setError("No se pudieron cargar las categorías");
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        setHasLoadedOnce(true);
       }
     };
 
@@ -936,6 +940,9 @@ export default function ServicesList() {
       });
   }, [filteredServices]);
 
+  const showServicesSkeleton =
+    loading || (!hasLoadedOnce && services.length === 0 && !error);
+
 
   // -------------------------
   // Sincronizar categoría según URL
@@ -960,7 +967,14 @@ export default function ServicesList() {
       }
       return;
     }
-    if (pathname === "/servicios" || pathname === "/servicios/") {
+    if (
+      pathname === "/categorías" ||
+      pathname === "/categorías/" ||
+      pathname === "/categorias" ||
+      pathname === "/categorias/" ||
+      pathname === "/servicios" ||
+      pathname === "/servicios/"
+    ) {
       setCategory(null);
       setPage(1);
       return;
@@ -998,12 +1012,12 @@ export default function ServicesList() {
               if (next == null) {
                 setPage(1);
                 setCategory(null);
-                navigate("/servicios");
+                navigate("/categorías");
                 return;
               }
               setPage(1);
               setCategory(next);
-              navigate(`/servicios/${next}`);
+              navigate(`/categorías/${next}`);
             }}
             sort={sort}
             onSortChange={(next) => {
@@ -1042,15 +1056,31 @@ export default function ServicesList() {
 
           {/* Contenido según categoría */}
           <div className="mx-auto w-full max-w-7xl px-6">
-            {loading && <p>Cargando servicios...</p>}
-            {!loading && error && <p className="text-red-600">{error}</p>}
+            {showServicesSkeleton && (
+              <div className="space-y-6">
+                <Skeleton className="h-8 w-52" />
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <div
+                      key={`services-skeleton-${index}`}
+                      className="space-y-3 rounded-xl border border-violet-100 bg-white p-3"
+                    >
+                      <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!showServicesSkeleton && error && <p className="text-red-600">{error}</p>}
 
 
-            {!loading && !error && (
+            {!showServicesSkeleton && !error && (
               <>
                 {category == null && (
                   <>
-                    {/* /servicios → carruseles transversales */}
+                    {/* /categorías → carruseles transversales */}
                     {marathonItems.length > 0 && (
                       <ServiceSection
                         title="Para un maratón"
@@ -1085,7 +1115,7 @@ export default function ServicesList() {
 
                 {category != null && (
                   <>
-                    {/* /servicios/peliculas (o cualquier otra) → grid grande, sin categoría arriba */}
+                    {/* /categorías/peliculas (o cualquier otra) → grid grande, sin categoría arriba */}
                     <ServiceSection
                       // Opcional: puedes mostrar título solo si quieres
                       title={category[0].toUpperCase() + category.slice(1)}

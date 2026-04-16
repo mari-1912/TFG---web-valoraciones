@@ -1,4 +1,5 @@
 // src/services/lists-service.ts
+import { handleUnauthorizedResponse } from "@/services/auth-service";
 
 export type BackendLista = {
   listaId: number;
@@ -34,6 +35,7 @@ async function apiGet<T>(path: string): Promise<T> {
     credentials: "include", // cookie HttpOnly
     headers: { "Content-Type": "application/json" },
   });
+  handleUnauthorizedResponse(res.status, path);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");

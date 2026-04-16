@@ -20,7 +20,21 @@ export function parseRating(value: unknown) {
   if (value == null) return null;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string") {
-    const cleaned = value.replace(",", ".");
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const fractionMatch = trimmed.match(
+      /^(-?\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)$/
+    );
+    if (fractionMatch) {
+      const numerator = Number(fractionMatch[1].replace(",", "."));
+      const denominator = Number(fractionMatch[2].replace(",", "."));
+      if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator > 0) {
+        return (numerator / denominator) * 10;
+      }
+    }
+
+    const cleaned = trimmed.replace(",", ".");
     const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -56,6 +70,17 @@ export function toFiveStars(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return null;
   const normalized = value > 5 ? value / 2 : value;
   return Math.max(1, Math.min(5, Math.round(normalized)));
+}
+
+export function formatRatingOutOfTen(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return null;
+  const normalized = value > 5 ? value : value * 2;
+  const clamped = Math.max(0, Math.min(10, normalized));
+  const rounded = Math.round(clamped * 10) / 10;
+  const asText = Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(1).replace(".", ",");
+  return `${asText}/10`;
 }
 
 export function formatCommentDate(value: unknown) {
@@ -175,17 +200,51 @@ export function mapApiComment(
   context: MapApiCommentContext,
   apiUrl: string
 ): DetailComment {
+  const rawCommentId =
+    comment?.commentId ?? comment?.id ?? comment?.comentarioId ?? null;
+  const parsedCommentId = Number(rawCommentId);
+  const numericId =
+    Number.isFinite(parsedCommentId) && parsedCommentId > 0
+      ? parsedCommentId
+      : null;
+  const commentId =
+    numericId != null
+      ? String(numericId)
+      : typeof rawCommentId === "string" && rawCommentId.trim()
+        ? rawCommentId.trim()
+        : `review-${index}`;
+  const commentUserId =
+    Number(
+      comment?.userId ??
+        comment?.user_id ??
+        comment?.usuarioId ??
+        comment?.usuario_id ??
+        comment?.usuario?.userId ??
+        comment?.usuario?.user_id ??
+        comment?.usuario?.id ??
+        comment?.user?.userId ??
+        comment?.user?.user_id ??
+        comment?.user?.id ??
+        comment?.authorId ??
+        comment?.author_id ??
+        comment?.author?.userId ??
+        comment?.author?.user_id ??
+        comment?.author?.id ??
+        0
+    ) || null;
   const username =
     pickString(
       comment?.usuario?.username,
+      comment?.usuario?.nombre,
       comment?.user?.username,
+      comment?.user?.name,
       comment?.username,
       comment?.user,
       comment?.usuario,
+      comment?.author?.username,
+      comment?.author?.name,
       comment?.author
-    ) || (comment?.userId ? `usuario_${comment.userId}` : "Usuario");
-  const commentUserId =
-    Number(comment?.userId ?? comment?.usuario?.userId ?? 0) || null;
+    ) || (commentUserId != null ? `usuario_${commentUserId}` : "Usuario");
   const currentUsername = context.currentUsername.trim().toLowerCase();
   const isOwn =
     (context.currentUserId != null &&
@@ -203,10 +262,25 @@ export function mapApiComment(
       comment?.usuario?.avatar_path,
       comment?.usuario?.foto,
       comment?.usuario?.avatar,
+      comment?.usuario?.imagenPerfil,
+      comment?.user?.avatarUrl,
+      comment?.user?.avatarPath,
+      comment?.user?.avatar_path,
+      comment?.user?.foto,
+      comment?.user?.avatar,
+      comment?.user?.imagenPerfil,
+      comment?.author?.avatarUrl,
+      comment?.author?.avatarPath,
+      comment?.author?.avatar_path,
+      comment?.author?.foto,
+      comment?.author?.avatar,
+      comment?.author?.imagenPerfil,
       comment?.avatarUrl,
       comment?.avatarPath,
       comment?.avatar_path,
-      comment?.foto
+      comment?.foto,
+      comment?.avatar,
+      comment?.imagenPerfil
     ),
     apiUrl
   );
@@ -214,14 +288,21 @@ export function mapApiComment(
     isOwn && context.currentUserAvatarUrl
       ? context.currentUserAvatarUrl
       : fallbackAvatar;
-
-  const commentId =
-    String(
-      comment?.commentId ??
-        comment?.id ??
-        comment?.comentarioId ??
-        `review-${index}`
-    ) ?? `review-${index}`;
+  const rawParentId =
+    comment?.parentId ??
+    comment?.parent_id ??
+    comment?.comentarioPadreId ??
+    comment?.parentCommentId ??
+    null;
+  const parentIdNumeric = Number(rawParentId);
+  const parentId =
+    rawParentId == null
+      ? null
+      : Number.isFinite(parentIdNumeric) && parentIdNumeric > 0
+        ? String(parentIdNumeric)
+        : typeof rawParentId === "string" && rawParentId.trim() && rawParentId !== "0"
+          ? rawParentId.trim()
+          : null;
 
   const fallbackCommentImage = resolveAssetUrl(
     pickString(
@@ -233,9 +314,86 @@ export function mapApiComment(
     ),
     apiUrl
   );
+  const likeCount =
+    parseCount(
+      comment?.reacciones?.like ??
+        comment?.likes ??
+        comment?.likesCount ??
+        comment?.reacciones?.count ??
+        comment?.reacciones?.totalLikes
+    ) ?? 0;
+  const repliesCount =
+    (Array.isArray(comment?.respuestas) ? comment.respuestas.length : null) ??
+    parseCount(
+      comment?.respuestasCount ??
+        comment?.replyCount ??
+        comment?.repliesCount ??
+        comment?.totalRespuestas
+    ) ??
+    0;
+  const userReaction = pickString(
+    comment?.reacciones?.userReaction,
+    comment?.reacciones?.usuario,
+    comment?.reaccion?.tipo,
+    comment?.reaccionUsuario?.tipo,
+    comment?.userReaction
+  )
+    .trim()
+    .toLowerCase();
+  const parsedRating = parseRating(
+    comment?.rating ??
+      comment?.ratingValue ??
+      comment?.puntuacion ??
+      comment?.valoracion ??
+      comment?.rating?.value ??
+      comment?.rating?.score ??
+      comment?.rating?.puntuacion ??
+      comment?.rating?.rating ??
+      comment?.rating?.valor ??
+      comment?.rating?.average ??
+      comment?.valoracion?.puntuacion ??
+      comment?.valoracion?.rating ??
+      comment?.valoracion?.valor ??
+      comment?.valoracionUsuario?.puntuacion ??
+      comment?.valoracionUsuario?.rating ??
+      comment?.valoracion_usuario?.puntuacion ??
+      comment?.valoracion_usuario?.rating ??
+      comment?.valoracion_personal?.puntuacion ??
+      comment?.valoracion_personal?.rating ??
+      comment?.puntuacion_usuario ??
+      comment?.valoracion_usuario ??
+      comment?.userRating ??
+      comment?.user_rating ??
+      comment?.ratingUsuario ??
+      comment?.rating_usuario ??
+      comment?.user?.rating ??
+      comment?.user?.puntuacion ??
+      comment?.metadata?.rating ??
+      comment?.metadata?.rating?.value ??
+      comment?.metadata?.rating?.score ??
+      comment?.metadata?.puntuacion ??
+      comment?.metadata?.valoracion ??
+      comment?.metadata?.userRating ??
+      comment?.metadata?.user_rating ??
+      comment?.metadata?.valoracionUsuario?.puntuacion ??
+      comment?.usuario?.puntuacion ??
+      comment?.usuario?.rating ??
+      comment?.usuario?.valoracion
+  );
+  const ratingLabel =
+    pickString(
+      comment?.ratingLabel,
+      comment?.rating_label,
+      comment?.valoracionLabel,
+      comment?.puntuacionLabel,
+      comment?.puntuacion_label
+    ) || formatRatingOutOfTen(parsedRating);
 
   return {
     id: commentId,
+    numericId,
+    parentId,
+    repliesCount,
     user: username,
     userId: commentUserId,
     avatarUrl: resolvedAvatar,
@@ -256,10 +414,13 @@ export function mapApiComment(
         comment?.fecha
       )
     ),
-    rating:
-      toFiveStars(
-        parseRating(comment?.rating ?? comment?.puntuacion ?? comment?.valoracion)
-      ) ?? null,
+    rating: toFiveStars(parsedRating) ?? null,
+    ratingLabel,
+    likeCount,
+    isLikedByCurrentUser:
+      userReaction === "like" ||
+      userReaction === "liked" ||
+      userReaction === "me_gusta",
     imageUrl: context.localCommentImages[commentId] ?? fallbackCommentImage,
     comment: normalizeCommentBody(
       pickString(

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ListCard, type Lista } from "@/components/lists/list-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import PageLayout from "@/layouts/layout";
 import { getListsByUser, getMyLists } from "@/services/lists-service";
 
@@ -81,7 +82,19 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
             </Link>
           </div>
         ) : loading ? (
-          <p>Cargando listas...</p>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={`list-skeleton-${index}`}
+                className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm"
+              >
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="mt-3 h-4 w-full" />
+                <Skeleton className="mt-2 h-4 w-5/6" />
+                <Skeleton className="mt-5 h-9 w-28 rounded-lg" />
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6">
             <p className="text-sm text-gray-700">{error}</p>

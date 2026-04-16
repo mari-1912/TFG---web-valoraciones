@@ -19,7 +19,9 @@ import {
 const LABELS: Record<string, string> = {
   home: "Home",
   inicio: "Home",
-  servicios: "Servicios",
+  servicios: "Categorías",
+  categorias: "Categorías",
+  "categorías": "Categorías",
   pelicula: "Película",
   serie: "Serie",
   libro: "Libro",

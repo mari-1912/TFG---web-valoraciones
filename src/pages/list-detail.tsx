@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
 import SectionList from "@/components/sections/section-list";
 import { getListContents } from "@/services/lists-service";
 
@@ -128,7 +129,26 @@ export default function ListDetail() {
     );
   }
 
-  if (loading) return <p className="p-6">Cargando lista...</p>;
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gray-50 px-6 py-12">
+        <div className="mx-auto max-w-5xl">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="mt-5 h-10 w-72" />
+          <Skeleton className="mt-3 h-4 w-full" />
+          <Skeleton className="mt-2 h-4 w-2/3" />
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton
+                key={`detail-list-skeleton-${index}`}
+                className="h-56 w-full rounded-2xl"
+              />
+            ))}
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (error) {
     return (

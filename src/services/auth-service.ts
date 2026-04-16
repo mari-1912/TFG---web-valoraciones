@@ -12,6 +12,8 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const REMEMBER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_ISSUED_AT_KEY = "sessionIssuedAt";
 const SESSION_EXPIRES_AT_KEY = "sessionExpiresAt";
+export const AUTH_EXPIRED_EVENT = "opinify:auth-expired";
+let authRedirectInProgress = false;
 
 function resolveSessionTtl(remember: boolean) {
   return remember ? REMEMBER_TTL_MS : SESSION_TTL_MS;
@@ -73,12 +75,51 @@ function clearSession(options: { preserveRemember?: boolean } = {}) {
   }
 }
 
+function getCurrentPath() {
+  if (typeof window === "undefined") return "/home";
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function isAuthRoute(path: string) {
+  return path.startsWith("/login") || path.startsWith("/registro");
+}
+
+export function handleUnauthorizedResponse(status: number, reason = "401") {
+  if (status !== 401) return false;
+
+  const hadLocalSession =
+    typeof window !== "undefined" &&
+    localStorage.getItem("isLoggedIn") === "true";
+
+  clearSession({ preserveRemember: true });
+  if (!hadLocalSession || typeof window === "undefined") return true;
+
+  window.dispatchEvent(
+    new CustomEvent(AUTH_EXPIRED_EVENT, {
+      detail: { reason, at: new Date().toISOString() },
+    })
+  );
+
+  const from = getCurrentPath();
+  if (!isAuthRoute(from) && !authRedirectInProgress) {
+    authRedirectInProgress = true;
+    const target = `/login?from=${encodeURIComponent(
+      from
+    )}&reason=session-expired`;
+    window.location.assign(target);
+  }
+
+  return true;
+}
+
 async function api(path: string, options: RequestInit = {}) {
   const res = await fetch(`${API_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
     credentials: "include", // <-- CLAVE: enviar/recibir cookies HttpOnly
     ...options,
   });
+
+  handleUnauthorizedResponse(res.status, path);
 
   const data = await res.json().catch(() => ({}));
   return { res, data };
@@ -201,7 +242,7 @@ export async function getMe(): Promise<{
 
   if (!res.ok) {
     // Si la cookie no es válida, limpiamos estado local
-    clearSession({ preserveRemember: true });
+    handleUnauthorizedResponse(res.status, "/usuarios/perfil");
     return { success: false, message: data?.message ?? "No autenticado." };
   }
 

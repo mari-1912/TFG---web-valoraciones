@@ -617,8 +617,8 @@ export function Header() {
         </NavigationMenuLink>
       </NavigationMenuItem>
 
-      {/* SERVICIOS — dropdown */}
-      {/* SERVICIOS — link a /servicios + botón para abrir dropdown */}
+      {/* CATEGORÍAS — dropdown */}
+      {/* CATEGORÍAS — link a /categorías + botón para abrir dropdown */}
       <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
         <div className="flex items-center">
           {/* Link clicable */}
@@ -626,15 +626,15 @@ export function Header() {
             asChild
             className={navigationMenuTriggerStyle()}
           >
-            <Link to="/servicios" onClick={onNavigate}>
-              Servicios
+            <Link to="/categorías" onClick={onNavigate}>
+              Categorías
             </Link>
           </NavigationMenuLink>
 
           {/* Flecha/trigger solo para desplegar */}
           <NavigationMenuTrigger
             className="px-2"
-            aria-label="Abrir menú de servicios"
+            aria-label="Abrir menú de categorías"
           />
         </div>
 
@@ -655,7 +655,7 @@ export function Header() {
                 className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
               >
                 <Link
-                  to="/servicios/peliculas"
+                  to="/categorías/peliculas"
                   onClick={onNavigate}
                   className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
                 >
@@ -670,7 +670,7 @@ export function Header() {
                 className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
               >
                 <Link
-                  to="/servicios/series"
+                  to="/categorías/series"
                   onClick={onNavigate}
                   className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
                 >
@@ -685,7 +685,7 @@ export function Header() {
                 className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
               >
                 <Link
-                  to="/servicios/libros"
+                  to="/categorías/libros"
                   onClick={onNavigate}
                   className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
                 >
@@ -700,7 +700,7 @@ export function Header() {
                 className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
               >
                 <Link
-                  to="/servicios/videojuegos"
+                  to="/categorías/videojuegos"
                   onClick={onNavigate}
                   className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
                 >

@@ -14,6 +14,7 @@ export function useDetailCurrentUser({
   const [currentUserAvatarUrl, setCurrentUserAvatarUrl] = useState<string | null>(
     null
   );
+  const [currentUserRole, setCurrentUserRole] = useState<string>("base");
 
   useEffect(() => {
     let isMounted = true;
@@ -23,6 +24,7 @@ export function useDetailCurrentUser({
         if (isMounted) {
           setCurrentUserId(null);
           setCurrentUserAvatarUrl(null);
+          setCurrentUserRole("base");
         }
         return;
       }
@@ -30,12 +32,21 @@ export function useDetailCurrentUser({
         const data = await fetchMyProfile();
         if (!isMounted) return;
         const perfil = data?.perfil ?? {};
+        const perfilRole = (perfil as { role?: unknown }).role;
         setCurrentUserId(Number(perfil.userId ?? 0) || null);
         setCurrentUserAvatarUrl(perfil.avatarUrl ?? null);
+        const role =
+          (perfil.tipo ?? perfilRole ?? localStorage.getItem("userRole") ?? "base")
+            .toString()
+            .toLowerCase();
+        setCurrentUserRole(role);
       } catch {
         if (isMounted) {
           setCurrentUserId(null);
           setCurrentUserAvatarUrl(null);
+          setCurrentUserRole(
+            (localStorage.getItem("userRole") ?? "base").toString().toLowerCase()
+          );
         }
       }
     };
@@ -46,5 +57,7 @@ export function useDetailCurrentUser({
     };
   }, [isLoggedIn, refreshKey]);
 
-  return { currentUserId, currentUserAvatarUrl };
+  const currentUserIsAdmin = currentUserRole === "admin";
+
+  return { currentUserId, currentUserAvatarUrl, currentUserRole, currentUserIsAdmin };
 }

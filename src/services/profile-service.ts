@@ -1,3 +1,5 @@
+import { handleUnauthorizedResponse } from "@/services/auth-service";
+
 const API_URL =
   import.meta.env.VITE_API_URL ??
   "https://tfg-web-valoraciones-back-i9b5.onrender.com";
@@ -33,6 +35,7 @@ async function profileApi(path: string, options: RequestInit = {}) {
     credentials: "include",
     ...options,
   });
+  handleUnauthorizedResponse(res.status, path);
 
   const data = await res.json().catch(() => ({}));
   return { res, data };
@@ -243,6 +246,44 @@ export async function updateProfile(
     return {
       success: false,
       message: data?.message ?? "No se pudo actualizar el perfil.",
+    };
+  }
+
+  return { success: true };
+}
+
+export async function followUser(
+  userId: number,
+  signal?: AbortSignal
+): Promise<{ success: boolean; message?: string }> {
+  const { res, data } = await profileApi(`/usuarios/${userId}/seguir`, {
+    method: "POST",
+    signal,
+  });
+
+  if (!res.ok) {
+    return {
+      success: false,
+      message: data?.message ?? "No se pudo seguir al usuario.",
+    };
+  }
+
+  return { success: true };
+}
+
+export async function unfollowUser(
+  userId: number,
+  signal?: AbortSignal
+): Promise<{ success: boolean; message?: string }> {
+  const { res, data } = await profileApi(`/usuarios/${userId}/seguir`, {
+    method: "DELETE",
+    signal,
+  });
+
+  if (!res.ok) {
+    return {
+      success: false,
+      message: data?.message ?? "No se pudo dejar de seguir al usuario.",
     };
   }
 

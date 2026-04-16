@@ -46,7 +46,6 @@ export default function Card(props: CardProps) {
     anio_lanzamiento,
     portada,
     imgSrc,
-    rating,
     description,
 
     // específicos
@@ -129,17 +128,7 @@ export default function Card(props: CardProps) {
         {metaLine || "\u00A0"}
       </p>
 
-      <div className="mt-0.5 text-yellow-500 h-[14px]">
-        {typeof rating === "number"
-          ? Array(Math.round(rating))
-              .fill(0)
-              .map((_, i) => (
-                <span key={i} aria-label="star">
-                  ⭐
-                </span>
-              ))
-          : null}
-      </div>
+      
     </div>
   );
 }

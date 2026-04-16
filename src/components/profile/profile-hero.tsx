@@ -224,30 +224,46 @@ export function ProfileHero({
                 {isEditing ? "Cerrar edición" : "Editar"}
               </button>
             ) : showFollowAction ? (
-              <button
-                type="button"
-                onClick={onToggleFollow}
-                disabled={followDisabled}
-                className={[
-                  "inline-flex items-center justify-center gap-2 rounded-full border px-5 py-2 text-sm font-semibold transition",
-                  isFollowing
-                    ? "border-emerald-300/60 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
-                    : "border-white/40 bg-white/10 text-white hover:bg-white hover:text-indigo-700",
-                  followDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-                ].join(" ")}
-              >
+              <div className="flex flex-col items-stretch gap-2">
                 {isFollowing ? (
-                  <>
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300/60 bg-emerald-400/20 px-5 py-2 text-sm font-semibold text-emerald-100 opacity-90"
+                  >
                     <UserCheck2 className="h-4 w-4" />
                     Siguiendo
-                  </>
+                  </button>
                 ) : (
-                  <>
+                  <button
+                    type="button"
+                    onClick={onToggleFollow}
+                    disabled={followDisabled}
+                    className={[
+                      "inline-flex items-center justify-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700",
+                      followDisabled
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer",
+                    ].join(" ")}
+                  >
                     <UserPlus className="h-4 w-4" />
                     +Seguir
-                  </>
+                  </button>
                 )}
-              </button>
+                <button
+                  type="button"
+                  onClick={onToggleFollow}
+                  disabled={followDisabled || !isFollowing}
+                  className={[
+                    "inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700",
+                    followDisabled || !isFollowing
+                      ? "cursor-not-allowed opacity-60"
+                      : "cursor-pointer",
+                  ].join(" ")}
+                >
+                  Dejar de seguir
+                </button>
+              </div>
             ) : null}
             {isEditing && (
               <>
