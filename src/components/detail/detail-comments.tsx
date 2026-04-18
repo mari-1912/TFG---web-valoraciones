@@ -52,7 +52,13 @@ type DetailCommentsProps = {
     message: string;
     imageFile?: File | null;
     parentId?: number | null;
-  }) => Promise<void>;
+  }) => Promise<
+    | void
+    | {
+        commentId?: string | number | null;
+        parentId?: number | null;
+      }
+  >;
   onLikeComment?: (comment: DetailComment) => Promise<void>;
   onEditComment?: (comment: DetailComment, message: string) => Promise<void>;
   onDeleteComment?: (comment: DetailComment) => Promise<void>;
@@ -100,6 +106,7 @@ export function DetailComments({
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [replyTarget, setReplyTarget] = useState<{
     parentId: number;
+    commentId: string;
     username: string;
   } | null>(null);
   const [expandedReplyParents, setExpandedReplyParents] = useState<Set<string>>(
@@ -108,7 +115,18 @@ export function DetailComments({
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(
     null
   );
+  const [pendingReplyParentId, setPendingReplyParentId] = useState<string | null>(
+    null
+  );
+  const [pendingPublishedComment, setPendingPublishedComment] = useState<{
+    commentId: string | null;
+    parentId: string | null;
+    message: string;
+    isReply: boolean;
+    requestedAtMs: number;
+  } | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setDraftComment("");
@@ -191,6 +209,36 @@ export function DetailComments({
       }
     };
   }, [selectedImagePreview, commentCropSourceUrl]);
+
+  useEffect(() => {
+    if (!replyTarget) return;
+    const raf = window.requestAnimationFrame(() => {
+      replyTextareaRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [replyTarget]);
+
+  const focusAndHighlightComment = (targetId: string) => {
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        const element = document.getElementById(`comment-${targetId}`);
+        if (!element) return;
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightedCommentId(targetId);
+        window.setTimeout(() => {
+          setHighlightedCommentId((current) =>
+            current === targetId ? null : current
+          );
+        }, 1800);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  };
 
   const sortedComments = useMemo(() => {
     const withIndex = comments.map((comment, index) => ({ comment, index }));
@@ -300,6 +348,29 @@ export function DetailComments({
     closeCommentCropModal();
   };
 
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setDraftError("Selecciona una imagen válida.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_COMMENT_IMAGE_MB * 1024 * 1024) {
+      setDraftError(`La imagen supera los ${MAX_COMMENT_IMAGE_MB}MB permitidos.`);
+      event.target.value = "";
+      return;
+    }
+
+    setCommentCropSourceUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+    setDraftError(null);
+  };
+
   const publishComment = async () => {
     const normalized = draftComment.trim();
     if (!normalized && !selectedImageFile) {
@@ -310,10 +381,31 @@ export function DetailComments({
     if (!onCreateComment) return;
 
     try {
-      await onCreateComment({
+      const publishResult = await onCreateComment({
         message: normalized,
         imageFile: selectedImageFile,
         parentId: replyTarget?.parentId ?? null,
+      });
+      const rawCreatedId =
+        publishResult &&
+        typeof publishResult === "object" &&
+        "commentId" in publishResult
+          ? publishResult.commentId
+          : null;
+      const createdCommentId =
+        rawCreatedId != null ? String(rawCreatedId).trim() : "";
+      const targetReplyParentId =
+        replyTarget?.parentId != null ? String(replyTarget.parentId) : null;
+      const messageForMatching = normalized.trim();
+      if (targetReplyParentId) {
+        setPendingReplyParentId(targetReplyParentId);
+      }
+      setPendingPublishedComment({
+        commentId: createdCommentId || null,
+        parentId: targetReplyParentId,
+        message: messageForMatching,
+        isReply: Boolean(targetReplyParentId),
+        requestedAtMs: Date.now(),
       });
       setDraftComment("");
       setDraftError(null);
@@ -328,6 +420,71 @@ export function DetailComments({
       );
     }
   };
+
+  useEffect(() => {
+    if (!pendingReplyParentId) return;
+    const hasAnyReply = comments.some(
+      (comment) => comment.parentId?.trim() === pendingReplyParentId
+    );
+    if (!hasAnyReply) return;
+    setExpandedReplyParents((prev) => {
+      const next = new Set(prev);
+      next.add(pendingReplyParentId);
+      return next;
+    });
+    setPendingReplyParentId(null);
+  }, [comments, pendingReplyParentId]);
+
+  useEffect(() => {
+    if (!pendingPublishedComment) return;
+    const normalizeCommentText = (value: string) =>
+      value.trim().replace(/\s+/g, " ").toLowerCase();
+    const requestedAtMs = pendingPublishedComment.requestedAtMs;
+    const minimumTimestamp = requestedAtMs - 20_000;
+    const normalizedMessage = normalizeCommentText(pendingPublishedComment.message);
+
+    let target =
+      pendingPublishedComment.commentId != null
+        ? comments.find((comment) => comment.id === pendingPublishedComment.commentId)
+        : undefined;
+
+    if (!target) {
+      const scoped = comments.filter((comment) => {
+        const isRecent = (comment.createdAtMs ?? 0) >= minimumTimestamp;
+        if (!isRecent) return false;
+        if (pendingPublishedComment.isReply) {
+          return comment.parentId?.trim() === pendingPublishedComment.parentId;
+        }
+        return !(comment.parentId?.trim());
+      });
+
+      const byMessage =
+        normalizedMessage.length > 0
+          ? scoped.filter(
+              (comment) => normalizeCommentText(comment.comment ?? "") === normalizedMessage
+            )
+          : [];
+      const pool = byMessage.length > 0 ? byMessage : scoped.filter((comment) => comment.isOwn);
+      if (pool.length > 0) {
+        target = [...pool].sort(
+          (a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0)
+        )[0];
+      }
+    }
+
+    if (!target) return;
+
+    const parentId = target.parentId?.trim();
+    if (parentId) {
+      setExpandedReplyParents((prev) => {
+        const next = new Set(prev);
+        next.add(parentId);
+        return next;
+      });
+    }
+    focusAndHighlightComment(target.id);
+    setPendingPublishedComment(null);
+  }, [comments, pendingPublishedComment]);
 
   const toggleReplies = (parentId: string) => {
     setExpandedReplyParents((prev) => {
@@ -372,6 +529,107 @@ export function DetailComments({
     }
   };
 
+  const renderComposer = ({
+    textareaId,
+    label,
+    placeholder,
+    submitLabel,
+    submitBusyLabel,
+    textareaRef,
+    onCancel,
+  }: {
+    textareaId: string;
+    label: string;
+    placeholder: string;
+    submitLabel: string;
+    submitBusyLabel: string;
+    textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+    onCancel?: () => void;
+  }) => {
+    return (
+      <>
+        <label
+          htmlFor={textareaId}
+          className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-600"
+        >
+          {label}
+        </label>
+        <div className="mx-auto mt-3 w-full max-w-4xl">
+          <textarea
+            ref={textareaRef}
+            id={textareaId}
+            value={draftComment}
+            onChange={(event) => {
+              setDraftComment(event.target.value);
+              if (draftError) setDraftError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                void publishComment();
+              }
+            }}
+            placeholder={placeholder}
+            className="min-h-[130px] w-full resize-y rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm leading-relaxed text-gray-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+        {selectedImagePreview ? (
+          <div className="mx-auto mt-3 w-full max-w-4xl">
+            <div className="relative inline-block">
+              <img
+                src={selectedImagePreview}
+                alt="Previsualización"
+                className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
+              />
+              <button
+                type="button"
+                onClick={clearSelectedImage}
+                className="absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100"
+                aria-label="Quitar imagen"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : null}
+        <div className="mx-auto mt-4 flex w-full max-w-4xl flex-wrap items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
+          >
+            <ImagePlus className="h-4 w-4" />
+            Añadir imagen
+          </button>
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-lg border border-indigo-200 bg-white px-5 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+            >
+              Cancelar respuesta
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void publishComment()}
+            disabled={creatingComment}
+            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {creatingComment ? submitBusyLabel : submitLabel}
+          </button>
+        </div>
+        {draftError ? <p className="mt-2 text-xs text-rose-600">{draftError}</p> : null}
+        {createCommentMessage ? (
+          <p className="mt-2 text-xs text-emerald-700">{createCommentMessage}</p>
+        ) : null}
+        {actionError ? (
+          <p className="mt-2 text-xs text-rose-600">{actionError}</p>
+        ) : null}
+      </>
+    );
+  };
+
   const renderCommentCard = (comment: DetailComment, isReply = false) => {
     const ownRatingValue =
       comment.isOwn && userRating != null && Number.isFinite(userRating)
@@ -393,219 +651,272 @@ export function DetailComments({
       ? "rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
       : "rounded-xl border border-gray-200 bg-white p-4 shadow-sm";
     const isHighlighted = highlightedCommentId === comment.id;
+    const isReplyComposerTarget = replyTarget?.commentId === comment.id;
 
     return (
-      <article
-        key={comment.id}
-        id={`comment-${comment.id}`}
-        className={`${articleClassName} ${isHighlighted ? "ring-2 ring-violet-300" : ""}`}
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700">
-            {comment.avatarUrl && !failedAvatarIds.has(comment.id) ? (
+      <div key={comment.id} className="space-y-3">
+        <article
+          id={`comment-${comment.id}`}
+          className={`${articleClassName} ${isHighlighted ? "ring-2 ring-violet-300" : ""}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700">
+              {comment.avatarUrl && !failedAvatarIds.has(comment.id) ? (
+                <img
+                  src={comment.avatarUrl}
+                  alt={comment.user}
+                  className="h-10 w-10 rounded-full object-cover"
+                  onError={() => {
+                    setFailedAvatarIds((prev) => {
+                      const next = new Set(prev);
+                      next.add(comment.id);
+                      return next;
+                    });
+                  }}
+                />
+              ) : (
+                (comment.user?.[0] ?? "U").toUpperCase()
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{comment.user}</p>
+              <p className="text-xs text-gray-500">{comment.date}</p>
+            </div>
+            <div className="ml-auto text-xs font-semibold text-yellow-500">
+              {effectiveRatingLabel ? (
+                <span className="inline-flex items-center gap-1">
+                  <span>{effectiveRatingLabel}</span>
+                  <Star className="h-3.5 w-3.5 fill-current" />
+                </span>
+              ) : (
+                "Sin rating"
+              )}
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                  aria-label="Opciones del comentario"
+                >
+                  <Ellipsis className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg"
+              >
+                <DropdownMenuItem
+                  onSelect={() => {
+                    const parentFromComment = Number(comment.parentId ?? 0);
+                    const targetParentId =
+                      Number.isFinite(parentFromComment) && parentFromComment > 0
+                        ? parentFromComment
+                        : Number(comment.numericId ?? 0);
+                    if (!Number.isFinite(targetParentId) || targetParentId <= 0) {
+                      setActionError("No se pudo identificar el comentario padre.");
+                      return;
+                    }
+                    setDraftComment(`@${comment.user} `);
+                    setReplyTarget({
+                      parentId: targetParentId,
+                      commentId: comment.id,
+                      username: comment.user,
+                    });
+                    setExpandedReplyParents((prev) =>
+                      new Set(prev).add(String(targetParentId))
+                    );
+                    setActionError(null);
+                  }}
+                  className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
+                >
+                  <MessageCircleReply className="h-4 w-4 text-gray-500" />
+                  Responder
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={
+                    !comment.isOwn ||
+                    !onEditComment ||
+                    deletingCommentId === comment.id ||
+                    isSavingCurrent
+                  }
+                  onSelect={() => {
+                    startEditingComment(comment);
+                  }}
+                  className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
+                >
+                  <Pencil className="h-4 w-4 text-gray-500" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={
+                    (!(comment.isOwn || canDeleteAnyComment)) ||
+                    deletingCommentId === comment.id
+                  }
+                  onSelect={() => {
+                    if (!onDeleteComment) return;
+                    void (async () => {
+                      try {
+                        await onDeleteComment(comment);
+                        setActionError(null);
+                      } catch (err) {
+                        setActionError(
+                          err instanceof Error
+                            ? err.message
+                            : "No se pudo borrar el comentario."
+                        );
+                      }
+                    })();
+                  }}
+                  className="rounded-lg px-2.5 py-2 text-sm text-rose-600"
+                >
+                  <Trash2 className="h-4 w-4 text-rose-500" />
+                  {deletingCommentId === comment.id ? "Borrando..." : "Eliminar"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {isEditingCurrent ? (
+            <div className="mt-3">
+              <textarea
+                value={editingDraft}
+                onChange={(event) => {
+                  setEditingDraft(event.target.value);
+                  if (actionError) setActionError(null);
+                }}
+                className="min-h-[90px] w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                placeholder="Edita tu comentario..."
+              />
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={cancelEditingComment}
+                  disabled={isSavingCurrent}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveEditedComment(comment)}
+                  disabled={isSavingCurrent}
+                  className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingCurrent ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </div>
+          ) : comment.comment ? (
+            <p className="mt-3 text-sm text-gray-600 line-clamp-4">{comment.comment}</p>
+          ) : !comment.imageUrl ? (
+            <p className="mt-3 text-sm text-gray-600">Sin comentario.</p>
+          ) : null}
+          {comment.imageUrl && !failedCommentImageIds.has(comment.id) ? (
+            <div className="mt-3">
               <img
-                src={comment.avatarUrl}
-                alt={comment.user}
-                className="h-10 w-10 rounded-full object-cover"
+                src={comment.imageUrl}
+                alt="Imagen del comentario"
+                className="h-36 w-full rounded-lg border border-gray-200 object-cover"
                 onError={() => {
-                  setFailedAvatarIds((prev) => {
+                  setFailedCommentImageIds((prev) => {
                     const next = new Set(prev);
                     next.add(comment.id);
                     return next;
                   });
                 }}
               />
-            ) : (
-              (comment.user?.[0] ?? "U").toUpperCase()
-            )}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-900">{comment.user}</p>
-            <p className="text-xs text-gray-500">{comment.date}</p>
-          </div>
-          <div className="ml-auto text-xs font-semibold text-yellow-500">
-            {effectiveRatingLabel ? (
-              <span className="inline-flex items-center gap-1">
-                <span>{effectiveRatingLabel}</span>
-                <Star className="h-3.5 w-3.5 fill-current" />
-              </span>
-            ) : (
-              "Sin rating"
-            )}
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-                aria-label="Opciones del comentario"
-              >
-                <Ellipsis className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg"
-            >
-              <DropdownMenuItem
-                onSelect={() => {
-                  const parentFromComment = Number(comment.parentId ?? 0);
-                  const targetParentId =
-                    Number.isFinite(parentFromComment) && parentFromComment > 0
-                      ? parentFromComment
-                      : Number(comment.numericId ?? 0);
-                  if (!Number.isFinite(targetParentId) || targetParentId <= 0) {
-                    setActionError("No se pudo identificar el comentario padre.");
-                    return;
-                  }
-                  setDraftComment(`@${comment.user} `);
-                  setReplyTarget({ parentId: targetParentId, username: comment.user });
-                  setExpandedReplyParents((prev) =>
-                    new Set(prev).add(String(targetParentId))
-                  );
-                  setActionError(null);
-                }}
-                className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
-              >
-                <MessageCircleReply className="h-4 w-4 text-gray-500" />
-                Responder
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={
-                  !comment.isOwn ||
-                  !onEditComment ||
-                  deletingCommentId === comment.id ||
-                  isSavingCurrent
-                }
-                onSelect={() => {
-                  startEditingComment(comment);
-                }}
-                className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
-              >
-                <Pencil className="h-4 w-4 text-gray-500" />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={
-                  (!(comment.isOwn || canDeleteAnyComment)) ||
-                  deletingCommentId === comment.id
-                }
-                onSelect={() => {
-                  if (!onDeleteComment) return;
-                  void (async () => {
-                    try {
-                      await onDeleteComment(comment);
-                      setActionError(null);
-                    } catch (err) {
-                      setActionError(
-                        err instanceof Error
-                          ? err.message
-                          : "No se pudo borrar el comentario."
-                      );
-                    }
-                  })();
-                }}
-                className="rounded-lg px-2.5 py-2 text-sm text-rose-600"
-              >
-                <Trash2 className="h-4 w-4 text-rose-500" />
-                {deletingCommentId === comment.id ? "Borrando..." : "Eliminar"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {isEditingCurrent ? (
-          <div className="mt-3">
-            <textarea
-              value={editingDraft}
-              onChange={(event) => {
-                setEditingDraft(event.target.value);
-                if (actionError) setActionError(null);
-              }}
-              className="min-h-[90px] w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              placeholder="Edita tu comentario..."
-            />
-            <div className="mt-2 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={cancelEditingComment}
-                disabled={isSavingCurrent}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveEditedComment(comment)}
-                disabled={isSavingCurrent}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSavingCurrent ? "Guardando..." : "Guardar"}
-              </button>
             </div>
-          </div>
-        ) : comment.comment ? (
-          <p className="mt-3 text-sm text-gray-600 line-clamp-4">{comment.comment}</p>
-        ) : !comment.imageUrl ? (
-          <p className="mt-3 text-sm text-gray-600">Sin comentario.</p>
-        ) : null}
-        {comment.imageUrl && !failedCommentImageIds.has(comment.id) ? (
-          <div className="mt-3">
-            <img
-              src={comment.imageUrl}
-              alt="Imagen del comentario"
-              className="h-36 w-full rounded-lg border border-gray-200 object-cover"
-              onError={() => {
-                setFailedCommentImageIds((prev) => {
-                  const next = new Set(prev);
-                  next.add(comment.id);
-                  return next;
-                });
-              }}
-            />
-          </div>
-        ) : null}
-        <div className="mt-3 flex items-center justify-end">
-          {likeCount > 0 ? (
-            <span className="mr-2 text-xs font-semibold text-gray-600">{likeCount}</span>
           ) : null}
-          <button
-            type="button"
-            disabled={!onLikeComment || isReactingCurrent}
-            onClick={() => {
-              if (!onLikeComment) return;
-              void (async () => {
-                try {
-                  await onLikeComment(comment);
-                  setActionError(null);
-                } catch (err) {
-                  setActionError(
-                    err instanceof Error
-                      ? err.message
-                      : "No se pudo registrar el like."
-                  );
-                }
-              })();
-            }}
-            className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
-              comment.isLikedByCurrentUser
-                ? "border-indigo-200 bg-indigo-100 text-indigo-700"
-                : "border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-            aria-label="Dar like al comentario"
-          >
-            <ThumbsUp
-              className={`h-3.5 w-3.5 ${isReactingCurrent ? "animate-pulse" : ""}`}
-            />
-          </button>
+          <div className="mt-3 flex items-center justify-end">
+            {likeCount > 0 ? (
+              <span className="mr-2 text-xs font-semibold text-gray-600">{likeCount}</span>
+            ) : null}
+            <button
+              type="button"
+              disabled={!onLikeComment || isReactingCurrent}
+              onClick={() => {
+                if (!onLikeComment) return;
+                void (async () => {
+                  try {
+                    await onLikeComment(comment);
+                    setActionError(null);
+                  } catch (err) {
+                    setActionError(
+                      err instanceof Error
+                        ? err.message
+                        : "No se pudo registrar el like."
+                    );
+                  }
+                })();
+              }}
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                comment.isLikedByCurrentUser
+                  ? "border-indigo-200 bg-indigo-100 text-indigo-700"
+                  : "border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+              aria-label="Dar like al comentario"
+            >
+              <ThumbsUp
+                className={`h-3.5 w-3.5 ${isReactingCurrent ? "animate-pulse" : ""}`}
+              />
+            </button>
+          </div>
+        </article>
+        {isReplyComposerTarget ? (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+            {renderComposer({
+              textareaId: "reply-comment",
+              label: `Responder a @${replyTarget?.username ?? comment.user}`,
+              placeholder: `Escribe una respuesta para @${replyTarget?.username ?? comment.user}...`,
+              submitLabel: "Responder",
+              submitBusyLabel: "Publicando...",
+              textareaRef: replyTextareaRef,
+              onCancel: () => {
+                setReplyTarget(null);
+                setDraftError(null);
+                clearSelectedImage();
+              },
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const renderMainComposer = () => {
+    if (replyTarget) {
+      return (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+          Estás respondiendo a <strong>@{replyTarget.username}</strong>. El editor
+          aparece debajo de su comentario.
         </div>
-      </article>
+      );
+    }
+
+    return (
+      <>
+        {renderComposer({
+          textareaId: "new-comment",
+          label: "Tu comentario",
+          placeholder: "Escribe qué te ha parecido este título...",
+          submitLabel: "Publicar",
+          submitBusyLabel: "Publicando...",
+        })}
+      </>
     );
   };
 
   return (
     <>
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageFileChange}
+      />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
           Comentarios de usuarios
@@ -627,120 +938,7 @@ export function DetailComments({
       </div>
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
-        <label
-          htmlFor="new-comment"
-          className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-600"
-        >
-          Tu comentario
-        </label>
-        <div className="mx-auto mt-3 w-full max-w-4xl">
-          <textarea
-            id="new-comment"
-            value={draftComment}
-            onChange={(event) => {
-              setDraftComment(event.target.value);
-              if (draftError) setDraftError(null);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                event.preventDefault();
-                void publishComment();
-              }
-            }}
-            placeholder="Escribe qué te ha parecido este título..."
-            className="min-h-[130px] w-full resize-y rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm leading-relaxed text-gray-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          />
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              if (!file) return;
-
-              if (!file.type.startsWith("image/")) {
-                setDraftError("Selecciona una imagen válida.");
-                event.target.value = "";
-                return;
-              }
-
-              if (file.size > MAX_COMMENT_IMAGE_MB * 1024 * 1024) {
-                setDraftError(
-                  `La imagen supera los ${MAX_COMMENT_IMAGE_MB}MB permitidos.`
-                );
-                event.target.value = "";
-                return;
-              }
-
-              setCommentCropSourceUrl((current) => {
-                if (current) URL.revokeObjectURL(current);
-                return URL.createObjectURL(file);
-              });
-              setDraftError(null);
-            }}
-          />
-        </div>
-        {replyTarget ? (
-          <div className="mx-auto mt-3 flex w-full max-w-4xl items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
-            <span>
-              Respondiendo a <strong>@{replyTarget.username}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={() => setReplyTarget(null)}
-              className="rounded-md border border-indigo-200 bg-white px-2 py-1 font-semibold text-indigo-700 transition hover:bg-indigo-100"
-            >
-              Cancelar respuesta
-            </button>
-          </div>
-        ) : null}
-        {selectedImagePreview ? (
-          <div className="mx-auto mt-3 w-full max-w-4xl">
-            <div className="relative inline-block">
-            <img
-              src={selectedImagePreview}
-              alt="Previsualización"
-              className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
-            />
-            <button
-              type="button"
-              onClick={clearSelectedImage}
-              className="absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100"
-              aria-label="Quitar imagen"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-            </div>
-          </div>
-        ) : null}
-        <div className="mx-auto mt-4 flex w-full max-w-4xl flex-wrap items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => imageInputRef.current?.click()}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
-          >
-            <ImagePlus className="h-4 w-4" />
-            Añadir imagen
-          </button>
-          <button
-            type="button"
-            onClick={() => void publishComment()}
-            disabled={creatingComment}
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {creatingComment ? "Publicando..." : "Publicar"}
-          </button>
-        </div>
-        {draftError ? (
-          <p className="mt-2 text-xs text-rose-600">{draftError}</p>
-        ) : null}
-        {createCommentMessage ? (
-          <p className="mt-2 text-xs text-emerald-700">{createCommentMessage}</p>
-        ) : null}
-        {actionError ? (
-          <p className="mt-2 text-xs text-rose-600">{actionError}</p>
-        ) : null}
+        {renderMainComposer()}
       </div>
 
       <div className="mt-6 space-y-4">

@@ -260,6 +260,14 @@ export default function ProfilePage() {
     { label: "Comentarios", value: commentsCount },
   ];
 
+  const timelineSourceRecords = useMemo(
+    () =>
+      isOwnProfile
+        ? timelineRecords
+        : timelineRecords.filter((record) => record.type !== "list"),
+    [isOwnProfile, timelineRecords]
+  );
+
   const activityCards = [
     { title: "Series", value: seriesCount, unit: "totales" },
     { title: "Películas", value: moviesCount, unit: "totales" },
@@ -272,7 +280,7 @@ export default function ProfilePage() {
     timelineActionLabel,
     handleToggleTimelineHistory,
   } = useProfileTimelineView({
-    timelineRecords,
+    timelineRecords: timelineSourceRecords,
     resetKey: requestedUserId,
   });
   const { isFollowingProfile, followUpdating, followMessage, handleToggleFollow } =
@@ -600,19 +608,23 @@ export default function ProfilePage() {
         <>
           <ProfileStatsSection cards={activityCards} />
 
-          <div className="mt-10 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Listas</h2>
-            <button
-              type="button"
-              className="text-sm font-medium text-violet-700 hover:text-violet-800"
-            >
-              Ver todo
-            </button>
-          </div>
+          {isOwnProfile ? (
+            <>
+              <div className="mt-10 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Listas</h2>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-violet-700 hover:text-violet-800"
+                >
+                  Ver todo
+                </button>
+              </div>
 
-          <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-white p-6 text-sm text-gray-600">
-            Aquí aparecerán tus listas guardadas y tus favoritos.
-          </div>
+              <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-white p-6 text-sm text-gray-600">
+                Aquí aparecerán tus listas guardadas y tus favoritos.
+              </div>
+            </>
+          ) : null}
 
           <div className="mt-10">
             <ProfileTimeline
