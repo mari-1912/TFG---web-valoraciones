@@ -1117,6 +1117,16 @@ export default function CommunityPage() {
     [refreshFeedSilently, resolveCommentIdForPost]
   );
 
+  const handleOpenUserProfile = useCallback(
+    (post: CommunityPost) => {
+      if (!(typeof post.userId === "number" && Number.isFinite(post.userId) && post.userId > 0)) {
+        return;
+      }
+      navigate(`/perfil?userId=${post.userId}`);
+    },
+    [navigate]
+  );
+
   if (loading) {
     return (
       <>
@@ -1185,6 +1195,10 @@ export default function CommunityPage() {
               const canNavigateToDetail =
                 post.contentId != null &&
                 Number.isFinite(post.contentId);
+              const canNavigateToUserProfile =
+                typeof post.userId === "number" &&
+                Number.isFinite(post.userId) &&
+                post.userId > 0;
               const isCommentPost = action === "comment" || action === "left_comment";
               const canModerateThisPost =
                 isCommentPost &&
@@ -1220,7 +1234,21 @@ export default function CommunityPage() {
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center">
                     <div className="flex items-center gap-3 md:w-52 md:shrink-0">
-                      <Avatar user={post.user} src={post.avatar} />
+                      {canNavigateToUserProfile ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleOpenUserProfile(post);
+                          }}
+                          className="rounded-full outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-violet-400"
+                          aria-label={`Ir al perfil de ${post.user}`}
+                        >
+                          <Avatar user={post.user} src={post.avatar} />
+                        </button>
+                      ) : (
+                        <Avatar user={post.user} src={post.avatar} />
+                      )}
                       <span className="max-w-[160px] truncate text-sm font-semibold text-gray-900">
                         {post.user}
                       </span>
