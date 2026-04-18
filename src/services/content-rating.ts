@@ -1,4 +1,5 @@
 import { handleUnauthorizedResponse } from "@/services/auth-service";
+import { getMe } from "@/services/auth-service";
 
 const API_URL =
   import.meta.env.VITE_API_URL ??
@@ -24,10 +25,6 @@ async function buildApiErrorMessage(
   res: Response,
   fallbackMessage: string
 ): Promise<string> {
-  if (res.status >= 500) {
-    return fallbackMessage;
-  }
-
   const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
 
   if (contentType.includes("application/json")) {
@@ -63,13 +60,43 @@ async function requestSetRating(
   contenidoId: string | number,
   puntuacion: number
 ) {
+  const me = await getMe().catch(() => ({ success: false } as const));
+  const userId =
+    me.success && me.user?.user_id != null && Number.isFinite(me.user.user_id)
+      ? Number(me.user.user_id)
+      : 0;
+  const parsedContenidoId = Number(contenidoId);
+  const normalizedContenidoId = Number.isFinite(parsedContenidoId)
+    ? parsedContenidoId
+    : contenidoId;
+
+  const body = {
+    // Validación vista en backend: exige puntuacion en raíz.
+    puntuacion,
+    // Compatibilidad con posibles accesos directos a campos en raíz.
+    userId,
+    contenidoId: normalizedContenidoId,
+    userid: userId,
+    contenidoid: normalizedContenidoId,
+    tipo: "Usuario",
+    // Compatibilidad con payload anidado.
+    valoracion: {
+      puntuacion,
+      userId,
+      contenidoId: normalizedContenidoId,
+      userid: userId,
+      contenidoid: normalizedContenidoId,
+      tipo: "Usuario",
+    },
+  };
+
   const res = await fetchWithSingleRetry(
     `${API_URL}/contenidos/${contenidoId}/valoracion`,
     {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ puntuacion }),
+      body: JSON.stringify(body),
     }
   );
   handleUnauthorizedResponse(

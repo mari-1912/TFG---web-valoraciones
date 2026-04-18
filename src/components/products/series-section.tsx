@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Tv } from "lucide-react";
 
 import Card from "../Card";
 import { fetchSeries } from "@/services/fetchSeries";
+import { buildDetailPath } from "@/lib/detail-route";
 
 type SerieBackend = {
   id: number | string;
@@ -154,7 +155,11 @@ export default function SectionSeries({
               {seriesList.map((s) => (
                 <div
                   key={s.id}
-                  onClick={() => navigate(`/detail/serie/${s.id}`)}
+                  onClick={() =>
+                    navigate(buildDetailPath("serie", s.id, s.titulo), {
+                      state: { item: { ...s, tipo: "serie" } },
+                    })
+                  }
                   className="w-[170px] shrink-0 cursor-pointer transition hover:scale-[1.02] sm:w-[210px]"
                 >
                   <Card
@@ -196,7 +201,11 @@ export default function SectionSeries({
             {visibleItems.map((s) => (
               <div
                 key={s.id}
-                onClick={() => navigate(`/detail/serie/${s.id}`)}
+                onClick={() =>
+                  navigate(buildDetailPath("serie", s.id, s.titulo), {
+                    state: { item: { ...s, tipo: "serie" } },
+                  })
+                }
                 className="cursor-pointer hover:scale-105 transform transition"
               >
                 <Card

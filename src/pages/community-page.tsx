@@ -19,6 +19,7 @@ import {
   updateContentComment,
 } from "../services/content-comments";
 import { appendProfileActivity } from "../services/profile-activity";
+import { buildDetailPath } from "@/lib/detail-route";
 
 // Catálogos para sacar posters reales
 import moviesData from "../data/movies.json";
@@ -956,9 +957,18 @@ export default function CommunityPage() {
       const resolvedCommentId = await resolveCommentIdForPost(post);
       if (resolvedCommentId != null && Number.isFinite(resolvedCommentId)) {
         navigate(
-          `/detail/${resolvedDetailType}/${post.contentId}?commentId=${resolvedCommentId}`,
+          `${buildDetailPath(
+            resolvedDetailType,
+            post.contentId,
+            post.title
+          )}?commentId=${resolvedCommentId}`,
           {
             state: {
+              item: {
+                id: post.contentId,
+                titulo: post.title ?? "",
+                tipo: resolvedDetailType,
+              },
               focusCommentId: String(resolvedCommentId),
               focusCommentText: post.comment ?? null,
               focusCommentUser: post.user ?? null,
@@ -967,7 +977,18 @@ export default function CommunityPage() {
         );
         return;
       }
-      navigate(`/detail/${resolvedDetailType}/${post.contentId}`);
+      navigate(
+        buildDetailPath(resolvedDetailType, post.contentId, post.title),
+        {
+          state: {
+            item: {
+              id: post.contentId,
+              titulo: post.title ?? "",
+              tipo: resolvedDetailType,
+            },
+          },
+        }
+      );
     },
     [navigate, resolveCommentIdForPost]
   );

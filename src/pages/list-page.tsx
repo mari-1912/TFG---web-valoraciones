@@ -12,6 +12,7 @@ import booksData from "../data/books.json";
 
 import { CategoryTabs } from "../components/lists/category-tabs";
 import type { ListCategoryKey } from "../components/lists/category-tabs";
+import { buildDetailPath } from "@/lib/detail-route";
 
 import { ItemCard } from "../components/lists/item-card";
 import type { CatalogItem } from "../components/lists/item-card";
@@ -137,8 +138,12 @@ export default function ListasPorCategoria() {
                 {paged.map((item) => (
                   <ItemCard
                     key={item.id}
-                    item={item}
-                    onClick={() => navigate(`/detail/${detailType}/${item.id}`)}
+                    item={{ ...item, type: detailType }}
+                    onClick={() =>
+                      navigate(buildDetailPath(detailType, item.id, item.title), {
+                        state: { item: { ...item, tipo: detailType } },
+                      })
+                    }
                   />
                 ))}
               </div>

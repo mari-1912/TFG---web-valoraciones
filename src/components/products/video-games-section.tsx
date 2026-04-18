@@ -3,6 +3,7 @@ import Card from "../Card";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Gamepad2 } from "lucide-react";
 import { fetchVideoGames } from "../../services/fetchVideogames";
+import { buildDetailPath } from "@/lib/detail-route";
 
 type SectionVideoGamesProps = {
   compact?: boolean;
@@ -89,7 +90,11 @@ export default function SectionVideoGames({
               {games.map((m) => (
                 <div
                   key={m.id}
-                  onClick={() => navigate(`/detail/videojuego/${m.id}`)}
+                  onClick={() =>
+                    navigate(buildDetailPath("videojuego", m.id, m.titulo), {
+                      state: { item: { ...m, tipo: "videojuego" } },
+                    })
+                  }
                   className="w-[170px] shrink-0 cursor-pointer transition hover:scale-[1.02] sm:w-[210px]"
                 >
                   <Card
@@ -134,7 +139,11 @@ export default function SectionVideoGames({
             {visibleItems.map((m) => (
               <div
                 key={m.id}
-                onClick={() => navigate(`/detail/videojuego/${m.id}`)}
+                onClick={() =>
+                  navigate(buildDetailPath("videojuego", m.id, m.titulo), {
+                    state: { item: { ...m, tipo: "videojuego" } },
+                  })
+                }
                 className="cursor-pointer hover:scale-105 transform transition"
               >
                 <Card

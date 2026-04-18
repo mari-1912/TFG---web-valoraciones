@@ -9,6 +9,7 @@ export type BackendLista = {
   nombre: string;
   descripcion?: string | null;
   visibilidad?: "publica" | "privada" | "solo_seguidores" | string;
+  imagen?: string | null;
 };
 
 export type BackendContenidoListado = {
@@ -44,6 +45,180 @@ async function apiGet<T>(path: string): Promise<T> {
   }
 
   return (await res.json()) as T;
+}
+
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+  if (contentType.includes("application/json")) {
+    const payload = await res.json().catch(() => ({} as Record<string, unknown>));
+    const message =
+      (typeof payload?.message === "string" && payload.message.trim()) ||
+      (typeof payload?.error === "string" && payload.error.trim()) ||
+      (typeof payload?.detail === "string" && payload.detail.trim()) ||
+      (typeof payload?.descripcion === "string" && payload.descripcion.trim()) ||
+      "";
+    if (message) return message;
+  }
+
+  const text = await res.text().catch(() => "");
+  return text.trim() || fallback;
+}
+
+async function apiPost<TBody, TResponse>(path: string, body: TBody): Promise<TResponse> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  handleUnauthorizedResponse(res.status, path);
+
+  if (!res.ok) {
+    const message = await parseErrorMessage(
+      res,
+      `Error ${res.status}. No se ha podido completar la acción.`
+    );
+    throw new Error(message);
+  }
+
+  return (await res.json().catch(() => ({}))) as TResponse;
+}
+
+async function apiDelete<TBody, TResponse>(
+  path: string,
+  body?: TBody
+): Promise<TResponse> {
+  const hasBody = body !== undefined;
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+    body: hasBody ? JSON.stringify(body) : undefined,
+  });
+  handleUnauthorizedResponse(res.status, path);
+
+  if (!res.ok) {
+    const message = await parseErrorMessage(
+      res,
+      `Error ${res.status}. No se ha podido completar la acción.`
+    );
+    throw new Error(message);
+  }
+
+  return (await res.json().catch(() => ({}))) as TResponse;
+}
+
+export type CreateUserListInput = {
+  nombre: string;
+  tipoContenidos: BackendLista["tipoContenidos"];
+  descripcion?: string;
+  visibilidad?: NonNullable<BackendLista["visibilidad"]>;
+  imagen?: string;
+  tipo?: string;
+  userId?: number;
+};
+
+type CreateUserListResponse = {
+  lista?: BackendLista;
+} & Partial<BackendLista>;
+
+type AddContentToListResponse = {
+  listaContenido?: {
+    listaId: number;
+    contenidoId: number;
+  };
+} & Record<string, unknown>;
+
+type RemoveContentFromListResponse = Record<string, unknown>;
+
+/**
+ * POST /listas/
+ * -> { lista: BackendLista } | BackendLista
+ */
+export async function createUserList(input: CreateUserListInput): Promise<BackendLista> {
+  const listaPayload = {
+    listaId: 0,
+    userId: input.userId ?? 0,
+    tipo: input.tipo ?? "user",
+    tipoContenidos: input.tipoContenidos,
+    nombre: input.nombre,
+    descripcion: input.descripcion ?? "",
+    visibilidad: input.visibilidad ?? "publica",
+    imagen: input.imagen ?? "",
+  };
+
+  // Compatibilidad: algunos backends validan campos en raíz y otros en `lista`.
+  const payload = {
+    ...listaPayload,
+    lista: listaPayload,
+  };
+
+  const data = await apiPost<typeof payload, CreateUserListResponse>("/listas/", payload);
+  const created = data?.lista ?? (data as BackendLista);
+  if (!created || typeof created.listaId !== "number") {
+    throw new Error("No se ha podido crear la lista.");
+  }
+  return created;
+}
+
+/**
+ * POST /listas/{listaId}/contenidos
+ * body: { listaContenido: { listaId, contenidoId } }
+ */
+export async function addContentToList(
+  listaId: number,
+  contenidoId: number
+): Promise<void> {
+  const listaContenido = { listaId, contenidoId };
+  // Compatibilidad: soporte para validadores en raíz y anidados.
+  const payload = {
+    ...listaContenido,
+    listaContenido,
+  };
+
+  await apiPost<typeof payload, AddContentToListResponse>(
+    `/listas/${listaId}/contenidos`,
+    payload
+  );
+}
+
+/**
+ * DELETE /listas/{listaId}/contenidos
+ * body: { contenidoId }
+ */
+export async function removeContentFromList(
+  listaId: number,
+  contenidoId: number
+): Promise<void> {
+  const path = `/listas/${listaId}/contenidos`;
+  const variants: Array<{ path: string; body?: Record<string, unknown> }> = [
+    { path, body: { contenidoId } },
+    { path, body: { listaId, contenidoId } },
+    { path, body: { listaContenido: { listaId, contenidoId } } },
+    {
+      path,
+      body: { contenidoId, listaId, listaContenido: { listaId, contenidoId } },
+    },
+    { path: `${path}?contenidoId=${contenidoId}` },
+    { path: `${path}?contenidoId=${contenidoId}`, body: { contenidoId } },
+  ];
+
+  let lastError: unknown = null;
+  for (const variant of variants) {
+    try {
+      await apiDelete<Record<string, unknown>, RemoveContentFromListResponse>(
+        variant.path,
+        variant.body
+      );
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("No se pudo quitar el contenido de la lista.");
 }
 
 /**

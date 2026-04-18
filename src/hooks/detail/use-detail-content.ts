@@ -90,7 +90,12 @@ export function useDetailContent({
     () => remoteItem ?? stateItem ?? localItem,
     [remoteItem, stateItem, localItem]
   );
-  const resolvedId = item?.id ?? id;
+  const resolvedId =
+    item?.id ??
+    item?._id ??
+    item?.contenidoId ??
+    item?.contenido_id ??
+    id;
   const normalizedId = resolvedId != null ? String(resolvedId) : "";
   const normalizedType = type && type.trim() ? type : "pelicula";
 

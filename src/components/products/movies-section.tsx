@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Popcorn } from "lucide-react";
 import { fetchMovies } from "../../services/fetchMovies";
 import { Button } from "../ui/button";
+import { buildDetailPath } from "@/lib/detail-route";
 
 type SectionMoviesProps = {
   compact?: boolean;
@@ -155,7 +156,11 @@ export default function SectionMovies({
               {movies.map((m) => (
                 <div
                   key={m.id}
-                  onClick={() => navigate(`/detail/pelicula/${m.id}`)}
+                  onClick={() =>
+                    navigate(buildDetailPath("pelicula", m.id, m.titulo), {
+                      state: { item: { ...m, tipo: "pelicula" } },
+                    })
+                  }
                   className="w-[170px] shrink-0 cursor-pointer transition hover:scale-[1.02] sm:w-[210px]"
                 >
                   <Card
@@ -203,7 +208,11 @@ export default function SectionMovies({
             {visibleItems.map((m) => (
               <div
                 key={m.id}
-                onClick={() => navigate(`/detail/pelicula/${m.id}`)}
+                onClick={() =>
+                  navigate(buildDetailPath("pelicula", m.id, m.titulo), {
+                    state: { item: { ...m, tipo: "pelicula" } },
+                  })
+                }
                 className="cursor-pointer hover:scale-105 transform transition"
               >
                 <Card

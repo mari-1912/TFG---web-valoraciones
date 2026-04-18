@@ -8,6 +8,7 @@ import {
   loadWatchedList,
 } from "../services/watchlist";
 import { isSessionValid } from "@/services/auth-service";
+import { buildDetailPath } from "@/lib/detail-route";
 
 export default function MyListsPage() {
   const isLoggedIn = isSessionValid();
@@ -68,7 +69,8 @@ export default function MyListsPage() {
                     {moviesToWatch.map((item) => (
                       <Link
                         key={`${item.type}-${item.id}`}
-                        to={`/detail/${item.type}/${item.id}`}
+                        to={buildDetailPath(item.type, item.id, item.title)}
+                        state={{ item: { id: item.id, titulo: item.title, tipo: item.type } }}
                         className="group rounded-xl border border-gray-200 bg-white overflow-hidden hover:shadow-md transition"
                       >
                         <div className="aspect-[2/3] bg-gray-200">
@@ -121,7 +123,8 @@ export default function MyListsPage() {
                     {moviesWatched.map((item) => (
                       <Link
                         key={`${item.type}-${item.id}`}
-                        to={`/detail/${item.type}/${item.id}`}
+                        to={buildDetailPath(item.type, item.id, item.title)}
+                        state={{ item: { id: item.id, titulo: item.title, tipo: item.type } }}
                         className="group rounded-xl border border-gray-200 bg-white overflow-hidden hover:shadow-md transition"
                       >
                         <div className="aspect-[2/3] bg-gray-200">

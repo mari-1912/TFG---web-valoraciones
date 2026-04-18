@@ -4,6 +4,7 @@ import Card from "../Card";
 import { fetchBooks } from "../../services/fetchBooks";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
+import { buildDetailPath } from "@/lib/detail-route";
 
 type Book = {
   id: number | string;
@@ -164,7 +165,11 @@ export default function SectionBooks({
                   <div
                     key={book.id}
                     className="w-[170px] shrink-0 cursor-pointer transition hover:scale-[1.02] sm:w-[210px]"
-                    onClick={() => navigate(`/detail/libro/${book.id}`)}
+                    onClick={() =>
+                      navigate(buildDetailPath("libro", book.id, book.titulo), {
+                        state: { item: { ...book, tipo: "libro" } },
+                      })
+                    }
                   >
                     <Card
                       id={book.id}
@@ -211,7 +216,11 @@ export default function SectionBooks({
                 <div
                   key={book.id}
                   className="cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => navigate(`/detail/libro/${book.id}`)}
+                  onClick={() =>
+                    navigate(buildDetailPath("libro", book.id, book.titulo), {
+                      state: { item: { ...book, tipo: "libro" } },
+                    })
+                  }
                 >
                   <Card
                     id={book.id}

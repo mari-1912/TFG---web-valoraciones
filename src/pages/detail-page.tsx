@@ -21,6 +21,10 @@ import { useDetailRating } from "@/hooks/detail/use-detail-rating";
 import { useDetailComments } from "@/hooks/detail/use-detail-comments";
 import { useDetailContent } from "@/hooks/detail/use-detail-content";
 import { useDetailCurrentUser } from "@/hooks/detail/use-detail-current-user";
+import {
+  isNumericDetailSegment,
+  slugifyDetailTitle,
+} from "@/lib/detail-route";
 import movies from "../data/movies.json";
 import books from "../data/books.json";
 import videoGames from "../data/video-games.json";
@@ -57,7 +61,7 @@ const TYPE_LABELS: Record<string, string> = {
 const TMDB_IMG_BASE = "https://image.tmdb.org/t/p/";
 
 export function DetailPage() {
-  const { id, type } = useParams();
+  const { id: detailSegment, type } = useParams();
   const location = useLocation();
   const locationState = location.state as
     | {
@@ -82,16 +86,53 @@ export function DetailPage() {
   const focusCommentId = focusCommentIdFromQuery ?? focusCommentIdFromState;
   const focusCommentText = focusCommentTextFromQuery ?? focusCommentTextFromState;
 
+  const normalizedDetailSegment = useMemo(
+    () => decodeURIComponent(detailSegment ?? "").trim(),
+    [detailSegment]
+  );
   const localItem = useMemo(() => {
-    if (!type || !id) return null;
+    if (!type || !normalizedDetailSegment) return null;
     const dataset = LOCAL_DATASETS[type];
     if (!Array.isArray(dataset)) return null;
-    return dataset.find((i) => String(i.id) === String(id)) ?? null;
-  }, [type, id]);
+    const isNumeric = isNumericDetailSegment(normalizedDetailSegment);
+    if (isNumeric) {
+      return (
+        dataset.find((i) => String(i.id) === String(normalizedDetailSegment)) ??
+        null
+      );
+    }
+    return (
+      dataset.find((i) => {
+        const candidateTitle = pickString(i?.title, i?.titulo, i?.nombre);
+        return slugifyDetailTitle(candidateTitle) === normalizedDetailSegment;
+      }) ?? null
+    );
+  }, [type, normalizedDetailSegment]);
+
+  const resolvedDetailId = useMemo(() => {
+    const fromState =
+      stateItem?.id ??
+      stateItem?._id ??
+      stateItem?.contenidoId ??
+      stateItem?.contenido_id;
+    if (fromState != null && String(fromState).trim()) return String(fromState);
+    const fromLocal =
+      localItem?.id ??
+      localItem?._id ??
+      localItem?.contenidoId ??
+      localItem?.contenido_id;
+    if (fromLocal != null && String(fromLocal).trim()) {
+      return String(fromLocal);
+    }
+    if (isNumericDetailSegment(normalizedDetailSegment)) {
+      return normalizedDetailSegment;
+    }
+    return "";
+  }, [stateItem, localItem, normalizedDetailSegment]);
 
   const { item, normalizedId, normalizedType } =
     useDetailContent({
-      id,
+      id: resolvedDetailId || undefined,
       type,
       stateItem,
       localItem,
@@ -558,6 +599,8 @@ export function DetailPage() {
             <div className="space-y-10">
               <DetailHero
                 contentListKey={`${normalizedType}:${normalizedId}`}
+                contentId={normalizedId}
+                listContentType={normalizedType}
                 typeLabel={typeLabel}
                 title={title}
                 description={description}

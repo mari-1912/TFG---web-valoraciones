@@ -14,6 +14,7 @@ import {
   type ContentSearchItem,
   type UserSearchItem,
 } from "@/services/search-service";
+import { buildDetailPath } from "@/lib/detail-route";
 
 
 import {
@@ -454,7 +455,12 @@ export function Header() {
           return;
         }
 
-        navigate(`/detail/${item.tipo}/${importedId}`, {
+        const importedTitle =
+          importedItem?.titulo ??
+          importedItem?.title ??
+          item.titulo ??
+          "";
+        navigate(buildDetailPath(item.tipo, importedId, importedTitle), {
           state: { item: importedItem },
         });
         onSelect?.();
@@ -467,7 +473,7 @@ export function Header() {
       return;
     }
 
-    navigate(`/detail/${item.tipo}/${item.id}`);
+    navigate(buildDetailPath(item.tipo, item.id, item.titulo));
     onSelect?.();
   };
 
