@@ -1,13 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ListCard, type Lista } from "@/components/lists/list-card";
-import { Skeleton } from "@/components/ui/skeleton";
 import PageLayout from "@/layouts/layout";
 import { getListsByUser, getMyLists } from "@/services/lists-service";
 
 type ListsCategoryProps = {
-  type: "nuestras" | "mis"; // tipo de listas
+  type: "nuestras" | "mis";
 };
+
+// Skeleton de tarjeta mientras carga
+function CardSkeleton() {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: "hsl(270 40% 96%)",
+        border: "1.5px solid hsl(270 30% 88%)",
+      }}
+    >
+      <div
+        style={{
+          height: 180,
+          background: "linear-gradient(90deg, hsl(270 40% 92%) 25%, hsl(270 40% 96%) 50%, hsl(270 40% 92%) 75%)",
+          backgroundSize: "200% 100%",
+          animation: "shimmer 1.4s infinite linear",
+        }}
+      />
+      <div className="px-4 py-4 flex flex-col gap-3">
+        <div style={{ height: 14, width: "40%", borderRadius: 99, background: "hsl(270 30% 88%)" }} />
+        <div style={{ height: 18, width: "75%", borderRadius: 8, background: "hsl(270 30% 90%)" }} />
+        <div style={{ height: 13, width: "90%", borderRadius: 8, background: "hsl(270 30% 92%)" }} />
+        <div style={{ height: 13, width: "60%", borderRadius: 8, background: "hsl(270 30% 92%)" }} />
+      </div>
+    </div>
+  );
+}
 
 export default function ListsCategory({ type }: ListsCategoryProps) {
   const [lists, setLists] = useState<Lista[]>([]);
@@ -22,6 +49,8 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
     [type]
   );
 
+  const title = type === "nuestras" ? "Nuestras listas" : "Mis listas";
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -34,23 +63,18 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
       }
 
       try {
-        // Nuestras listas = listas públicas del usuario Opinify (id=5)
-        // Mis listas = listas del usuario autenticado
         const result =
           type === "nuestras" ? await getListsByUser(5) : await getMyLists();
-
         setLists(result as unknown as Lista[]);
-      } catch (e: any) {
-        const msg = String(e?.message ?? "");
+      } catch (e: unknown) {
+        const msg = String((e as Error)?.message ?? "");
         if (msg.startsWith("401")) {
-          // Sesión caducada/no válida
           localStorage.removeItem("isLoggedIn");
           localStorage.removeItem("userRole");
           localStorage.removeItem("currentUser");
           navigate("/login");
           return;
         }
-
         setError(msg || "Error cargando listas");
         setLists([]);
       } finally {
@@ -63,51 +87,128 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
 
   return (
     <PageLayout>
-      <main className="min-h-screen bg-gray-50 px-6 py-12">
-        <h1 className="text-3xl font-bold text-indigo-700 mb-8 text-center">
-          {type === "nuestras" ? "Nuestras listas" : "Mis listas"}
-        </h1>
+      <style>{`
+        @keyframes shimmer {
+          from { background-position: 200% 0; }
+          to   { background-position: -200% 0; }
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
-        {!isLoggedIn ? (
-          <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-center">
-            <p className="text-gray-700">
-              Inicia sesión para ver{" "}
-              {type === "nuestras" ? "las listas del administrador" : "tus listas"}.
-            </p>
-            <Link
-              to="/login"
-              className="mt-4 inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-            >
-              Ir a login
+      <main
+        className="min-h-screen px-6 py-12"
+        style={{ background: "hsl(264 100% 99%)" }}
+      >
+        {/* Cabecera */}
+        <div
+          className="max-w-6xl mx-auto mb-10"
+          style={{ animation: "fadeUp 0.5s ease both" }}
+        >
+          {/* Miga de pan */}
+          <div className="flex items-center gap-2 text-xs mb-4" style={{ color: "hsl(258 16% 55%)" }}>
+            <Link to="/listas" style={{ color: "hsl(268 84% 62%)" }} className="hover:underline">
+              Listas
             </Link>
+            <span>/</span>
+            <span>{title}</span>
           </div>
-        ) : loading ? (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={`list-skeleton-${index}`}
-                className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm"
+
+          <h1
+            className="text-3xl font-black tracking-tight"
+            style={{ color: "hsl(268 84% 62%)" }}
+          >
+            {title}
+          </h1>
+
+          {!loading && !error && lists.length > 0 && (
+            <p className="mt-1 text-sm" style={{ color: "hsl(258 16% 45%)" }}>
+              {lists.length} {lists.length === 1 ? "lista" : "listas"}
+            </p>
+          )}
+        </div>
+
+        {/* Contenido */}
+        <div
+          className="max-w-6xl mx-auto"
+          style={{ animation: "fadeUp 0.55s ease 0.08s both" }}
+        >
+          {/* No logueado */}
+          {!isLoggedIn ? (
+            <div
+              className="rounded-3xl p-10 text-center mx-auto max-w-md"
+              style={{
+                background: "hsl(270 40% 96%)",
+                border: "1.5px solid hsl(270 30% 88%)",
+              }}
+            >
+              <p className="text-base mb-5" style={{ color: "hsl(258 16% 40%)" }}>
+                Inicia sesión para ver{" "}
+                {type === "nuestras" ? "las listas de Opinify" : "tus listas"}.
+              </p>
+              <Link
+                to="/login"
+                className="inline-block font-bold py-2.5 px-6 rounded-2xl text-white text-sm"
+                style={{ background: "hsl(268 84% 62%)" }}
               >
-                <Skeleton className="h-5 w-2/3" />
-                <Skeleton className="mt-3 h-4 w-full" />
-                <Skeleton className="mt-2 h-4 w-5/6" />
-                <Skeleton className="mt-5 h-9 w-28 rounded-lg" />
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6">
-            <p className="text-sm text-gray-700">{error}</p>
-          </div>
-        ) : lists.length === 0 ? (
-          <p className="text-center text-gray-700">No hay listas disponibles.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {lists.map((lista) => (
-              <ListCard key={lista.listaId} lista={lista} basePath={basePath} />
-            ))}
-          </div>
-        )}
+                Iniciar sesión
+              </Link>
+            </div>
+
+          /* Cargando */
+          ) : loading ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+
+          /* Error */
+          ) : error ? (
+            <div
+              className="rounded-3xl p-8 mx-auto max-w-md text-center"
+              style={{
+                background: "hsl(270 40% 96%)",
+                border: "1.5px solid hsl(270 30% 88%)",
+              }}
+            >
+              <p className="text-sm" style={{ color: "hsl(258 16% 40%)" }}>
+                {error}
+              </p>
+            </div>
+
+          /* Sin listas */
+          ) : lists.length === 0 ? (
+            <div
+              className="rounded-3xl p-10 mx-auto max-w-md text-center"
+              style={{
+                background: "hsl(270 40% 96%)",
+                border: "1.5px solid hsl(270 30% 88%)",
+              }}
+            >
+              <p className="text-base" style={{ color: "hsl(258 16% 40%)" }}>
+                {type === "nuestras"
+                  ? "Aún no hay listas publicadas."
+                  : "Todavía no has creado ninguna lista."}
+              </p>
+            </div>
+
+          /* Grid de listas */
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {lists.map((lista, i) => (
+                <div
+                  key={lista.listaId}
+                  style={{ animation: `fadeUp 0.4s ease ${i * 0.05}s both` }}
+                >
+                  <ListCard lista={lista} basePath={basePath} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </PageLayout>
   );
