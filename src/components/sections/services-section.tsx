@@ -14,6 +14,7 @@ import {
   type SortKey,
 } from "../service-filters";
 import type { ServiceList } from "@/services/services-list";
+import { buildDetailPath } from "@/lib/detail-route";
 
 
 interface Props {
@@ -146,7 +147,10 @@ export default function ServiceSection({
   };
 
   const handleCardClick = (item: ServiceList) => {
-    navigate(`/detail/${toDetailType(item.category)}/${item.id}`);
+    const detailType = toDetailType(item.category);
+    navigate(buildDetailPath(detailType, item.id, item.title), {
+      state: { item: { ...item, tipo: detailType } },
+    });
   };
 
   if (fullWidth) {

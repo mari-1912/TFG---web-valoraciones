@@ -70,7 +70,10 @@ export function useDetailRating({
         setRatingMessage("Inicia sesión para valorar.");
         return;
       }
-      if (!normalizedId) return;
+      if (!normalizedId) {
+        setRatingMessage("No se pudo identificar el contenido para valorar.");
+        return;
+      }
       setRatingUpdating(true);
       setRatingMessage(null);
       try {
@@ -101,7 +104,10 @@ export function useDetailRating({
       setRatingMessage("Inicia sesión para valorar.");
       return;
     }
-    if (!normalizedId) return;
+    if (!normalizedId) {
+      setRatingMessage("No se pudo identificar el contenido para valorar.");
+      return;
+    }
     setRatingUpdating(true);
     setRatingMessage(null);
     try {

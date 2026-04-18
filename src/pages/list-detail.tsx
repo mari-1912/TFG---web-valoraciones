@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import PageLayout from "@/layouts/layout";
 import { getListContents } from "@/services/lists-service";
 import type { BackendContenidoListado } from "@/services/lists-service";
+import { buildDetailPath } from "@/lib/detail-route";
+import ContentCard from "@/components/content-card";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -16,31 +18,7 @@ type Lista = {
 
 type ContenidoItem = BackendContenidoListado & { tipo?: string | null };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const TIPO_META: Record<string, { label: string; color: string; bg: string }> = {
-  pelicula:   { label: "Película",   color: "#7c3aed", bg: "rgba(124,58,237,0.14)" },
-  serie:      { label: "Serie",      color: "#0ea5e9", bg: "rgba(14,165,233,0.14)"  },
-  libro:      { label: "Libro",      color: "#16a34a", bg: "rgba(22,163,74,0.14)"   },
-  videojuego: { label: "Videojuego", color: "#ea580c", bg: "rgba(234,88,12,0.14)"   },
-};
-
-function getTipoMeta(tipo?: string | null) {
-  return TIPO_META[(tipo ?? "").toLowerCase()] ?? { label: tipo ?? "", color: "#6b7280", bg: "rgba(107,114,128,0.14)" };
-}
-
-function formatScore(puntuacion?: number | null, puntuacionApi?: number | null) {
-  const val = puntuacion ?? puntuacionApi;
-  if (val == null) return null;
-  return Number(val).toFixed(1);
-}
-
 // Ruta hacia la página de detalle según tipo de contenido
-function buildDetailPath(tipo: string | null | undefined, id: number | string) {
-  const t = (tipo ?? "").toLowerCase();
-  return `/detail/${t}/${id}`;
-}
-
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 
 function ContentSkeleton() {
@@ -71,100 +49,6 @@ function ContentSkeleton() {
 }
 
 // ── Tarjeta de contenido ─────────────────────────────────────────────────────
-
-function ContentCard({ item }: { item: ContenidoItem }) {
-  const [imgError, setImgError] = useState(false);
-  const meta = getTipoMeta(item.tipo);
-  const score = formatScore(item.puntuacion, item.puntuacionApi);
-  const detailPath = buildDetailPath(item.tipo, item.id);
-  const hasImage = !!item.portada && !imgError;
-
-  return (
-    <Link
-      to={detailPath}
-      className="group flex flex-col h-full rounded-2xl overflow-hidden transition-all duration-300"
-      style={{
-        background: "hsl(270 40% 96%)",
-        border: "1.5px solid hsl(270 30% 88%)",
-        boxShadow: "0 4px 16px rgba(80,15,120,0.08)",
-        textDecoration: "none",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)";
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 14px 36px rgba(80,15,120,0.20)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = "";
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(80,15,120,0.08)";
-      }}
-    >
-      {/* Poster */}
-      <div className="relative overflow-hidden" style={{ aspectRatio: "2/3" }}>
-        {hasImage ? (
-          <img
-            src={item.portada!}
-            alt={item.titulo}
-            className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-            onError={() => setImgError(true)}
-            loading="lazy"
-          />
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{
-              background: "linear-gradient(135deg, hsl(268 84% 62%) 0%, hsl(295 86% 65%) 100%)",
-            }}
-          >
-            <span
-              className="font-black select-none"
-              style={{ fontSize: 48, color: "rgba(255,255,255,0.22)", lineHeight: 1 }}
-            >
-              {item.titulo.charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
-
-        {/* Score flotante */}
-        {score && (
-          <div
-            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
-            style={{
-              background: "rgba(0,0,0,0.55)",
-              color: "#facc15",
-              backdropFilter: "blur(6px)",
-            }}
-          >
-            ★ {score}
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="p-3 flex flex-col gap-1.5 flex-1">
-        <span
-          className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full"
-          style={{ background: meta.bg, color: meta.color }}
-        >
-          {meta.label}
-        </span>
-
-        <p
-          className="font-semibold text-sm leading-snug line-clamp-2"
-          style={{ color: "hsl(258 24% 16%)" }}
-        >
-          {item.titulo}
-        </p>
-
-        <span
-          className="text-xs font-medium mt-auto pt-2"
-          style={{ color: "hsl(268 84% 62%)" }}
-        >
-          Ver detalle →
-        </span>
-      </div>
-    </Link>
-  );
-}
 
 // ── Página ───────────────────────────────────────────────────────────────────
 
@@ -344,7 +228,14 @@ export default function ListDetail() {
                   style={{ animation: "fadeUp 0.5s ease 0.1s both" }}>
                   {contenidos.map((item, i) => (
                     <div key={item.id} className="flex" style={{ animation: `fadeUp 0.35s ease ${i * 0.04}s both` }}>
-                      <ContentCard item={item} />
+                      <ContentCard
+                        title={item.titulo}
+                        image={item.portada}
+                        type={item.tipo}
+                        score={item.puntuacion ?? item.puntuacionApi}
+                        to={buildDetailPath(item.tipo, item.id, item.titulo)}
+                        state={{ item: { id: item.id, titulo: item.titulo, tipo: item.tipo } }}
+                      />
                     </div>
                   ))}
                 </div>

@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ListPlus, Plus, Star, X } from "lucide-react";
 import type { ContentStatus } from "@/services/content-status";
 import {
+  addContentToList,
+  createUserList,
+  getMyLists,
+  removeContentFromList,
+} from "@/services/lists-service";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -10,6 +16,8 @@ import {
 
 type DetailHeroProps = {
   contentListKey?: string;
+  contentId?: string | number;
+  listContentType?: string;
   typeLabel: string;
   title: string;
   description: string;
@@ -43,12 +51,6 @@ type UserList = {
   name: string;
 };
 
-const DEFAULT_MOCK_LISTS: UserList[] = [
-  { id: "mock-favoritos", name: "Favoritos" },
-  { id: "mock-pendientes", name: "Pendientes" },
-  { id: "mock-plan-finde", name: "Plan finde" },
-];
-
 function normalizeStorageUser() {
   if (typeof window === "undefined") return "anon";
   const raw = localStorage.getItem("currentUser") ?? "";
@@ -61,8 +63,21 @@ function normalizeContentListKey(contentListKey: string | undefined, title: stri
   return source.replace(/\s+/g, "-");
 }
 
+function resolveListContentType(value?: string) {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized === "pelicula") return "pelicula";
+  if (normalized === "serie") return "serie";
+  if (normalized === "libro") return "libro";
+  if (normalized === "videojuego" || normalized === "juego-mesa") {
+    return "videojuego";
+  }
+  return "pelicula";
+}
+
 export function DetailHero({
   contentListKey,
+  contentId,
+  listContentType,
   typeLabel,
   title,
   description,
@@ -90,12 +105,13 @@ export function DetailHero({
   const [userLists, setUserLists] = useState<UserList[]>([]);
   const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
   const [isCreatingList, setIsCreatingList] = useState(false);
+  const [isCreatingListLoading, setIsCreatingListLoading] = useState(false);
+  const [assigningListId, setAssigningListId] = useState<string | null>(null);
   const [newListName, setNewListName] = useState("");
   const [newListError, setNewListError] = useState<string | null>(null);
   const videoRef = useRef<HTMLDivElement | null>(null);
   const storageUser = normalizeStorageUser();
   const normalizedListKey = normalizeContentListKey(contentListKey, title);
-  const listsStorageKey = `mock-user-lists:${storageUser}`;
   const contentListsStorageKey = `mock-content-lists:${storageUser}:${normalizedListKey}`;
 
   useEffect(() => {
@@ -105,53 +121,54 @@ export function DetailHero({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const readUserLists = () => {
+    let cancelled = false;
+
+    const loadLists = async () => {
       try {
-        const rawLists = localStorage.getItem(listsStorageKey);
-        if (!rawLists) {
-          localStorage.setItem(listsStorageKey, JSON.stringify(DEFAULT_MOCK_LISTS));
-          return DEFAULT_MOCK_LISTS;
-        }
-        const parsed = JSON.parse(rawLists);
-        if (!Array.isArray(parsed)) {
-          localStorage.setItem(listsStorageKey, JSON.stringify(DEFAULT_MOCK_LISTS));
-          return DEFAULT_MOCK_LISTS;
-        }
-        const normalized = parsed
-          .map((item) => {
-            if (!item || typeof item !== "object") return null;
-            const id = typeof item.id === "string" ? item.id.trim() : "";
-            const name = typeof item.name === "string" ? item.name.trim() : "";
-            if (!id || !name) return null;
-            return { id, name };
+        const backendLists = await getMyLists();
+        if (cancelled) return;
+
+        const nextLists = backendLists
+          .map((list) => {
+            const numericId = Number(list.listaId);
+            if (!Number.isFinite(numericId)) return null;
+            const name = String(list.nombre ?? "").trim();
+            if (!name) return null;
+            return { id: String(numericId), name };
           })
           .filter((item): item is UserList => item != null);
-        if (!normalized.length) {
-          localStorage.setItem(listsStorageKey, JSON.stringify(DEFAULT_MOCK_LISTS));
-          return DEFAULT_MOCK_LISTS;
+        setUserLists(nextLists);
+
+        try {
+          const rawSelected = localStorage.getItem(contentListsStorageKey);
+          const parsed = rawSelected ? JSON.parse(rawSelected) : [];
+          const validIds = Array.isArray(parsed)
+            ? parsed
+                .map((value) => (typeof value === "string" ? value : ""))
+                .filter(
+                  (value) =>
+                    value &&
+                    Number.isFinite(Number(value)) &&
+                    nextLists.some((list) => list.id === value)
+                )
+            : [];
+          setSelectedListIds(validIds);
+        } catch {
+          setSelectedListIds([]);
         }
-        return normalized;
       } catch {
-        return DEFAULT_MOCK_LISTS;
+        if (cancelled) return;
+        setUserLists([]);
+        setSelectedListIds([]);
       }
     };
 
-    const nextLists = readUserLists();
-    setUserLists(nextLists);
+    void loadLists();
 
-    try {
-      const rawSelected = localStorage.getItem(contentListsStorageKey);
-      const parsed = rawSelected ? JSON.parse(rawSelected) : [];
-      const validIds = Array.isArray(parsed)
-        ? parsed
-            .map((value) => (typeof value === "string" ? value : ""))
-            .filter((value) => value && nextLists.some((list) => list.id === value))
-        : [];
-      setSelectedListIds(validIds);
-    } catch {
-      setSelectedListIds([]);
-    }
-  }, [listsStorageKey, contentListsStorageKey]);
+    return () => {
+      cancelled = true;
+    };
+  }, [contentListsStorageKey]);
 
   const openRatingModal = () => {
     setPendingRating(userRating ?? 0);
@@ -167,6 +184,8 @@ export function DetailHero({
   const currentStatusLabel = statusOptions.find(
     (option) => option.value === currentStatus
   )?.label;
+  const numericContentId = Number(contentId);
+  const hasValidNumericContentId = Number.isFinite(numericContentId);
   const persistSelectedListIds = (nextIds: string[]) => {
     if (typeof window === "undefined") return;
     if (!nextIds.length) {
@@ -183,7 +202,65 @@ export function DetailHero({
       return next;
     });
   };
-  const handleCreateList = () => {
+  const handleToggleListAssignment = async (listId: string) => {
+    const isSelected = selectedListIds.includes(listId);
+    const parsedListId = Number(listId);
+    if (!Number.isFinite(parsedListId)) {
+      // Lista local antigua (mock): permitimos toggle local para no bloquear la UI.
+      toggleListAssignment(listId);
+      if (!isSelected) {
+        setNewListError(
+          "Esta lista es local y no está sincronizada con el servidor."
+        );
+      } else {
+        setNewListError(null);
+      }
+      return;
+    }
+
+    if (!hasValidNumericContentId) {
+      setNewListError("No se pudo identificar el contenido.");
+      return;
+    }
+
+    // Actualización optimista de UI.
+    toggleListAssignment(listId);
+    setAssigningListId(listId);
+    try {
+      if (isSelected) {
+        await removeContentFromList(parsedListId, numericContentId);
+      } else {
+        await addContentToList(parsedListId, numericContentId);
+      }
+      setNewListError(null);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : isSelected
+            ? "No se pudo quitar el contenido de la lista."
+            : "No se pudo añadir el contenido a la lista.";
+      const normalizedMessage = message.toLowerCase();
+      const alreadyRemoved =
+        isSelected &&
+        (normalizedMessage.includes("no existe") ||
+          normalizedMessage.includes("no encontrado") ||
+          normalizedMessage.includes("not found") ||
+          normalizedMessage.includes("ya no") ||
+          normalizedMessage.includes("no está en la lista") ||
+          normalizedMessage.includes("no esta en la lista"));
+      if (!alreadyRemoved) {
+        // Revertimos optimista si el backend rechaza la operación.
+        toggleListAssignment(listId);
+        setNewListError(message);
+      } else {
+        setNewListError(null);
+      }
+    } finally {
+      setAssigningListId(null);
+    }
+  };
+  const handleCreateList = async () => {
     const normalizedName = newListName.trim();
     if (!normalizedName) {
       setNewListError("Escribe un nombre para la lista.");
@@ -196,26 +273,44 @@ export function DetailHero({
       setNewListError("Ya existe una lista con ese nombre.");
       return;
     }
-    const created: UserList = {
-      id:
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `mock-list-${Date.now()}`,
-      name: normalizedName,
-    };
-    const nextLists = [created, ...userLists];
-    setUserLists(nextLists);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(listsStorageKey, JSON.stringify(nextLists));
+    if (isCreatingListLoading) return;
+
+    setIsCreatingListLoading(true);
+    try {
+      if (!hasValidNumericContentId) {
+        throw new Error("No se pudo identificar el contenido.");
+      }
+      const createdFromApi = await createUserList({
+        nombre: normalizedName,
+        tipoContenidos: resolveListContentType(listContentType),
+        descripcion: "",
+        visibilidad: "publica",
+        imagen: "",
+      });
+      await addContentToList(createdFromApi.listaId, numericContentId);
+      const created: UserList = {
+        id: String(createdFromApi.listaId),
+        name: createdFromApi.nombre || normalizedName,
+      };
+      const nextLists = [created, ...userLists.filter((list) => list.id !== created.id)];
+      setUserLists(nextLists);
+      setSelectedListIds((prev) => {
+        const next = prev.includes(created.id) ? prev : [created.id, ...prev];
+        persistSelectedListIds(next);
+        return next;
+      });
+      setNewListName("");
+      setNewListError(null);
+      setIsCreatingList(false);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "No se ha podido crear la lista.";
+      setNewListError(message);
+    } finally {
+      setIsCreatingListLoading(false);
     }
-    setSelectedListIds((prev) => {
-      const next = prev.includes(created.id) ? prev : [created.id, ...prev];
-      persistSelectedListIds(next);
-      return next;
-    });
-    setNewListName("");
-    setNewListError(null);
-    setIsCreatingList(false);
   };
   const selectedLists = userLists.filter((list) => selectedListIds.includes(list.id));
   const listTriggerLabel =
@@ -408,10 +503,12 @@ export function DetailHero({
                       key={list.id}
                       onSelect={(event) => {
                         event.preventDefault();
-                        toggleListAssignment(list.id);
+                        void handleToggleListAssignment(list.id);
                       }}
+                      disabled={assigningListId === list.id}
                       className={[
                         "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
+                        assigningListId === list.id ? "cursor-not-allowed opacity-60" : "",
                         isSelected
                           ? "border-yellow-400/70 bg-yellow-400/20 text-yellow-200"
                           : "border-white/15 text-white/90 hover:bg-white/10",
@@ -426,6 +523,7 @@ export function DetailHero({
                   <DropdownMenuItem
                     onSelect={(event) => {
                       event.preventDefault();
+                      if (isCreatingListLoading) return;
                       setIsCreatingList((prev) => !prev);
                       setNewListError(null);
                     }}
@@ -439,6 +537,7 @@ export function DetailHero({
                       <input
                         type="text"
                         value={newListName}
+                        disabled={isCreatingListLoading}
                         onChange={(event) => {
                           setNewListName(event.target.value);
                           if (newListError) setNewListError(null);
@@ -455,14 +554,12 @@ export function DetailHero({
                       <button
                         type="button"
                         onClick={handleCreateList}
+                        disabled={isCreatingListLoading}
                         className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-400/70 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-yellow-200 transition hover:bg-yellow-400/10"
                       >
                         <ListPlus className="h-4 w-4" />
-                        Crear y añadir
+                        {isCreatingListLoading ? "Creando..." : "Crear y añadir"}
                       </button>
-                      {newListError ? (
-                        <p className="mt-1 text-[11px] text-rose-300">{newListError}</p>
-                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -470,6 +567,9 @@ export function DetailHero({
             </DropdownMenu>
 
           </div>
+          {newListError ? (
+            <p className="text-xs text-rose-300">{newListError}</p>
+          ) : null}
           {statusMessage ? (
             <p className="text-xs text-white/80">{statusMessage}</p>
           ) : null}
