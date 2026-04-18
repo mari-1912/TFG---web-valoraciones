@@ -99,7 +99,7 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
       `}</style>
 
       <main
-        className="min-h-screen px-6 py-12"
+        className="min-h-screen px-6 py-16"
         style={{ background: "hsl(264 100% 99%)" }}
       >
         {/* Cabecera */}
