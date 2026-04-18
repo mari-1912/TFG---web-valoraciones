@@ -442,7 +442,7 @@ export function useDetailComments({
       message: string;
       imageFile?: File | null;
       parentId?: number | null;
-    }) => {
+    }): Promise<{ commentId: string | null; parentId: number | null }> => {
       const message = input.message;
       const normalizedMessage = message.trim();
       const imageFile = input.imageFile ?? null;
@@ -474,6 +474,7 @@ export function useDetailComments({
           messageForApi,
           Number.isFinite(parentId) ? parentId : undefined
         );
+        let createdCommentId: string | null = null;
         const createdComment =
           data?.comentario != null
             ? {
@@ -484,6 +485,7 @@ export function useDetailComments({
         let mergedLocalImages = localCommentImages;
         if (createdComment) {
           const createdId = String(createdComment.commentId ?? "").trim();
+          if (createdId) createdCommentId = createdId;
           if (createdId && imageFile) {
             const localUrl = URL.createObjectURL(imageFile);
             mergedLocalImages = { ...localCommentImages, [createdId]: localUrl };
@@ -513,6 +515,34 @@ export function useDetailComments({
             payloadComments,
             mergedLocalImages
           );
+          if (!createdCommentId) {
+            const minimumTimestamp = Date.now() - 20_000;
+            const normalizedComparable = messageForApi
+              .trim()
+              .replace(/\s+/g, " ")
+              .toLowerCase();
+            const candidates = hydrated.filter((comment) => {
+              const isRecent = (comment.createdAtMs ?? 0) >= minimumTimestamp;
+              if (!isRecent) return false;
+              const sameScope = parentId
+                ? comment.parentId?.trim() === String(parentId)
+                : !comment.parentId?.trim();
+              if (!sameScope) return false;
+              const normalizedComment = (comment.comment ?? "")
+                .trim()
+                .replace(/\s+/g, " ")
+                .toLowerCase();
+              return normalizedComparable
+                ? normalizedComment === normalizedComparable
+                : comment.isOwn;
+            });
+            if (candidates.length > 0) {
+              createdCommentId =
+                [...candidates].sort(
+                  (a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0)
+                )[0]?.id ?? null;
+            }
+          }
           setComments(hydrated);
           setCommentsError(null);
         } catch {
@@ -527,6 +557,10 @@ export function useDetailComments({
             : "Comentario con imagen",
           date: new Date().toISOString(),
         });
+        return {
+          commentId: createdCommentId,
+          parentId,
+        };
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "No se pudo publicar el comentario.";
