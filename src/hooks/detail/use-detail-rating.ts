@@ -9,6 +9,7 @@ import { parseRating } from "@/pages/detail-page.helpers";
 type UseDetailRatingArgs = {
   item: any;
   isLoggedIn: boolean;
+  canRate: boolean;
   normalizedId: string;
   ratingCacheKey: string;
   sessionUsername: string;
@@ -18,6 +19,7 @@ type UseDetailRatingArgs = {
 export function useDetailRating({
   item,
   isLoggedIn,
+  canRate,
   normalizedId,
   ratingCacheKey,
   sessionUsername,
@@ -70,6 +72,10 @@ export function useDetailRating({
         setRatingMessage("Inicia sesión para valorar.");
         return;
       }
+      if (!canRate) {
+        setRatingMessage("Marca el contenido como completado para poder puntuar.");
+        return;
+      }
       if (!normalizedId) {
         setRatingMessage("No se pudo identificar el contenido para valorar.");
         return;
@@ -96,12 +102,16 @@ export function useDetailRating({
         setRatingUpdating(false);
       }
     },
-    [isLoggedIn, normalizedId, ratingCacheKey, sessionUsername, title]
+    [isLoggedIn, canRate, normalizedId, ratingCacheKey, sessionUsername, title]
   );
 
   const handleClearRating = useCallback(async () => {
     if (!isLoggedIn) {
       setRatingMessage("Inicia sesión para valorar.");
+      return;
+    }
+    if (!canRate) {
+      setRatingMessage("Marca el contenido como completado para gestionar tu puntuación.");
       return;
     }
     if (!normalizedId) {
@@ -128,7 +138,7 @@ export function useDetailRating({
     } finally {
       setRatingUpdating(false);
     }
-  }, [isLoggedIn, normalizedId, ratingCacheKey, sessionUsername, title]);
+  }, [isLoggedIn, canRate, normalizedId, ratingCacheKey, sessionUsername, title]);
 
   return {
     userRating,

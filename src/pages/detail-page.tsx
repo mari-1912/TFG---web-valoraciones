@@ -527,11 +527,13 @@ export function DetailPage() {
     item,
     isLoggedIn,
     normalizedId,
+    normalizedType,
     statusCacheKey,
     sessionUsername,
     title,
     statusOptions,
   });
+  const isCompletedForRating = currentStatus === "completed";
   const {
     userRating,
     ratingUpdating,
@@ -541,6 +543,7 @@ export function DetailPage() {
   } = useDetailRating({
     item,
     isLoggedIn,
+    canRate: isCompletedForRating,
     normalizedId,
     ratingCacheKey,
     sessionUsername,
@@ -623,6 +626,7 @@ export function DetailPage() {
                 onSetRating={handleSetRating}
                 onClearRating={handleClearRating}
                 ratingMessage={ratingMessage}
+                ratingEnabled={isCompletedForRating}
               />
 
               {(watchProviders?.flatrate?.length ||

@@ -3,6 +3,7 @@ import {
   type ContentStatus,
   updateContentStatus,
 } from "@/services/content-status";
+import { syncContentInStatusLists } from "@/services/status-lists-sync";
 import { appendProfileActivity } from "@/services/profile-activity";
 import { parseStoredStatus, pickString } from "@/pages/detail-page.helpers";
 
@@ -15,6 +16,7 @@ type UseDetailStatusArgs = {
   item: any;
   isLoggedIn: boolean;
   normalizedId: string;
+  normalizedType: string;
   statusCacheKey: string;
   sessionUsername: string;
   title: string;
@@ -25,6 +27,7 @@ export function useDetailStatus({
   item,
   isLoggedIn,
   normalizedId,
+  normalizedType,
   statusCacheKey,
   sessionUsername,
   title,
@@ -78,6 +81,9 @@ export function useDetailStatus({
       }
       if (!normalizedId) return;
       if (estado === null) {
+        await syncContentInStatusLists(normalizedId, normalizedType, null).catch(
+          () => undefined
+        );
         setCurrentStatus(null);
         setStatusMessage(null);
         if (statusCacheKey) {
@@ -95,6 +101,9 @@ export function useDetailStatus({
       setStatusMessage(null);
       try {
         await updateContentStatus(normalizedId, estado);
+        await syncContentInStatusLists(normalizedId, normalizedType, estado).catch(
+          () => undefined
+        );
         setCurrentStatus(estado);
         if (statusCacheKey) {
           localStorage.setItem(statusCacheKey, estado);
@@ -117,6 +126,7 @@ export function useDetailStatus({
     [
       isLoggedIn,
       normalizedId,
+      normalizedType,
       statusCacheKey,
       sessionUsername,
       title,
