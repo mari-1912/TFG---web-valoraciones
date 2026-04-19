@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "@/components/sections/footer";
 import { ProfileHero, type QuickStat } from "@/components/profile/profile-hero";
 import { ProfileStatsSection } from "@/components/profile/profile-stats-section";
@@ -78,7 +78,14 @@ function getInitialFollowStateFromPayload(data: any): boolean | null {
   return null;
 }
 
+function parseUserId(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get("userId");
   const requestedUserId = useMemo(() => {
@@ -135,7 +142,7 @@ export default function ProfilePage() {
         const user = result.user as
           | { user_id?: number; userId?: number; id?: number }
           | undefined;
-        setCurrentUserId(user?.user_id ?? user?.userId ?? user?.id ?? null);
+        setCurrentUserId(parseUserId(user?.user_id ?? user?.userId ?? user?.id));
       })
       .catch(() => {
         if (cancelled) return;
@@ -174,9 +181,9 @@ export default function ProfilePage() {
 
         if (requestedUserId === null) {
           setIsLoggedIn(true);
-          setCurrentUserId((prev) => prev ?? perfil.userId ?? null);
+          setCurrentUserId((prev) => prev ?? parseUserId(perfil.userId));
         }
-        setProfileUserId(Number(perfil.userId ?? requestedUserId ?? 0) || null);
+        setProfileUserId(parseUserId(perfil.userId ?? requestedUserId));
         setInitialIsFollowing(getInitialFollowStateFromPayload(data));
 
         setUsername(perfil.username ?? "");
@@ -235,7 +242,10 @@ export default function ProfilePage() {
 
   const isOwnProfile =
     requestedUserId === null ||
-    (currentUserId !== null && requestedUserId === currentUserId);
+    (currentUserId !== null &&
+      requestedUserId !== null &&
+      Number(requestedUserId) === Number(currentUserId));
+  const statsTargetUserId = requestedUserId ?? profileUserId;
   const canEdit = isOwnProfile;
 
   useEffect(() => {
@@ -606,7 +616,17 @@ export default function ProfilePage() {
 
       <section className="mx-auto max-w-6xl px-4 py-10">
         <>
-          <ProfileStatsSection cards={activityCards} />
+          <ProfileStatsSection
+            cards={activityCards}
+            showViewAll
+            onViewAll={() =>
+              navigate(
+                statsTargetUserId != null
+                  ? `/perfil/estadisticas?userId=${statsTargetUserId}`
+                  : "/perfil/estadisticas"
+              )
+            }
+          />
 
           {isOwnProfile ? (
             <>

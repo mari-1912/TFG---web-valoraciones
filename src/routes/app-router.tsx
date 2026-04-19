@@ -11,6 +11,8 @@ import ListsCategory from "../pages/list-categories-page";
 import ListDetail from "@/pages/list-detail";
 import AboutPage from "@/pages/about-page";
 import ProfilePage from "@/pages/profile-page";
+import ProfileStatsPage from "@/pages/profile-stats-page";
+import MyStatusListDetailPage from "@/pages/my-status-list-detail-page";
 import { ensureSessionValid } from "@/services/auth-service";
 
 function RequireAuth({ children }: { children: ReactElement }) {
@@ -143,6 +145,14 @@ export const RoutesComponent = () => {
         }
       />
       <Route
+        path="/listas/mis-listas/estado/:estado"
+        element={
+          <RequireAuth>
+            <MyStatusListDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/comunidad"
         element={
           <RequireAuth>
@@ -157,6 +167,14 @@ export const RoutesComponent = () => {
         element={
           <RequireAuth>
             <ProfilePage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/perfil/estadisticas"
+        element={
+          <RequireAuth>
+            <ProfileStatsPage />
           </RequireAuth>
         }
       />

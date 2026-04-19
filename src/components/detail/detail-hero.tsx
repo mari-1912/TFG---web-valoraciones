@@ -44,12 +44,90 @@ type DetailHeroProps = {
   onSetRating?: (value: number) => void;
   onClearRating?: () => void;
   ratingMessage?: string | null;
+  ratingEnabled?: boolean;
 };
 
 type UserList = {
   id: string;
   name: string;
 };
+
+type CategoryKey = "pelicula" | "serie" | "libro" | "videojuego";
+
+type ManagedStatusMeta = {
+  status: ContentStatus;
+  category: CategoryKey | null;
+};
+
+const MANAGED_STATUS_BASE: Record<string, ContentStatus> = {
+  proximamente: "watchlist",
+  en_progreso: "in_progress",
+  completado: "completed",
+  abandonado: "dropped",
+};
+
+function normalizeKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeCategory(value: unknown): CategoryKey | null {
+  const key = normalizeKey(typeof value === "string" ? value : "");
+  if (!key) return null;
+  if (["pelicula", "peliculas", "movie", "movies"].includes(key)) return "pelicula";
+  if (["serie", "series", "tv"].includes(key)) return "serie";
+  if (["libro", "libros", "book", "books"].includes(key)) return "libro";
+  if (["videojuego", "videojuegos", "game", "games", "juego_mesa"].includes(key)) {
+    return "videojuego";
+  }
+  return null;
+}
+
+function parseManagedStatusMeta(name: string, tipoContenidos?: string): ManagedStatusMeta | null {
+  const normalized = normalizeKey(name);
+  if (!normalized) return null;
+
+  const direct = MANAGED_STATUS_BASE[normalized];
+  if (direct) {
+    return {
+      status: direct,
+      category: normalizeCategory(tipoContenidos),
+    };
+  }
+
+  const match = normalized.match(
+    /^(proximamente|en_progreso|completado|abandonado)[ _](peliculas?|series?|libros?|videojuegos?)$/
+  );
+  if (!match) return null;
+
+  const status = MANAGED_STATUS_BASE[match[1]];
+  const category = normalizeCategory(match[2]) ?? normalizeCategory(tipoContenidos);
+  return {
+    status,
+    category,
+  };
+}
+
+function isManagedStatusList(
+  name: string,
+  description: string | null | undefined,
+  tipoContenidos?: string
+) {
+  if (parseManagedStatusMeta(name, tipoContenidos) != null) return true;
+  const normalizedDescription = normalizeKey(description ?? "");
+  return normalizedDescription.startsWith("lista_automatica_de_estado");
+}
+
+function getWatchlistLabel(category: CategoryKey) {
+  if (category === "libro") return "Quiero leer";
+  if (category === "videojuego") return "Quiero jugar";
+  return "Quiero ver";
+}
 
 function normalizeStorageUser() {
   if (typeof window === "undefined") return "anon";
@@ -98,6 +176,7 @@ export function DetailHero({
   onSetRating,
   onClearRating,
   ratingMessage,
+  ratingEnabled = true,
 }: DetailHeroProps) {
   const [showVideo, setShowVideo] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -113,6 +192,7 @@ export function DetailHero({
   const storageUser = normalizeStorageUser();
   const normalizedListKey = normalizeContentListKey(contentListKey, title);
   const contentListsStorageKey = `mock-content-lists:${storageUser}:${normalizedListKey}`;
+  const currentCategory = resolveListContentType(listContentType) as CategoryKey;
 
   useEffect(() => {
     if (!showVideo) return;
@@ -128,15 +208,40 @@ export function DetailHero({
         const backendLists = await getMyLists();
         if (cancelled) return;
 
-        const nextLists = backendLists
-          .map((list) => {
-            const numericId = Number(list.listaId);
-            if (!Number.isFinite(numericId)) return null;
-            const name = String(list.nombre ?? "").trim();
-            if (!name) return null;
-            return { id: String(numericId), name };
-          })
-          .filter((item): item is UserList => item != null);
+        const visibleLists: UserList[] = [];
+        let watchlistEntry: UserList | null = null;
+
+        for (const list of backendLists) {
+          const numericId = Number(list.listaId);
+          if (!Number.isFinite(numericId)) continue;
+          const name = String(list.nombre ?? "").trim();
+          if (!name) continue;
+
+          const managedMeta = parseManagedStatusMeta(name, list.tipoContenidos);
+          const managed = isManagedStatusList(name, list.descripcion, list.tipoContenidos);
+          if (managed) {
+            const listCategory =
+              managedMeta?.category ?? normalizeCategory(list.tipoContenidos);
+            const isCurrentWatchlist =
+              managedMeta?.status === "watchlist" &&
+              listCategory != null &&
+              listCategory === currentCategory;
+            if (isCurrentWatchlist && watchlistEntry == null) {
+              watchlistEntry = {
+                id: String(numericId),
+                name: getWatchlistLabel(currentCategory),
+              };
+            }
+            continue;
+          }
+
+          visibleLists.push({
+            id: String(numericId),
+            name,
+          });
+        }
+
+        const nextLists = watchlistEntry ? [watchlistEntry, ...visibleLists] : visibleLists;
         setUserLists(nextLists);
 
         try {
@@ -168,9 +273,10 @@ export function DetailHero({
     return () => {
       cancelled = true;
     };
-  }, [contentListsStorageKey]);
+  }, [contentListsStorageKey, currentCategory]);
 
   const openRatingModal = () => {
+    if (!ratingEnabled) return;
     setPendingRating(userRating ?? 0);
     setShowRatingModal(true);
   };
@@ -319,6 +425,7 @@ export function DetailHero({
       : selectedLists.length === 1
       ? selectedLists[0].name
       : `En ${selectedLists.length} listas`;
+  const ratingBlockedMessage = "Disponible al marcar como completado.";
 
   return (
     <section className="relative overflow-hidden rounded-3xl border border-gray-200 bg-neutral-900 text-white shadow-sm">
@@ -456,11 +563,7 @@ export function DetailHero({
                   return (
                     <DropdownMenuItem
                       key={option.value}
-                      onSelect={() =>
-                        onSetStatus?.(
-                          option.value === currentStatus ? null : option.value
-                        )
-                      }
+                      onSelect={() => onSetStatus?.(option.value)}
                       disabled={statusUpdating}
                       className={[
                         "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
@@ -581,7 +684,13 @@ export function DetailHero({
             <button
               type="button"
               onClick={openRatingModal}
-              className="mt-3 w-full rounded-xl border border-yellow-400/60 px-4 py-3 text-sm font-semibold text-yellow-200 transition hover:bg-yellow-400/10"
+              disabled={!ratingEnabled || ratingUpdating}
+              className={[
+                "mt-3 w-full rounded-xl border border-yellow-400/60 px-4 py-3 text-sm font-semibold text-yellow-200 transition",
+                !ratingEnabled || ratingUpdating
+                  ? "cursor-not-allowed opacity-60"
+                  : "hover:bg-yellow-400/10",
+              ].join(" ")}
             >
               <span className="inline-flex items-center justify-center gap-2">
                 <Star className="h-5 w-5" />
@@ -596,13 +705,16 @@ export function DetailHero({
                 <button
                   type="button"
                   onClick={onClearRating}
-                  disabled={ratingUpdating}
+                  disabled={ratingUpdating || !ratingEnabled}
                   className="text-xs font-semibold text-white/70 transition hover:text-white"
                 >
                   Quitar
                 </button>
               ) : null}
             </div>
+            {!ratingEnabled ? (
+              <p className="mt-2 text-xs text-yellow-200/80">{ratingBlockedMessage}</p>
+            ) : null}
             {ratingMessage ? (
               <p className="mt-2 text-xs text-white/80">{ratingMessage}</p>
             ) : null}

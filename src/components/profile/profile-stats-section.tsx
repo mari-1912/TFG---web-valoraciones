@@ -6,19 +6,28 @@ type StatsCard = {
 
 type ProfileStatsSectionProps = {
   cards: StatsCard[];
+  showViewAll?: boolean;
+  onViewAll?: () => void;
 };
 
-export function ProfileStatsSection({ cards }: ProfileStatsSectionProps) {
+export function ProfileStatsSection({
+  cards,
+  showViewAll = true,
+  onViewAll,
+}: ProfileStatsSectionProps) {
   return (
     <section>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">Estadísticas</h2>
-        <button
-          type="button"
-          className="text-sm font-medium text-violet-700 hover:text-violet-800"
-        >
-          Ver todo
-        </button>
+        {showViewAll ? (
+          <button
+            type="button"
+            onClick={onViewAll}
+            className="text-sm font-medium text-violet-700 hover:text-violet-800"
+          >
+            Ver todo
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
