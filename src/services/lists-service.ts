@@ -250,3 +250,99 @@ export async function getListContents(
 ): Promise<BackendListaContenidosResponse> {
   return apiGet<BackendListaContenidosResponse>(`/listas/${listaId}/contenidos`);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Funciones añadidas: gestión completa de listas
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function apiPatch<TBody, TResponse>(path: string, body: TBody): Promise<TResponse> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  handleUnauthorizedResponse(res.status, path);
+  if (!res.ok) {
+    const message = await parseErrorMessage(res, `Error ${res.status}. No se ha podido completar la acción.`);
+    throw new Error(message);
+  }
+  return (await res.json().catch(() => ({}))) as TResponse;
+}
+
+/** PATCH /listas/{listaId} */
+export async function updateUserList(
+  listaId: number,
+  payload: Partial<Pick<BackendLista, "nombre" | "descripcion" | "visibilidad">>
+): Promise<BackendLista> {
+  const data = await apiPatch<typeof payload, { lista?: BackendLista }>(`/listas/${listaId}`, payload);
+  return data?.lista ?? (data as BackendLista);
+}
+
+/** DELETE /listas/{listaId} */
+export async function deleteUserList(listaId: number): Promise<void> {
+  const res = await fetch(`${API_URL}/listas/${listaId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  handleUnauthorizedResponse(res.status, `/listas/${listaId}`);
+  if (!res.ok && res.status !== 204) {
+    const message = await parseErrorMessage(res, "No se pudo eliminar la lista.");
+    throw new Error(message);
+  }
+}
+
+/** POST /listas/{listaId}/imagen  (multipart/form-data, campo "imagen") */
+export async function uploadListImage(listaId: number, file: File): Promise<BackendLista> {
+  const formData = new FormData();
+  formData.append("imagen", file);
+  const res = await fetch(`${API_URL}/listas/${listaId}/imagen`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  handleUnauthorizedResponse(res.status, `/listas/${listaId}/imagen`);
+  if (!res.ok) {
+    const message = await parseErrorMessage(res, "No se pudo subir la imagen.");
+    throw new Error(message);
+  }
+  const data = await res.json().catch(() => ({})) as { lista?: BackendLista };
+  return data?.lista ?? (data as BackendLista);
+}
+
+/** DELETE /listas/{listaId}/imagen */
+export async function clearListImage(listaId: number): Promise<BackendLista> {
+  const data = await apiDelete<undefined, { lista?: BackendLista }>(`/listas/${listaId}/imagen`);
+  return data?.lista ?? (data as BackendLista);
+}
+
+export type ListaMiembro = {
+  userId: number;
+  username: string;
+  rol?: string;
+  foto?: string | null;
+  avatarUrl?: string | null;
+};
+
+/** GET /listas/{listaId}/miembros */
+export async function getListMembers(listaId: number): Promise<ListaMiembro[]> {
+  const data = await apiGet<{ miembros?: ListaMiembro[] }>(`/listas/${listaId}/miembros`);
+  return data?.miembros ?? [];
+}
+
+/** POST /listas/{listaId}/miembros */
+export async function addMembersToList(
+  listaId: number,
+  userIds: number[],
+  rol = "colaborador"
+): Promise<void> {
+  await apiPost(`/listas/${listaId}/miembros`, { userIds, rol });
+}
+
+/** DELETE /listas/{listaId}/miembros */
+export async function removeMembersFromList(
+  listaId: number,
+  userIds: number[]
+): Promise<void> {
+  await apiDelete(`/listas/${listaId}/miembros`, { userIds });
+}
