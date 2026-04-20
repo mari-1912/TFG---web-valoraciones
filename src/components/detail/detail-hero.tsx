@@ -47,9 +47,11 @@ type DetailHeroProps = {
   ratingEnabled?: boolean;
 };
 
+// tipoContenidos opcional para filtrar el dropdown por tipo de contenido actual
 type UserList = {
   id: string;
   name: string;
+  tipoContenidos?: string;
 };
 
 type CategoryKey = "pelicula" | "serie" | "libro" | "videojuego";
@@ -107,10 +109,7 @@ function parseManagedStatusMeta(name: string, tipoContenidos?: string): ManagedS
 
   const status = MANAGED_STATUS_BASE[match[1]];
   const category = normalizeCategory(match[2]) ?? normalizeCategory(tipoContenidos);
-  return {
-    status,
-    category,
-  };
+  return { status, category };
 }
 
 function isManagedStatusList(
@@ -146,9 +145,7 @@ function resolveListContentType(value?: string) {
   if (normalized === "pelicula") return "pelicula";
   if (normalized === "serie") return "serie";
   if (normalized === "libro") return "libro";
-  if (normalized === "videojuego" || normalized === "juego-mesa") {
-    return "videojuego";
-  }
+  if (normalized === "videojuego" || normalized === "juego-mesa") return "videojuego";
   return "pelicula";
 }
 
@@ -211,17 +208,18 @@ export function DetailHero({
         const visibleLists: UserList[] = [];
         let watchlistEntry: UserList | null = null;
 
-        for (const list of backendLists) {
-          const numericId = Number(list.listaId);
+        for (const backendList of backendLists) {
+          const numericId = Number(backendList.listaId);
           if (!Number.isFinite(numericId)) continue;
-          const name = String(list.nombre ?? "").trim();
+          const name = String(backendList.nombre ?? "").trim();
           if (!name) continue;
 
-          const managedMeta = parseManagedStatusMeta(name, list.tipoContenidos);
-          const managed = isManagedStatusList(name, list.descripcion, list.tipoContenidos);
+          const managedMeta = parseManagedStatusMeta(name, backendList.tipoContenidos);
+          const managed = isManagedStatusList(name, backendList.descripcion, backendList.tipoContenidos);
+
           if (managed) {
             const listCategory =
-              managedMeta?.category ?? normalizeCategory(list.tipoContenidos);
+              managedMeta?.category ?? normalizeCategory(backendList.tipoContenidos);
             const isCurrentWatchlist =
               managedMeta?.status === "watchlist" &&
               listCategory != null &&
@@ -230,6 +228,7 @@ export function DetailHero({
               watchlistEntry = {
                 id: String(numericId),
                 name: getWatchlistLabel(currentCategory),
+                tipoContenidos: backendList.tipoContenidos,
               };
             }
             continue;
@@ -238,10 +237,13 @@ export function DetailHero({
           visibleLists.push({
             id: String(numericId),
             name,
+            tipoContenidos: backendList.tipoContenidos,
           });
         }
 
-        const nextLists = watchlistEntry ? [watchlistEntry, ...visibleLists] : visibleLists;
+        const nextLists: UserList[] = watchlistEntry
+          ? [watchlistEntry, ...visibleLists]
+          : visibleLists;
         setUserLists(nextLists);
 
         try {
@@ -254,7 +256,7 @@ export function DetailHero({
                   (value) =>
                     value &&
                     Number.isFinite(Number(value)) &&
-                    nextLists.some((list) => list.id === value)
+                    nextLists.some((nl) => nl.id === value)
                 )
             : [];
           setSelectedListIds(validIds);
@@ -292,6 +294,7 @@ export function DetailHero({
   )?.label;
   const numericContentId = Number(contentId);
   const hasValidNumericContentId = Number.isFinite(numericContentId);
+
   const persistSelectedListIds = (nextIds: string[]) => {
     if (typeof window === "undefined") return;
     if (!nextIds.length) {
@@ -300,6 +303,7 @@ export function DetailHero({
     }
     localStorage.setItem(contentListsStorageKey, JSON.stringify(nextIds));
   };
+
   const toggleListAssignment = (listId: string) => {
     setSelectedListIds((prev) => {
       const exists = prev.includes(listId);
@@ -308,16 +312,14 @@ export function DetailHero({
       return next;
     });
   };
+
   const handleToggleListAssignment = async (listId: string) => {
     const isSelected = selectedListIds.includes(listId);
     const parsedListId = Number(listId);
     if (!Number.isFinite(parsedListId)) {
-      // Lista local antigua (mock): permitimos toggle local para no bloquear la UI.
       toggleListAssignment(listId);
       if (!isSelected) {
-        setNewListError(
-          "Esta lista es local y no está sincronizada con el servidor."
-        );
+        setNewListError("Esta lista es local y no está sincronizada con el servidor.");
       } else {
         setNewListError(null);
       }
@@ -329,7 +331,6 @@ export function DetailHero({
       return;
     }
 
-    // Actualización optimista de UI.
     toggleListAssignment(listId);
     setAssigningListId(listId);
     try {
@@ -356,7 +357,6 @@ export function DetailHero({
           normalizedMessage.includes("no está en la lista") ||
           normalizedMessage.includes("no esta en la lista"));
       if (!alreadyRemoved) {
-        // Revertimos optimista si el backend rechaza la operación.
         toggleListAssignment(listId);
         setNewListError(message);
       } else {
@@ -366,6 +366,7 @@ export function DetailHero({
       setAssigningListId(null);
     }
   };
+
   const handleCreateList = async () => {
     const normalizedName = newListName.trim();
     if (!normalizedName) {
@@ -397,8 +398,9 @@ export function DetailHero({
       const created: UserList = {
         id: String(createdFromApi.listaId),
         name: createdFromApi.nombre || normalizedName,
+        tipoContenidos: createdFromApi.tipoContenidos,
       };
-      const nextLists = [created, ...userLists.filter((list) => list.id !== created.id)];
+      const nextLists = [created, ...userLists.filter((ul) => ul.id !== created.id)];
       setUserLists(nextLists);
       setSelectedListIds((prev) => {
         const next = prev.includes(created.id) ? prev : [created.id, ...prev];
@@ -418,13 +420,20 @@ export function DetailHero({
       setIsCreatingListLoading(false);
     }
   };
-  const selectedLists = userLists.filter((list) => selectedListIds.includes(list.id));
+
+  // Solo muestra listas compatibles con el tipo de contenido actual
+  const resolvedContentType = resolveListContentType(listContentType);
+  const filteredLists = userLists.filter(
+    (ul) => !ul.tipoContenidos || ul.tipoContenidos === resolvedContentType
+  );
+  const selectedLists = filteredLists.filter((ul) => selectedListIds.includes(ul.id));
   const listTriggerLabel =
     selectedLists.length === 0
       ? "Añadir a mi lista"
       : selectedLists.length === 1
       ? selectedLists[0].name
       : `En ${selectedLists.length} listas`;
+
   const ratingBlockedMessage = "Disponible al marcar como completado.";
 
   return (
@@ -441,6 +450,7 @@ export function DetailHero({
       <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-transparent pointer-events-none" />
 
       <div className="relative z-10 grid gap-8 p-6 sm:p-8 lg:grid-cols-[220px_minmax(0,1fr)_240px]">
+        {/* Columna portada */}
         <div className="space-y-4">
           {image ? (
             <img
@@ -453,7 +463,6 @@ export function DetailHero({
               Sin portada
             </div>
           )}
-
           {canShowVideo ? (
             <button
               type="button"
@@ -465,6 +474,7 @@ export function DetailHero({
           ) : null}
         </div>
 
+        {/* Columna información */}
         <div className="space-y-4">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-yellow-400">
             {typeLabel}
@@ -513,8 +523,10 @@ export function DetailHero({
           ) : null}
         </div>
 
+        {/* Columna acciones */}
         <div className="space-y-5">
           <div className="space-y-3">
+            {/* Estado */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -573,15 +585,14 @@ export function DetailHero({
                       ].join(" ")}
                     >
                       <span>{option.label}</span>
-                      {isActive ? (
-                        <Check className="h-4 w-4 text-white/80" />
-                      ) : null}
+                      {isActive ? <Check className="h-4 w-4 text-white/80" /> : null}
                     </DropdownMenuItem>
                   );
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Listas — filtradas por tipo de contenido */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -599,29 +610,35 @@ export function DetailHero({
                 <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-300/90">
                   Mis listas
                 </p>
-                {userLists.map((list) => {
-                  const isSelected = selectedListIds.includes(list.id);
-                  return (
-                    <DropdownMenuItem
-                      key={list.id}
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        void handleToggleListAssignment(list.id);
-                      }}
-                      disabled={assigningListId === list.id}
-                      className={[
-                        "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
-                        assigningListId === list.id ? "cursor-not-allowed opacity-60" : "",
-                        isSelected
-                          ? "border-yellow-400/70 bg-yellow-400/20 text-yellow-200"
-                          : "border-white/15 text-white/90 hover:bg-white/10",
-                      ].join(" ")}
-                    >
-                      <span>{list.name}</span>
-                      {isSelected ? <Check className="h-4 w-4 text-white/80" /> : null}
-                    </DropdownMenuItem>
-                  );
-                })}
+                {filteredLists.length === 0 ? (
+                  <p className="px-1 py-1 text-xs italic text-white/50">
+                    No tienes listas de {typeLabel.toLowerCase()}s
+                  </p>
+                ) : (
+                  filteredLists.map((ul) => {
+                    const isSelected = selectedListIds.includes(ul.id);
+                    return (
+                      <DropdownMenuItem
+                        key={ul.id}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          void handleToggleListAssignment(ul.id);
+                        }}
+                        disabled={assigningListId === ul.id}
+                        className={[
+                          "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
+                          assigningListId === ul.id ? "cursor-not-allowed opacity-60" : "",
+                          isSelected
+                            ? "border-yellow-400/70 bg-yellow-400/20 text-yellow-200"
+                            : "border-white/15 text-white/90 hover:bg-white/10",
+                        ].join(" ")}
+                      >
+                        <span>{ul.name}</span>
+                        {isSelected ? <Check className="h-4 w-4 text-white/80" /> : null}
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
                 <div className="mt-2 border-t border-white/10 pt-2">
                   <DropdownMenuItem
                     onSelect={(event) => {
@@ -668,8 +685,8 @@ export function DetailHero({
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-
           </div>
+
           {newListError ? (
             <p className="text-xs text-rose-300">{newListError}</p>
           ) : null}
@@ -677,6 +694,7 @@ export function DetailHero({
             <p className="text-xs text-white/80">{statusMessage}</p>
           ) : null}
 
+          {/* Valoración */}
           <div className="pt-2 border-t border-white/10">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-yellow-300">
               Tu valoración
@@ -722,6 +740,7 @@ export function DetailHero({
         </div>
       </div>
 
+      {/* Tráiler */}
       {canShowVideo && showVideo ? (
         <div
           ref={videoRef}
@@ -753,25 +772,21 @@ export function DetailHero({
                     allowFullScreen
                   />
                 ) : (
-                  <video
-                    src={videoUrl}
-                    controls
-                    className="h-full w-full object-cover"
-                  >
+                  <video src={videoUrl} controls className="h-full w-full object-cover">
                     Tu navegador no soporta video.
                   </video>
                 )}
               </div>
             ) : (
               <div className="aspect-video w-full rounded-xl bg-black/40 flex items-center justify-center text-gray-300">
-                null
+                Sin vídeo disponible
               </div>
             )}
           </div>
         </div>
       ) : null}
 
-      // Modal de puntuacion tipo IMDb
+      {/* Modal de puntuación tipo IMDb */}
       {showRatingModal ? (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
