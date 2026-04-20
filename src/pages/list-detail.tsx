@@ -464,6 +464,75 @@ function MembersPanel({ listaId }: { listaId: number }) {
   );
 }
 
+// ── Tarjeta de contenido con botón eliminar ───────────────────────────────────
+
+function RemovableContentCard({
+  item,
+  listaId,
+  canRemove,
+  onRemoved,
+  style,
+}: {
+  item: ContenidoItem;
+  listaId: number;
+  canRemove: boolean;
+  onRemoved: (id: number) => void;
+  style?: React.CSSProperties;
+}) {
+  const [removing, setRemoving] = useState(false);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
+
+  const handleRemove = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirmId !== item.id) {
+      // Primer click: pedir confirmación
+      setConfirmId(item.id);
+      setTimeout(() => setConfirmId(null), 2500);
+      return;
+    }
+    // Segundo click: borrar
+    setRemoving(true);
+    try {
+      await removeContentFromList(listaId, item.id);
+      onRemoved(item.id);
+    } catch {
+      setRemoving(false);
+      setConfirmId(null);
+    }
+  };
+
+  return (
+    <div className="relative group flex" style={style}>
+      {canRemove && (
+        <button
+          onClick={handleRemove}
+          disabled={removing}
+          aria-label="Quitar de la lista"
+          className="absolute top-2 left-2 z-20 flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold transition-all duration-200 opacity-0 group-hover:opacity-100"
+          style={{
+            background: confirmId === item.id ? "#dc2626" : "rgba(20,0,40,0.72)",
+            color: "#fff",
+            backdropFilter: "blur(4px)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}
+        >
+          <Trash2 size={10} />
+          {removing ? "…" : confirmId === item.id ? "¿Confirmar?" : "Quitar"}
+        </button>
+      )}
+      <ContentCard
+        title={item.titulo}
+        image={item.portada}
+        type={item.tipo}
+        score={item.puntuacion ?? item.puntuacionApi}
+        to={buildDetailPath(item.tipo, item.id, item.titulo)}
+        state={{ item: { id: item.id, titulo: item.titulo, tipo: item.tipo } }}
+      />
+    </div>
+  );
+}
+
 // ── Panel añadir contenido ────────────────────────────────────────────────────
 
 type SearchResult = {
@@ -936,16 +1005,16 @@ export default function ListDetail() {
                 ) : (
                   <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 items-stretch">
                     {contenidos.map((item, i) => (
-                      <div key={item.id} className="flex" style={{ animation: `fadeUp 0.35s ease ${i * 0.04}s both` }}>
-                        <ContentCard
-                          title={item.titulo}
-                          image={item.portada}
-                          type={item.tipo}
-                          score={item.puntuacion ?? item.puntuacionApi}
-                          to={buildDetailPath(item.tipo, item.id, item.titulo)}
-                          state={{ item: { id: item.id, titulo: item.titulo, tipo: item.tipo } }}
-                        />
-                      </div>
+                      <RemovableContentCard
+                        key={item.id}
+                        item={item}
+                        listaId={list.listaId}
+                        canRemove={isOwner}
+                        onRemoved={(id) =>
+                          setContenidos((prev) => prev.filter((c) => c.id !== id))
+                        }
+                        style={{ animation: `fadeUp 0.35s ease ${i * 0.04}s both` }}
+                      />
                     ))}
                   </div>
                 )}
