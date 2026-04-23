@@ -1,5 +1,6 @@
 import type { ChangeEvent, RefObject } from "react";
 import {
+  Loader2,
   MessageSquareText,
   ShieldCheck,
   Star,
@@ -8,10 +9,47 @@ import {
   UserCheck2,
   UserPlus,
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type QuickStat = {
+  id: "following" | "followers";
   label: string;
   value: number;
+};
+
+type SocialConnectionsStatId = "following" | "followers";
+
+export type SocialConnectionUser = {
+  userId: number;
+  username: string;
+  tipo?: string;
+  reputacion?: number;
+  avatarPath?: string | null;
+  avatarUrl?: string | null;
+};
+
+export type SocialConnectionsPanel = {
+  users: SocialConnectionUser[];
+  total: number;
+  loaded: boolean;
+  loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  error: string | null;
+};
+
+export type SocialConnectionsDropdown = {
+  active: SocialConnectionsStatId | null;
+  followers: SocialConnectionsPanel;
+  following: SocialConnectionsPanel;
+  onOpenChange: (target: SocialConnectionsStatId, open: boolean) => void;
+  onLoadMore: (target: SocialConnectionsStatId) => void;
+  onRetry: (target: SocialConnectionsStatId) => void;
 };
 
 type ProfileHeroProps = {
@@ -42,6 +80,7 @@ type ProfileHeroProps = {
   followDisabled?: boolean;
   onToggleFollow?: () => void;
   followMessage?: string | null;
+  socialConnections?: SocialConnectionsDropdown;
   avatarInputRef: RefObject<HTMLInputElement | null>;
   coverInputRef: RefObject<HTMLInputElement | null>;
   onAvatarChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -76,11 +115,131 @@ export function ProfileHero({
   followDisabled = false,
   onToggleFollow,
   followMessage,
+  socialConnections,
   avatarInputRef,
   coverInputRef,
   onAvatarChange,
   onCoverChange,
 }: ProfileHeroProps) {
+  const baseQuickStatClassName =
+    "flex flex-col items-center justify-center rounded-xl border border-white/10 bg-black/30 px-4 py-5 text-center";
+
+  const renderConnectionsDropdown = (
+    target: SocialConnectionsStatId,
+    stat: QuickStat
+  ) => {
+    if (!socialConnections) return null;
+    const panel =
+      target === "following"
+        ? socialConnections.following
+        : socialConnections.followers;
+    const label = target === "following" ? "Seguidos" : "Seguidores";
+
+    return (
+      <DropdownMenu
+        key={stat.label}
+        open={socialConnections.active === target}
+        onOpenChange={(open) => socialConnections.onOpenChange(target, open)}
+      >
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`${baseQuickStatClassName} cursor-pointer transition hover:border-violet-200/70 hover:bg-black/40`}
+            aria-label={`Mostrar ${label.toLowerCase()} de ${displayName}`}
+          >
+            <p className="text-2xl font-semibold">{stat.value}</p>
+            <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+              {stat.label}
+            </p>
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent
+          align="center"
+          sideOffset={8}
+          className="w-[min(92vw,22rem)] border-violet-200 bg-white p-0 text-gray-900 shadow-xl"
+        >
+          <div className="border-b border-violet-100 px-4 py-3">
+            <p className="text-sm font-semibold text-gray-900">{label}</p>
+            <p className="text-xs text-gray-500">
+              {panel.total} {panel.total === 1 ? "usuario" : "usuarios"}
+            </p>
+          </div>
+
+          {panel.loading && !panel.loaded ? (
+            <div className="flex items-center gap-2 px-4 py-4 text-sm text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+              Cargando usuarios...
+            </div>
+          ) : panel.error ? (
+            <div className="space-y-2 px-4 py-4">
+              <p className="text-sm text-rose-600">{panel.error}</p>
+              <button
+                type="button"
+                onClick={() => socialConnections.onRetry(target)}
+                className="rounded-full border border-violet-300 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : panel.users.length === 0 ? (
+            <p className="px-4 py-4 text-sm text-gray-600">
+              No hay usuarios para mostrar.
+            </p>
+          ) : (
+            <div className="max-h-80 overflow-y-auto py-1">
+              {panel.users.map((user) => {
+                const avatar = user.avatarUrl ?? user.avatarPath ?? null;
+                const username = user.username?.trim() || `user-${user.userId}`;
+                return (
+                  <Link
+                    key={`${target}-${user.userId}`}
+                    to={`/perfil?userId=${user.userId}`}
+                    className="flex items-center gap-3 px-4 py-2 transition hover:bg-violet-50"
+                  >
+                    {avatar ? (
+                      <img
+                        src={avatar}
+                        alt={username}
+                        className="h-9 w-9 rounded-full border border-violet-100 object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-violet-100 bg-violet-100 text-xs font-semibold uppercase text-violet-700">
+                        {username.slice(0, 1)}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900">
+                        @{username}
+                      </p>
+                      <p className="truncate text-xs text-gray-500">
+                        {[user.tipo, Number.isFinite(user.reputacion) ? `${user.reputacion} rep` : null]
+                          .filter(Boolean)
+                          .join(" • ") || "Usuario"}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+              {panel.hasMore ? (
+                <div className="border-t border-violet-100 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => socialConnections.onLoadMore(target)}
+                    disabled={panel.loadingMore}
+                    className="w-full rounded-full border border-violet-300 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {panel.loadingMore ? "Cargando..." : "Cargar más"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
   return (
     <section className="relative overflow-hidden bg-[#0f0b14] text-white">
       {coverImage && (
@@ -311,18 +470,43 @@ export function ProfileHero({
           </p>
         )}
 
-        <div className="mt-8 grid grid-cols-1 gap-3 border-t border-white/10 pt-6 sm:grid-cols-3">
-          {quickStats.map((stat) => (
-            <div
-              key={stat.label}
-              className="flex flex-col items-center justify-center rounded-xl border border-white/10 bg-black/30 px-4 py-5 text-center"
-            >
-              <p className="text-2xl font-semibold">{stat.value}</p>
-              <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
-                {stat.label}
-              </p>
-            </div>
-          ))}
+        <div className="mt-8 grid grid-cols-1 gap-3 border-t border-white/10 pt-6 sm:grid-cols-2">
+          {quickStats.map((stat) => {
+            if (stat.id === "followers") {
+              return (
+                renderConnectionsDropdown("followers", stat) ?? (
+                  <div key={stat.label} className={baseQuickStatClassName}>
+                    <p className="text-2xl font-semibold">{stat.value}</p>
+                    <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+                      {stat.label}
+                    </p>
+                  </div>
+                )
+              );
+            }
+
+            if (stat.id === "following") {
+              return (
+                renderConnectionsDropdown("following", stat) ?? (
+                  <div key={stat.label} className={baseQuickStatClassName}>
+                    <p className="text-2xl font-semibold">{stat.value}</p>
+                    <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+                      {stat.label}
+                    </p>
+                  </div>
+                )
+              );
+            }
+
+            return (
+              <div key={stat.label} className={baseQuickStatClassName}>
+                <p className="text-2xl font-semibold">{stat.value}</p>
+                <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+                  {stat.label}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ListCard, type Lista } from "@/components/lists/list-card";
 import Footer from "@/components/sections/footer";
-import { ProfileHero, type QuickStat } from "@/components/profile/profile-hero";
+import {
+  ProfileHero,
+  type QuickStat,
+  type SocialConnectionsDropdown,
+  type SocialConnectionsPanel,
+} from "@/components/profile/profile-hero";
 import { ProfileStatsSection } from "@/components/profile/profile-stats-section";
 import { ProfileTimeline } from "@/components/profile/profile-timeline";
 import { StatusCardsSection, type StatusCardGroup } from "@/components/status/status-cards-section";
@@ -19,6 +24,8 @@ import {
 import {
   fetchAllUserFollowerIds,
   fetchMyProfile,
+  fetchUserFollowersPage,
+  fetchUserFollowingPage,
   fetchUserProfile,
   removeProfileImage,
   removeProfileCover,
@@ -113,12 +120,30 @@ function parseFollowerIdsFromPayload(payload: any): number[] {
   return [...ids];
 }
 
+function dedupeConnectionUsers(
+  users: SocialConnectionsPanel["users"]
+): SocialConnectionsPanel["users"] {
+  const byUserId = new Map<number, SocialConnectionsPanel["users"][number]>();
+  for (const user of users) {
+    byUserId.set(user.userId, user);
+  }
+  return [...byUserId.values()];
+}
+
 type CompletedCounts = Record<CategoryKey, number>;
 type StatusCounts = Record<StatusKey, number>;
 
 type ProfileListsSummary = {
   statusCounts: StatusCounts;
   visibleCustomLists: Lista[];
+};
+
+type SocialListTarget = "following" | "followers";
+
+type SocialListState = SocialConnectionsPanel & {
+  page: number;
+  pages: number;
+  pageSize: number;
 };
 
 const EMPTY_COMPLETED_COUNTS: CompletedCounts = {
@@ -138,6 +163,19 @@ const EMPTY_STATUS_COUNTS: StatusCounts = {
 const EMPTY_PROFILE_LISTS_SUMMARY: ProfileListsSummary = {
   statusCounts: { ...EMPTY_STATUS_COUNTS },
   visibleCustomLists: [],
+};
+
+const EMPTY_SOCIAL_LIST_STATE: SocialListState = {
+  users: [],
+  total: 0,
+  loaded: false,
+  loading: false,
+  loadingMore: false,
+  hasMore: false,
+  error: null,
+  page: 0,
+  pages: 1,
+  pageSize: 20,
 };
 
 async function loadCompletedCountsForProfile(
@@ -321,7 +359,6 @@ export default function ProfilePage() {
   const [reviewsCount, setReviewsCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followersCount, setFollowersCount] = useState(0);
-  const [commentsCount, setCommentsCount] = useState(0);
   const [seriesCount, setSeriesCount] = useState(0);
   const [moviesCount, setMoviesCount] = useState(0);
   const [booksCount, setBooksCount] = useState(0);
@@ -339,9 +376,20 @@ export default function ProfilePage() {
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [openSocialTarget, setOpenSocialTarget] =
+    useState<SocialListTarget | null>(null);
+  const [followersList, setFollowersList] =
+    useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
+  const [followingList, setFollowingList] =
+    useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
+  const profileUserIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    profileUserIdRef.current = profileUserId;
+  }, [profileUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -442,7 +490,6 @@ export default function ProfilePage() {
             ? resolvedFollowersCount
             : followerIds.length
         );
-        setCommentsCount(stats.comentarios ?? 0);
 
         const canManageListsForTarget =
           requestedUserId === null ||
@@ -537,10 +584,115 @@ export default function ProfilePage() {
   const displayName = useMemo(() => username || "Usuario", [username]);
   const displayRole = useMemo(() => role || "base", [role]);
 
+  useEffect(() => {
+    setOpenSocialTarget(null);
+    setFollowersList(EMPTY_SOCIAL_LIST_STATE);
+    setFollowingList(EMPTY_SOCIAL_LIST_STATE);
+  }, [profileUserId]);
+
+  const loadSocialConnections = async (
+    target: SocialListTarget,
+    options?: { page?: number; append?: boolean }
+  ) => {
+    const targetUserId = profileUserIdRef.current;
+    if (targetUserId == null) return;
+
+    const page = Number(options?.page ?? 1);
+    const append = options?.append === true;
+    const setListState =
+      target === "followers" ? setFollowersList : setFollowingList;
+
+    setListState((prev) => ({
+      ...prev,
+      error: null,
+      loading: append ? prev.loading : true,
+      loadingMore: append,
+    }));
+
+    try {
+      const result =
+        target === "followers"
+          ? await fetchUserFollowersPage(targetUserId, { page, pageSize: 20 })
+          : await fetchUserFollowingPage(targetUserId, { page, pageSize: 20 });
+
+      if (profileUserIdRef.current !== targetUserId) return;
+
+      setListState((prev) => {
+        const users = append
+          ? dedupeConnectionUsers([...prev.users, ...result.users])
+          : dedupeConnectionUsers(result.users);
+        return {
+          ...prev,
+          users,
+          total: result.total,
+          loaded: true,
+          loading: false,
+          loadingMore: false,
+          hasMore: result.page < result.pages,
+          page: result.page,
+          pages: result.pages,
+          pageSize: result.pageSize,
+          error: null,
+        };
+      });
+    } catch (error) {
+      if (profileUserIdRef.current !== targetUserId) return;
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los usuarios.";
+      setListState((prev) => ({
+        ...prev,
+        loading: false,
+        loadingMore: false,
+        error: message,
+      }));
+    }
+  };
+
+  const handleSocialDropdownOpenChange = (
+    target: SocialListTarget,
+    open: boolean
+  ) => {
+    if (!open) {
+      setOpenSocialTarget((current) => (current === target ? null : current));
+      return;
+    }
+
+    setOpenSocialTarget(target);
+    const currentList = target === "followers" ? followersList : followingList;
+    if (!currentList.loaded && !currentList.loading) {
+      void loadSocialConnections(target, { page: 1, append: false });
+    }
+  };
+
+  const handleSocialConnectionsLoadMore = (target: SocialListTarget) => {
+    const currentList = target === "followers" ? followersList : followingList;
+    if (currentList.loading || currentList.loadingMore || !currentList.hasMore) {
+      return;
+    }
+    void loadSocialConnections(target, {
+      page: currentList.page + 1,
+      append: true,
+    });
+  };
+
+  const handleSocialConnectionsRetry = (target: SocialListTarget) => {
+    void loadSocialConnections(target, { page: 1, append: false });
+  };
+
+  const socialConnectionsDropdown: SocialConnectionsDropdown = {
+    active: openSocialTarget,
+    followers: followersList,
+    following: followingList,
+    onOpenChange: handleSocialDropdownOpenChange,
+    onLoadMore: handleSocialConnectionsLoadMore,
+    onRetry: handleSocialConnectionsRetry,
+  };
+
   const quickStats: QuickStat[] = [
-    { label: "Siguiendo", value: followingCount },
-    { label: "Seguidores", value: followersCount },
-    { label: "Comentarios", value: commentsCount },
+    { id: "following", label: "Seguidos", value: followingCount },
+    { id: "followers", label: "Seguidores", value: followersCount },
   ];
 
   const timelineSourceRecords = useMemo(
@@ -889,6 +1041,7 @@ export default function ProfilePage() {
         followDisabled={!isLoggedIn || currentUserId == null || followUpdating}
         onToggleFollow={handleToggleFollow}
         followMessage={followMessage}
+        socialConnections={socialConnectionsDropdown}
         avatarInputRef={fileInputRef}
         coverInputRef={coverFileInputRef}
         onAvatarChange={handleAvatarChange}
