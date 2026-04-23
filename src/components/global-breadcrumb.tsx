@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { fetchUserProfile } from "@/services/profile-service";
+import { getListContents } from "@/services/lists-service";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,8 @@ const LABELS: Record<string, string> = {
   videojuegos: "Videojuegos",
   listas: "Listas",
   "mis-listas": "Mis listas",
+  "listas-opinify": "Listas Opinify",
+  "nuestras-listas": "Listas Opinify",
   comunidad: "Comunidad",
   detail: "Detalle",
   estado: "Estado",
@@ -89,8 +92,8 @@ function pickTitle(value?: unknown, fallback?: unknown) {
   return null;
 }
 
-function parseUserId(value: string | null): number | null {
-  if (!value) return null;
+function parseUserId(value: unknown): number | null {
+  if (value == null) return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
@@ -102,6 +105,9 @@ export function AppBreadcrumb() {
   const segments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
   const [remoteDetailName, setRemoteDetailName] = useState<string | null>(null);
   const [statusOwnerUsername, setStatusOwnerUsername] = useState<string | null>(null);
+  const [listDetailName, setListDetailName] = useState<string | null>(null);
+  const [listOwnerUserId, setListOwnerUserId] = useState<number | null>(null);
+  const [listOwnerUsername, setListOwnerUsername] = useState<string | null>(null);
   const shouldHide = !segments.length || HIDE_ON.has(segments[0]);
   const statusOwnerUserId = useMemo(
     () => parseUserId(new URLSearchParams(search).get("userId")),
@@ -116,6 +122,21 @@ export function AppBreadcrumb() {
   const detailInfo = useMemo(() => {
     if (segments[0] !== "detail" || segments.length < 3) return null;
     return { type: segments[1], id: segments[2] };
+  }, [segments]);
+  const listDetailInfo = useMemo(() => {
+    if (segments[0] !== "listas" || segments.length < 3) return null;
+    const scope = segments[1];
+    if (
+      scope !== "mis-listas" &&
+      scope !== "listas-opinify" &&
+      scope !== "nuestras-listas"
+    ) {
+      return null;
+    }
+    if (segments[2] === "estado") return null;
+    const listId = parseUserId(decodeURIComponent(segments[2]));
+    if (listId == null) return null;
+    return { scope, listId };
   }, [segments]);
 
   const detailName = useMemo(() => {
@@ -187,6 +208,56 @@ export function AppBreadcrumb() {
     };
   }, [isStatusRoute, statusOwnerUserId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    if (!listDetailInfo) {
+      setListDetailName(null);
+      setListOwnerUserId(null);
+      setListOwnerUsername(null);
+      return;
+    }
+
+    const loadListContext = async () => {
+      try {
+        const data = await getListContents(listDetailInfo.listId);
+        if (cancelled) return;
+
+        const resolvedListName = String(data?.lista?.nombre ?? "").trim();
+        const ownerId = parseUserId(data?.lista?.userId);
+        setListDetailName(resolvedListName || null);
+        setListOwnerUserId(ownerId);
+
+        if (ownerId == null) {
+          setListOwnerUsername(null);
+          return;
+        }
+
+        try {
+          const profile = await fetchUserProfile(ownerId, controller.signal);
+          if (cancelled) return;
+          const username = String(profile?.perfil?.username ?? "").trim();
+          setListOwnerUsername(username || null);
+        } catch {
+          if (cancelled) return;
+          setListOwnerUsername(null);
+        }
+      } catch {
+        if (cancelled) return;
+        setListDetailName(null);
+        setListOwnerUserId(null);
+        setListOwnerUsername(null);
+      }
+    };
+
+    void loadListContext();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [listDetailInfo]);
+
   const crumbs = (() => {
     if (detailInfo) {
       const type = detailInfo.type;
@@ -212,6 +283,37 @@ export function AppBreadcrumb() {
         label: ownerLabel,
         to: `/perfil?userId=${statusOwnerUserId}`,
       };
+    }
+
+    if (isStatusRoute && defaultCrumbs.length >= 4) {
+      // /listas/mis-listas/estado/:estado -> ocultamos el crumb intermedio "Estado"
+      defaultCrumbs.splice(2, 1);
+    }
+
+    if (listDetailInfo && defaultCrumbs.length >= 3) {
+      if (listDetailName && listDetailName.length > 0) {
+        defaultCrumbs[2] = {
+          label: listDetailName,
+          to:
+            defaultCrumbs[2]?.to ??
+            "/" + segments.slice(0, 3).join("/"),
+        };
+      }
+
+      if (
+        (listDetailInfo.scope === "listas-opinify" ||
+          listDetailInfo.scope === "nuestras-listas") &&
+        listOwnerUserId != null
+      ) {
+        const ownerLabel =
+          listOwnerUsername && listOwnerUsername.length > 0
+            ? `Perfil @${listOwnerUsername}`
+            : `Perfil user-${listOwnerUserId}`;
+        defaultCrumbs[1] = {
+          label: ownerLabel,
+          to: `/perfil?userId=${listOwnerUserId}`,
+        };
+      }
     }
 
     return defaultCrumbs;

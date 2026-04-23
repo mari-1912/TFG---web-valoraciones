@@ -765,11 +765,12 @@ export default function ListDetail() {
   const isAdmin = userRole === "admin";
 
   const backPath = useMemo(() => {
-    if (location.pathname.includes("/listas/nuestras-listas")) return "/listas/nuestras-listas";
+    if (location.pathname.includes("/listas/listas-opinify")) return "/listas/listas-opinify";
+    if (location.pathname.includes("/listas/nuestras-listas")) return "/listas/listas-opinify";
     if (location.pathname.includes("/listas/mis-listas")) return "/listas/mis-listas";
     return "/listas";
   }, [location.pathname]);
-  const backLabel = backPath.includes("nuestras") ? "Nuestras listas" : "Mis listas";
+  const backLabel = backPath.includes("listas-opinify") ? "Listas Opinify" : "Mis listas";
 
   // Resolvemos el userId del usuario logueado
   useEffect(() => {

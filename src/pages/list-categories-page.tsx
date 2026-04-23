@@ -210,10 +210,10 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
   const canCreate = type === "mis" || (type === "nuestras" && isAdmin);
 
   const basePath = useMemo(
-    () => (type === "nuestras" ? "/listas/nuestras-listas" : "/listas/mis-listas"),
+    () => (type === "nuestras" ? "/listas/listas-opinify" : "/listas/mis-listas"),
     [type]
   );
-  const title = type === "nuestras" ? "Nuestras listas" : "Mis listas";
+  const title = type === "nuestras" ? "Listas Opinify" : "Mis listas";
   const isManagedListsView = type === "mis";
 
   // Listas sin las gestionadas por estado (solo para "mis listas")

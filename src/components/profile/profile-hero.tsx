@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export type QuickStat = {
-  id: "following" | "followers";
+  id: "following" | "followers" | "comments";
   label: string;
   value: number;
 };
@@ -52,6 +52,23 @@ export type SocialConnectionsDropdown = {
   onRetry: (target: SocialConnectionsStatId) => void;
 };
 
+export type CommentPreviewItem = {
+  id: string;
+  title: string;
+  detail?: string;
+  date: string;
+};
+
+export type CommentsPreviewDropdown = {
+  open: boolean;
+  total: number;
+  items: CommentPreviewItem[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  onOpenChange: (open: boolean) => void;
+};
+
 type ProfileHeroProps = {
   coverImage: string | null;
   profileImage: string | null;
@@ -81,6 +98,7 @@ type ProfileHeroProps = {
   onToggleFollow?: () => void;
   followMessage?: string | null;
   socialConnections?: SocialConnectionsDropdown;
+  commentsPreview?: CommentsPreviewDropdown;
   avatarInputRef: RefObject<HTMLInputElement | null>;
   coverInputRef: RefObject<HTMLInputElement | null>;
   onAvatarChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -116,6 +134,7 @@ export function ProfileHero({
   onToggleFollow,
   followMessage,
   socialConnections,
+  commentsPreview,
   avatarInputRef,
   coverInputRef,
   onAvatarChange,
@@ -123,6 +142,12 @@ export function ProfileHero({
 }: ProfileHeroProps) {
   const baseQuickStatClassName =
     "flex flex-col items-center justify-center rounded-xl border border-white/10 bg-black/30 px-4 py-5 text-center";
+  const dropdownPanelClassName =
+    "w-[min(92vw,24rem)] overflow-hidden rounded-2xl border border-violet-200/80 bg-[#f7f3ff] p-0 text-gray-900 shadow-[0_18px_40px_rgba(124,58,237,0.22)] backdrop-blur";
+  const dropdownHeaderClassName =
+    "border-b border-violet-200/70 bg-gradient-to-r from-violet-100 via-fuchsia-50 to-indigo-100 px-4 py-3";
+  const dropdownInlineButtonClassName =
+    "rounded-full border border-violet-300 bg-white/90 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50";
 
   const renderConnectionsDropdown = (
     target: SocialConnectionsStatId,
@@ -157,9 +182,9 @@ export function ProfileHero({
         <DropdownMenuContent
           align="center"
           sideOffset={8}
-          className="w-[min(92vw,22rem)] border-violet-200 bg-white p-0 text-gray-900 shadow-xl"
+          className={dropdownPanelClassName}
         >
-          <div className="border-b border-violet-100 px-4 py-3">
+          <div className={dropdownHeaderClassName}>
             <p className="text-sm font-semibold text-gray-900">{label}</p>
             <p className="text-xs text-gray-500">
               {panel.total} {panel.total === 1 ? "usuario" : "usuarios"}
@@ -167,27 +192,27 @@ export function ProfileHero({
           </div>
 
           {panel.loading && !panel.loaded ? (
-            <div className="flex items-center gap-2 px-4 py-4 text-sm text-gray-600">
+            <div className="mx-3 my-3 flex items-center gap-2 rounded-xl border border-violet-100 bg-white/90 px-4 py-4 text-sm text-gray-600">
               <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
               Cargando usuarios...
             </div>
           ) : panel.error ? (
-            <div className="space-y-2 px-4 py-4">
+            <div className="mx-3 my-3 space-y-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4">
               <p className="text-sm text-rose-600">{panel.error}</p>
               <button
                 type="button"
                 onClick={() => socialConnections.onRetry(target)}
-                className="rounded-full border border-violet-300 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+                className={dropdownInlineButtonClassName}
               >
                 Reintentar
               </button>
             </div>
           ) : panel.users.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-gray-600">
+            <p className="mx-3 my-3 rounded-xl border border-violet-100 bg-white/90 px-4 py-4 text-sm text-gray-600">
               No hay usuarios para mostrar.
             </p>
           ) : (
-            <div className="max-h-80 overflow-y-auto py-1">
+            <div className="max-h-80 overflow-y-auto px-2 py-2">
               {panel.users.map((user) => {
                 const avatar = user.avatarUrl ?? user.avatarPath ?? null;
                 const username = user.username?.trim() || `user-${user.userId}`;
@@ -195,7 +220,7 @@ export function ProfileHero({
                   <Link
                     key={`${target}-${user.userId}`}
                     to={`/perfil?userId=${user.userId}`}
-                    className="flex items-center gap-3 px-4 py-2 transition hover:bg-violet-50"
+                    className="mb-1 flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition hover:border-violet-200 hover:bg-white/90"
                   >
                     {avatar ? (
                       <img
@@ -222,17 +247,117 @@ export function ProfileHero({
                 );
               })}
               {panel.hasMore ? (
-                <div className="border-t border-violet-100 px-3 py-2">
+                <div className="border-t border-violet-200/70 px-3 py-2">
                   <button
                     type="button"
                     onClick={() => socialConnections.onLoadMore(target)}
                     disabled={panel.loadingMore}
-                    className="w-full rounded-full border border-violet-300 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-full border border-violet-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {panel.loadingMore ? "Cargando..." : "Cargar más"}
                   </button>
                 </div>
               ) : null}
+            </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  const renderCommentsDropdown = (stat: QuickStat) => {
+    if (!commentsPreview) return null;
+    const displayInitial = (displayName.trim().slice(0, 1) || "U").toUpperCase();
+
+    return (
+      <DropdownMenu
+        key={stat.label}
+        open={commentsPreview.open}
+        onOpenChange={commentsPreview.onOpenChange}
+      >
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`${baseQuickStatClassName} cursor-pointer transition hover:border-violet-200/70 hover:bg-black/40`}
+            aria-label={`Mostrar comentarios de ${displayName}`}
+          >
+            <p className="text-2xl font-semibold">{stat.value}</p>
+            <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+              {stat.label}
+            </p>
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent
+          align="center"
+          sideOffset={8}
+          className={dropdownPanelClassName}
+        >
+          <div className={dropdownHeaderClassName}>
+            <p className="text-sm font-semibold text-gray-900">Comentarios</p>
+            <p className="text-xs text-gray-500">
+              {commentsPreview.total}{" "}
+              {commentsPreview.total === 1 ? "comentario" : "comentarios"}
+            </p>
+          </div>
+
+          {commentsPreview.loading && !commentsPreview.items.length ? (
+            <div className="mx-3 my-3 flex items-center gap-2 rounded-xl border border-violet-100 bg-white/90 px-4 py-4 text-sm text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+              Cargando comentarios...
+            </div>
+          ) : commentsPreview.error ? (
+            <div className="mx-3 my-3 space-y-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4">
+              <p className="text-sm text-rose-600">{commentsPreview.error}</p>
+              {commentsPreview.onRetry ? (
+                <button
+                  type="button"
+                  onClick={commentsPreview.onRetry}
+                  className={dropdownInlineButtonClassName}
+                >
+                  Reintentar
+                </button>
+              ) : null}
+            </div>
+          ) : !commentsPreview.items.length ? (
+            <p className="mx-3 my-3 rounded-xl border border-violet-100 bg-white/90 px-4 py-4 text-sm text-gray-600">
+              Aún no hay comentarios para mostrar.
+            </p>
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto p-3">
+              {commentsPreview.items.map((item) => (
+                <article
+                  key={item.id}
+                  className="rounded-2xl border border-violet-200/80 bg-white/95 p-3 shadow-[0_10px_22px_rgba(124,58,237,0.14)]"
+                >
+                  <div className="flex items-center gap-2">
+                    {profileImage ? (
+                      <img
+                        src={profileImage}
+                        alt={displayName}
+                        className="h-9 w-9 rounded-full border border-violet-100 object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-violet-100 bg-violet-100 text-xs font-semibold text-violet-700">
+                        {displayInitial}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {displayName}
+                      </p>
+                      <p className="text-xs text-gray-500">{item.date}</p>
+                    </div>
+                  </div>
+
+                  <p className="mt-2 text-xs font-medium text-gray-700">{item.title}</p>
+                  {item.detail ? (
+                    <div className="mt-2 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2 text-sm text-gray-700">
+                      {item.detail}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
             </div>
           )}
         </DropdownMenuContent>
@@ -470,7 +595,11 @@ export function ProfileHero({
           </p>
         )}
 
-        <div className="mt-8 grid grid-cols-1 gap-3 border-t border-white/10 pt-6 sm:grid-cols-2">
+        <div
+          className={`mt-8 grid grid-cols-1 gap-3 border-t border-white/10 pt-6 ${
+            quickStats.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
+          }`}
+        >
           {quickStats.map((stat) => {
             if (stat.id === "followers") {
               return (
@@ -488,6 +617,19 @@ export function ProfileHero({
             if (stat.id === "following") {
               return (
                 renderConnectionsDropdown("following", stat) ?? (
+                  <div key={stat.label} className={baseQuickStatClassName}>
+                    <p className="text-2xl font-semibold">{stat.value}</p>
+                    <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+                      {stat.label}
+                    </p>
+                  </div>
+                )
+              );
+            }
+
+            if (stat.id === "comments") {
+              return (
+                renderCommentsDropdown(stat) ?? (
                   <div key={stat.label} className={baseQuickStatClassName}>
                     <p className="text-2xl font-semibold">{stat.value}</p>
                     <p className="mt-1 text-xs uppercase tracking-widest text-white/70">

@@ -112,25 +112,26 @@ function buildListAliases(baseName: string, category: CategoryKey) {
   return [...aliases];
 }
 
-function findListByNameAndCategory(
+function findListsByNameAndCategory(
   lists: BackendLista[],
   aliases: string[],
   category: CategoryKey
-): BackendLista | null {
+): BackendLista[] {
   const normalizedAliases = new Set(aliases.map((alias) => normalizeKey(alias)));
 
-  return (
-    lists.find((list) => {
+  return lists
+    .filter((list) => {
       const listCategory = normalizeCategory(list.tipoContenidos);
       if (listCategory !== category) return false;
       return normalizedAliases.has(normalizeKey(list.nombre ?? ""));
-    }) ?? null
-  );
+    })
+    .sort((a, b) => Number(a.listaId) - Number(b.listaId));
 }
 
 type EnsureResult = {
   status: StatusKey;
-  list: BackendLista;
+  primaryList: BackendLista;
+  allLists: BackendLista[];
 };
 
 async function ensureStatusListsForCategory(
@@ -141,10 +142,14 @@ async function ensureStatusListsForCategory(
 
   for (const definition of STATUS_DEFINITIONS) {
     const aliases = buildListAliases(definition.baseName, category);
-    const existing = findListByNameAndCategory(existingLists, aliases, category);
+    const existing = findListsByNameAndCategory(existingLists, aliases, category);
 
-    if (existing) {
-      ensured.push({ status: definition.status, list: existing });
+    if (existing.length > 0) {
+      ensured.push({
+        status: definition.status,
+        primaryList: existing[0],
+        allLists: existing,
+      });
       continue;
     }
 
@@ -156,7 +161,11 @@ async function ensureStatusListsForCategory(
       imagen: "",
     });
 
-    ensured.push({ status: definition.status, list: created });
+    ensured.push({
+      status: definition.status,
+      primaryList: created,
+      allLists: [created],
+    });
   }
 
   return ensured;
@@ -178,8 +187,17 @@ export async function syncContentInStatusLists(
 
     const membership = new Map<number, Set<number>>();
 
+    const uniqueLists = new Map<number, BackendLista>();
+    for (const ensured of ensuredLists) {
+      for (const list of ensured.allLists) {
+        const listId = Number(list.listaId);
+        if (!Number.isFinite(listId) || listId <= 0) continue;
+        if (!uniqueLists.has(listId)) uniqueLists.set(listId, list);
+      }
+    }
+
     await Promise.all(
-      ensuredLists.map(async ({ list }) => {
+      [...uniqueLists.values()].map(async (list) => {
         try {
           const data = await getListContents(list.listaId);
           const ids = new Set<number>();
@@ -195,25 +213,30 @@ export async function syncContentInStatusLists(
       })
     );
 
-    for (const { status, list } of ensuredLists) {
-      const ids = membership.get(list.listaId) ?? new Set<number>();
-      const shouldBeHere = nextStatus != null && status === nextStatus;
-      const isHere = ids.has(numericId);
+    for (const { status, primaryList, allLists } of ensuredLists) {
+      for (const list of allLists) {
+        const ids = membership.get(list.listaId) ?? new Set<number>();
+        const shouldBeHere =
+          nextStatus != null &&
+          status === nextStatus &&
+          Number(list.listaId) === Number(primaryList.listaId);
+        const isHere = ids.has(numericId);
 
-      if (shouldBeHere && !isHere) {
-        try {
-          await addContentToList(list.listaId, numericId);
-        } catch {
-          // Evitamos romper la UX si falla la sincronización secundaria.
+        if (shouldBeHere && !isHere) {
+          try {
+            await addContentToList(list.listaId, numericId);
+          } catch {
+            // Evitamos romper la UX si falla la sincronización secundaria.
+          }
+          continue;
         }
-        continue;
-      }
 
-      if (!shouldBeHere && isHere) {
-        try {
-          await removeContentFromList(list.listaId, numericId);
-        } catch {
-          // Evitamos romper la UX si falla la sincronización secundaria.
+        if (!shouldBeHere && isHere) {
+          try {
+            await removeContentFromList(list.listaId, numericId);
+          } catch {
+            // Evitamos romper la UX si falla la sincronización secundaria.
+          }
         }
       }
     }

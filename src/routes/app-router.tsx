@@ -31,6 +31,12 @@ function LegacyServicesCategoryRedirect() {
   return <Navigate to={`/categorías/${encodedCategory}`} replace />;
 }
 
+function LegacyNuestrasListDetailRedirect() {
+  const { id } = useParams();
+  const encodedId = encodeURIComponent(id ?? "");
+  return <Navigate to={`/listas/listas-opinify/${encodedId}`} replace />;
+}
+
 
 export const RoutesComponent = () => {
   return (
@@ -110,12 +116,16 @@ export const RoutesComponent = () => {
 
       {/* Grids de listas */}
       <Route
-        path="/listas/nuestras-listas"
+        path="/listas/listas-opinify"
         element={
           <RequireAuth>
             <ListsCategory type="nuestras" />
           </RequireAuth>
         }
+      />
+      <Route
+        path="/listas/nuestras-listas"
+        element={<Navigate to="/listas/listas-opinify" replace />}
       />
       <Route
         path="/listas/mis-listas"
@@ -129,12 +139,16 @@ export const RoutesComponent = () => {
 
       {/* Detalle de cada lista */}
       <Route
-        path="/listas/nuestras-listas/:id"
+        path="/listas/listas-opinify/:id"
         element={
           <RequireAuth>
             <ListDetail />
           </RequireAuth>
         }
+      />
+      <Route
+        path="/listas/nuestras-listas/:id"
+        element={<LegacyNuestrasListDetailRedirect />}
       />
       <Route
         path="/listas/mis-listas/:id"

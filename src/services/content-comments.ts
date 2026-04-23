@@ -79,9 +79,26 @@ export async function createContentComment(
 
 export async function listContentComments(
   contenidoId: string | number,
-  options?: { signal?: AbortSignal }
+  options?: {
+    signal?: AbortSignal;
+    page?: number;
+    pageSize?: number;
+    paginate?: boolean;
+  }
 ) {
-  const res = await fetch(`${API_URL}/contenidos/${contenidoId}/comentarios`, {
+  const query = new URLSearchParams();
+  const shouldPaginate = options?.paginate !== false;
+  if (shouldPaginate) {
+    if (Number.isFinite(options?.page) && Number(options?.page) > 0) {
+      query.set("page", String(Number(options?.page)));
+    }
+    if (Number.isFinite(options?.pageSize) && Number(options?.pageSize) > 0) {
+      query.set("pageSize", String(Number(options?.pageSize)));
+    }
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+
+  const res = await fetch(`${API_URL}/contenidos/${contenidoId}/comentarios${suffix}`, {
     method: "GET",
     credentials: "include",
     signal: options?.signal,
