@@ -638,7 +638,9 @@ export default function CommunityPage() {
         if (signal?.aborted) return;
 
         const activities = Array.isArray(payload?.actividades) ? payload.actividades : [];
-        const mapped = activities.map(mapActivityToPost);
+        const mapped = activities.map(mapActivityToPost).filter(
+          (p) => p.action === "comment" || p.action === "left_comment" || p.action === "rating"
+        );
         const hydrated = await hydrateAvatars(mapped, signal);
         if (signal?.aborted) return;
 
@@ -740,7 +742,9 @@ export default function CommunityPage() {
         userIds: followedUserIds,
       });
       const activities = Array.isArray(payload?.actividades) ? payload.actividades : [];
-      const mapped = activities.map(mapActivityToPost);
+      const mapped = activities.map(mapActivityToPost).filter(
+          (p) => p.action === "comment" || p.action === "left_comment" || p.action === "rating"
+        );
       const hydrated = await hydrateAvatars(mapped);
       setFeed((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
