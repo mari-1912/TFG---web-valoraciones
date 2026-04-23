@@ -3,7 +3,7 @@ import {
   addContentToList,
   createUserList,
   getListContents,
-  getMyLists,
+  getMyListsWithFallback,
   removeContentFromList,
   type BackendLista,
 } from "@/services/lists-service";
@@ -18,7 +18,7 @@ type StatusListDefinition = {
 };
 
 const STATUS_DEFINITIONS: StatusListDefinition[] = [
-  { status: "watchlist", baseName: "proximamente", label: "Quiero ver" },
+  { status: "watchlist", baseName: "pendientes", label: "Pendientes" },
   { status: "in_progress", baseName: "en_progreso", label: "En progreso" },
   { status: "completed", baseName: "completado", label: "Completado" },
   { status: "dropped", baseName: "abandonado", label: "Abandonado" },
@@ -30,6 +30,24 @@ const CATEGORY_SUFFIXES: Record<CategoryKey, string[]> = {
   libro: ["libros", "libro"],
   videojuego: ["videojuegos", "videojuego"],
 };
+
+const BASE_NAME_ALIASES: Record<string, string[]> = {
+  pendientes: ["pendientes", "proximamente", "watchlist"],
+  en_progreso: ["en_progreso", "enprogreso", "in_progress"],
+  completado: ["completado", "completed"],
+  abandonado: ["abandonado", "dropped", "dejado"],
+};
+
+let statusSyncQueue: Promise<void> = Promise.resolve();
+
+function enqueueStatusSync<T>(job: () => Promise<T>): Promise<T> {
+  const run = statusSyncQueue.then(job, job);
+  statusSyncQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
 
 function parseContentId(value: string | number) {
   const id = Number(value);
@@ -72,18 +90,23 @@ function buildListName(baseName: string, category: CategoryKey) {
 
 function buildListAliases(baseName: string, category: CategoryKey) {
   const suffixes = CATEGORY_SUFFIXES[category];
+  const baseAliases = BASE_NAME_ALIASES[baseName] ?? [baseName];
   const aliases = new Set<string>();
 
-  for (const suffix of suffixes) {
-    aliases.add(`${baseName}_${suffix}`);
-    aliases.add(`${baseName} ${suffix}`);
+  for (const baseAlias of baseAliases) {
+    for (const suffix of suffixes) {
+      aliases.add(`${baseAlias}_${suffix}`);
+      aliases.add(`${baseAlias} ${suffix}`);
+    }
   }
 
   if (category === "pelicula") {
-    aliases.add(baseName);
-    aliases.add(baseName.replace(/_/g, " "));
+    for (const baseAlias of baseAliases) {
+      aliases.add(baseAlias);
+      aliases.add(baseAlias.replace(/_/g, " "));
+    }
     // Compatibilidad con nombres antiguos concretos.
-    if (baseName === "proximamente") aliases.add("próximamente");
+    if (baseName === "pendientes") aliases.add("próximamente");
   }
 
   return [...aliases];
@@ -144,53 +167,55 @@ export async function syncContentInStatusLists(
   contentType: string,
   nextStatus: ContentStatus | null
 ): Promise<void> {
-  const numericId = parseContentId(contentId);
-  const category = normalizeCategory(contentType);
+  return enqueueStatusSync(async () => {
+    const numericId = parseContentId(contentId);
+    const category = normalizeCategory(contentType);
 
-  if (numericId == null || category == null) return;
+    if (numericId == null || category == null) return;
 
-  const myLists = await getMyLists();
-  const ensuredLists = await ensureStatusListsForCategory(myLists, category);
+    const myLists = await getMyListsWithFallback();
+    const ensuredLists = await ensureStatusListsForCategory(myLists, category);
 
-  const membership = new Map<number, Set<number>>();
+    const membership = new Map<number, Set<number>>();
 
-  await Promise.all(
-    ensuredLists.map(async ({ list }) => {
-      try {
-        const data = await getListContents(list.listaId);
-        const ids = new Set<number>();
-        const contenidos = Array.isArray(data?.contenidos) ? data.contenidos : [];
-        for (const contenido of contenidos) {
-          const id = parseUserId(contenido.id);
-          if (id != null) ids.add(id);
+    await Promise.all(
+      ensuredLists.map(async ({ list }) => {
+        try {
+          const data = await getListContents(list.listaId);
+          const ids = new Set<number>();
+          const contenidos = Array.isArray(data?.contenidos) ? data.contenidos : [];
+          for (const contenido of contenidos) {
+            const id = parseUserId(contenido.id);
+            if (id != null) ids.add(id);
+          }
+          membership.set(list.listaId, ids);
+        } catch {
+          membership.set(list.listaId, new Set<number>());
         }
-        membership.set(list.listaId, ids);
-      } catch {
-        membership.set(list.listaId, new Set<number>());
+      })
+    );
+
+    for (const { status, list } of ensuredLists) {
+      const ids = membership.get(list.listaId) ?? new Set<number>();
+      const shouldBeHere = nextStatus != null && status === nextStatus;
+      const isHere = ids.has(numericId);
+
+      if (shouldBeHere && !isHere) {
+        try {
+          await addContentToList(list.listaId, numericId);
+        } catch {
+          // Evitamos romper la UX si falla la sincronización secundaria.
+        }
+        continue;
       }
-    })
-  );
 
-  for (const { status, list } of ensuredLists) {
-    const ids = membership.get(list.listaId) ?? new Set<number>();
-    const shouldBeHere = nextStatus != null && status === nextStatus;
-    const isHere = ids.has(numericId);
-
-    if (shouldBeHere && !isHere) {
-      try {
-        await addContentToList(list.listaId, numericId);
-      } catch {
-        // Evitamos romper la UX si falla la sincronización secundaria.
-      }
-      continue;
-    }
-
-    if (!shouldBeHere && isHere) {
-      try {
-        await removeContentFromList(list.listaId, numericId);
-      } catch {
-        // Evitamos romper la UX si falla la sincronización secundaria.
+      if (!shouldBeHere && isHere) {
+        try {
+          await removeContentFromList(list.listaId, numericId);
+        } catch {
+          // Evitamos romper la UX si falla la sincronización secundaria.
+        }
       }
     }
-  }
+  });
 }

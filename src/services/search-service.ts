@@ -38,6 +38,14 @@ const API_URL =
   import.meta.env.VITE_API_URL ??
   "https://tfg-web-valoraciones-back-i9b5.onrender.com";
 
+const normalizeText = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const toNumber = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const parsed = Number(value);
@@ -128,6 +136,19 @@ const normalizeSearchItems = (
     .filter((item): item is ContentSearchItem => item != null);
 };
 
+const matchesQuery = (item: ContentSearchItem, query: string) => {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) return true;
+
+  const normalizedTitle = normalizeText(item.titulo ?? "");
+  if (!normalizedTitle) return false;
+  if (normalizedTitle.includes(normalizedQuery)) return true;
+
+  const tokens = normalizedQuery.split(" ").filter(Boolean);
+  if (tokens.length === 0) return true;
+  return tokens.every((token) => normalizedTitle.includes(token));
+};
+
 export async function searchContents(
   query: string,
   signal?: AbortSignal,
@@ -208,7 +229,8 @@ export async function searchContentsAcrossCategories(
           : index === 2
             ? "libro"
             : "videojuego";
-    items.push(...normalizeSearchItems(result.value, tipo));
+    const normalizedItems = normalizeSearchItems(result.value, tipo);
+    items.push(...normalizedItems.filter((item) => matchesQuery(item, query)));
   });
 
   if (!anySuccess) {

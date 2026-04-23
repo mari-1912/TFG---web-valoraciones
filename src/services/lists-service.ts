@@ -30,6 +30,297 @@ const API_URL =
   import.meta.env.VITE_API_URL ??
   "https://tfg-web-valoraciones-back-i9b5.onrender.com";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function pickPositiveNumber(...values: Array<unknown>) {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function pickString(...values: Array<unknown>) {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+
+function pickNullableString(...values: Array<unknown>) {
+  for (const value of values) {
+    if (value == null) return null;
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+  return null;
+}
+
+function pickOptionalNumber(...values: Array<unknown>) {
+  for (const value of values) {
+    if (value == null) return null;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function normalizeBackendList(raw: unknown): BackendLista | null {
+  if (!isRecord(raw)) return null;
+  const nested =
+    (isRecord(raw.lista) && raw.lista) ||
+    (isRecord(raw.list) && raw.list) ||
+    (isRecord(raw.listaDetalle) && raw.listaDetalle) ||
+    (isRecord(raw.listDetail) && raw.listDetail) ||
+    null;
+  const row = nested ? { ...raw, ...nested } : raw;
+
+  const listaId = pickPositiveNumber(
+    row.listaId,
+    row.lista_id,
+    row.id,
+    row.listaID,
+    row.listId,
+    row.list_id
+  );
+  if (listaId == null) return null;
+
+  const userId = pickPositiveNumber(
+    row.userId,
+    row.user_id,
+    row.usuarioId,
+    row.usuario_id,
+    row.ownerId,
+    row.owner_id
+  );
+  const tipoContenidos =
+    pickString(
+      row.tipoContenidos,
+      row.tipo_contenidos,
+      row.tipoContenido,
+      row.tipo_contenido,
+      row.contentType,
+      row.category,
+      row.categoria
+    ) || "desconocido";
+  const nombre =
+    pickString(
+      row.nombre,
+      row.nombreLista,
+      row.nombre_lista,
+      row.listName,
+      row.list_name,
+      row.name,
+      row.titulo,
+      row.title
+    ) || `Lista ${listaId}`;
+
+  return {
+    listaId,
+    userId: userId ?? 0,
+    tipo:
+      pickString(row.tipo, row.type, row.listType, row.list_type) || undefined,
+    tipoContenidos,
+    nombre,
+    descripcion: pickNullableString(
+      row.descripcion,
+      row.description,
+      row.descripcionLista,
+      row.listDescription
+    ),
+    visibilidad:
+      pickString(row.visibilidad, row.visibility, row.privacy, row.privacidad) ||
+      undefined,
+    imagen: pickNullableString(
+      row.imagen,
+      row.image,
+      row.imagenUrl,
+      row.imageUrl,
+      row.portada
+    ),
+  };
+}
+
+function extractRawLists(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+  const row = payload as Record<string, unknown>;
+
+  const candidates: unknown[] = [
+    row.listas,
+    row.lista,
+    row.items,
+    row.results,
+    row.data,
+    row.rows,
+    row.collection,
+    row.resultsList,
+    row.records,
+    row.values,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (isRecord(candidate)) {
+      const nestedArray = extractRawLists(candidate);
+      if (nestedArray.length) return nestedArray;
+    }
+  }
+  if (normalizeBackendList(payload)) return [payload];
+  return [];
+}
+
+function parseListsPayload(payload: unknown): BackendLista[] {
+  const rows = extractRawLists(payload);
+  const parsed = rows
+    .map((item) => normalizeBackendList(item))
+    .filter((item): item is BackendLista => item != null);
+  const deduped = new Map<number, BackendLista>();
+  for (const list of parsed) {
+    if (!deduped.has(list.listaId)) deduped.set(list.listaId, list);
+  }
+  return [...deduped.values()];
+}
+
+function normalizeBackendContent(
+  raw: unknown,
+  fallbackType?: string
+): BackendContenidoListado | null {
+  if (!isRecord(raw)) return null;
+  const nested =
+    (isRecord(raw.contenido) && raw.contenido) ||
+    (isRecord(raw.item) && raw.item) ||
+    (isRecord(raw.content) && raw.content) ||
+    null;
+  const row = nested ? { ...raw, ...nested } : raw;
+
+  const id = pickPositiveNumber(
+    row.id,
+    row.contenidoId,
+    row.contenido_id,
+    row.itemId,
+    row.item_id,
+    row.contentId,
+    row.content_id
+  );
+  if (id == null) return null;
+
+  const titulo = pickString(row.titulo, row.title, row.nombre, row.name) || `Contenido ${id}`;
+  const portada = pickNullableString(
+    row.portada,
+    row.imagen,
+    row.image,
+    row.cover,
+    row.poster
+  );
+  const puntuacion = pickOptionalNumber(
+    row.puntuacion,
+    row.score,
+    row.rating,
+    row.valoracion
+  );
+  const puntuacionApi = pickOptionalNumber(
+    row.puntuacionApi,
+    row.puntuacion_api,
+    row.apiScore,
+    row.api_score,
+    row.ratingApi
+  );
+  const tipo =
+    pickString(
+      row.tipo,
+      row.tipoContenido,
+      row.tipo_contenido,
+      row.tipoContenidos,
+      row.tipo_contenidos,
+      row.category,
+      row.categoria
+    ) ||
+    (typeof fallbackType === "string" ? fallbackType : "");
+
+  return {
+    id,
+    titulo,
+    portada,
+    puntuacion,
+    puntuacionApi,
+    tipo: tipo || null,
+  };
+}
+
+function extractRawContents(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+  const row = payload as Record<string, unknown>;
+  const candidates: unknown[] = [
+    row.contenidos,
+    row.contenido,
+    row.items,
+    row.results,
+    row.data,
+    row.rows,
+    row.collection,
+    row.entries,
+    row.elementos,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (isRecord(candidate)) {
+      const nested = extractRawContents(candidate);
+      if (nested.length) return nested;
+    }
+  }
+  const single = normalizeBackendContent(payload);
+  return single ? [payload] : [];
+}
+
+function parseListContentsPayload(
+  payload: unknown,
+  fallbackListId?: number
+): BackendListaContenidosResponse {
+  const fallbackListIdSafe =
+    Number.isFinite(Number(fallbackListId)) && Number(fallbackListId) > 0
+      ? Number(fallbackListId)
+      : 0;
+
+  const normalizedList =
+    normalizeBackendList(payload) ||
+    (isRecord(payload) ? normalizeBackendList(payload.lista) : null) ||
+    (isRecord(payload) ? normalizeBackendList(payload.list) : null) ||
+    null;
+
+  const lista: BackendLista =
+    normalizedList ??
+    ({
+      listaId: fallbackListIdSafe,
+      userId: 0,
+      tipo: "user",
+      tipoContenidos: "desconocido",
+      nombre: fallbackListIdSafe ? `Lista ${fallbackListIdSafe}` : "Lista",
+      descripcion: null,
+      visibilidad: "publica",
+      imagen: null,
+    } satisfies BackendLista);
+
+  const rows = extractRawContents(payload);
+  const parsed = rows
+    .map((item) => normalizeBackendContent(item, lista.tipoContenidos))
+    .filter((item): item is BackendContenidoListado => item != null);
+  const deduped = new Map<number, BackendContenidoListado>();
+  for (const item of parsed) {
+    if (!deduped.has(item.id)) deduped.set(item.id, item);
+  }
+
+  return {
+    lista,
+    contenidos: [...deduped.values()],
+  };
+}
+
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "GET",
@@ -154,8 +445,9 @@ export async function createUserList(input: CreateUserListInput): Promise<Backen
   };
 
   const data = await apiPost<typeof payload, CreateUserListResponse>("/listas/", payload);
-  const created = data?.lista ?? (data as BackendLista);
-  if (!created || typeof created.listaId !== "number") {
+  const createdCandidate = data?.lista ?? data;
+  const created = normalizeBackendList(createdCandidate);
+  if (!created) {
     throw new Error("No se ha podido crear la lista.");
   }
   return created;
@@ -225,9 +517,64 @@ export async function removeContentFromList(
  * GET /listas/usuario
  * -> { listas: BackendLista[] }
  */
-export async function getMyLists(): Promise<BackendLista[]> {
-  const data = await apiGet<{ listas?: BackendLista[] }>("/listas/usuario");
-  return data?.listas ?? [];
+export async function getMyLists(usePagination?: boolean): Promise<BackendLista[]> {
+  const url = !usePagination ? `/listas/usuario?usePagination=${usePagination}` : "/listas/usuario";
+  const data = await apiGet<unknown>(url);
+  return parseListsPayload(data);
+}
+
+function isAuthError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.trim();
+  return message.startsWith("401") || message.startsWith("403");
+}
+
+/**
+ * Intenta obtener listas del usuario autenticado.
+ * Primario: /listas/usuario/{userId}
+ * Fallback: /listas/usuario
+ */
+export async function getMyListsWithFallback(): Promise<BackendLista[]> {
+  // const me = await getMe().catch(() => ({ success: false } as const));
+  // const userId = resolveAuthenticatedUserId(me);
+
+  // let byUserIdLists: BackendLista[] = [];
+  // if (userId > 0) {
+  //   try {
+  //     byUserIdLists = await getListsByUser(userId);
+  //     if (byUserIdLists.length > 0) {
+  //       return byUserIdLists;
+  //     }
+  //   } catch (error) {
+  //     if (isAuthError(error)) throw error;
+  //   }
+  // }
+
+  let myLists: BackendLista[] = [];
+  try {
+    myLists = await getMyLists(false);
+  } catch (error) {
+    if (isAuthError(error)) throw error;
+  }
+
+  const merged = new Map<number, BackendLista>();
+  // for (const list of [...myLists, ...byUserIdLists]) {
+  //   const id = Number(list?.listaId);
+  //   if (!Number.isFinite(id) || id <= 0) continue;
+  //   if (!merged.has(id)) {
+  //     merged.set(id, list);
+  //   }
+  // }
+
+  for (const list of [...myLists]) {
+    const id = Number(list?.listaId);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    if (!merged.has(id)) {
+      merged.set(id, list);
+    }
+  }
+
+  return [...merged.values()];
 }
 
 /**
@@ -235,10 +582,8 @@ export async function getMyLists(): Promise<BackendLista[]> {
  * -> { listas: BackendLista[] }
  */
 export async function getListsByUser(userId: number): Promise<BackendLista[]> {
-  const data = await apiGet<{ listas?: BackendLista[] }>(
-    `/listas/usuario/${userId}`
-  );
-  return data?.listas ?? [];
+  const data = await apiGet<unknown>(`/listas/usuario/${userId}`);
+  return parseListsPayload(data);
 }
 
 /**
@@ -248,7 +593,8 @@ export async function getListsByUser(userId: number): Promise<BackendLista[]> {
 export async function getListContents(
   listaId: number
 ): Promise<BackendListaContenidosResponse> {
-  return apiGet<BackendListaContenidosResponse>(`/listas/${listaId}/contenidos`);
+  const data = await apiGet<unknown>(`/listas/${listaId}/contenidos`);
+  return parseListContentsPayload(data, listaId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -140,12 +140,6 @@ export function DetailPage() {
       typeEndpoints: TYPE_ENDPOINTS,
     });
   const sessionUsername = getSessionUsername();
-  const statusCacheKey = normalizedId
-    ? `content-status:${sessionUsername}:${normalizedType}:${normalizedId}`
-    : "";
-  const ratingCacheKey = normalizedId
-    ? `content-rating:${sessionUsername}:${normalizedType}:${normalizedId}`
-    : "";
   const isLoggedIn = isSessionValid();
   const { currentUserId, currentUserAvatarUrl, currentUserIsAdmin } =
     useDetailCurrentUser({
@@ -419,31 +413,31 @@ export function DetailPage() {
   const typeLabel = type ? TYPE_LABELS[type] ?? "Detalle" : "Detalle";
   const statusLabelsByType: Record<string, Record<ContentStatus, string>> = {
     pelicula: {
-      watchlist: "Quiero ver",
+      watchlist: "Pendientes",
       in_progress: "Viendo",
       completed: "Visto",
       dropped: "Abandonado",
     },
     serie: {
-      watchlist: "Quiero ver",
+      watchlist: "Pendientes",
       in_progress: "Viendo",
       completed: "Visto",
       dropped: "Abandonado",
     },
     libro: {
-      watchlist: "Quiero leer",
+      watchlist: "Pendientes",
       in_progress: "Leyendo",
       completed: "Leído",
       dropped: "Abandonado",
     },
     videojuego: {
-      watchlist: "Quiero jugar",
+      watchlist: "Pendientes",
       in_progress: "Jugando",
       completed: "Jugado",
       dropped: "Abandonado",
     },
     "juego-mesa": {
-      watchlist: "Quiero jugar",
+      watchlist: "Pendientes",
       in_progress: "Jugando",
       completed: "Jugado",
       dropped: "Abandonado",
@@ -455,31 +449,31 @@ export function DetailPage() {
     Record<ContentStatus, string>
   > = {
     pelicula: {
-      watchlist: "Marcado para ver",
+      watchlist: "Marcado en Pendientes",
       in_progress: "Marcado como viendo",
       completed: "Marcado como visto",
       dropped: "Marcado como abandonado",
     },
     serie: {
-      watchlist: "Marcado para ver",
+      watchlist: "Marcado en Pendientes",
       in_progress: "Marcado como viendo",
       completed: "Marcado como visto",
       dropped: "Marcado como abandonado",
     },
     libro: {
-      watchlist: "Marcado para leer",
+      watchlist: "Marcado en Pendientes",
       in_progress: "Marcado como leyendo",
       completed: "Marcado como leído",
       dropped: "Marcado como abandonado",
     },
     videojuego: {
-      watchlist: "Marcado para jugar",
+      watchlist: "Marcado en Pendientes",
       in_progress: "Marcado como jugando",
       completed: "Marcado como jugado",
       dropped: "Marcado como abandonado",
     },
     "juego-mesa": {
-      watchlist: "Marcado para jugar",
+      watchlist: "Marcado en Pendientes",
       in_progress: "Marcado como jugando",
       completed: "Marcado como jugado",
       dropped: "Marcado como abandonado",
@@ -528,10 +522,6 @@ export function DetailPage() {
     isLoggedIn,
     normalizedId,
     normalizedType,
-    statusCacheKey,
-    sessionUsername,
-    title,
-    statusOptions,
   });
   const isCompletedForRating = currentStatus === "completed";
   const {
@@ -545,9 +535,6 @@ export function DetailPage() {
     isLoggedIn,
     canRate: isCompletedForRating,
     normalizedId,
-    ratingCacheKey,
-    sessionUsername,
-    title,
   });
   const {
     comments,
@@ -566,7 +553,6 @@ export function DetailPage() {
     isLoggedIn,
     canDeleteAnyComment: currentUserIsAdmin,
     sessionUsername,
-    title,
     currentUserId,
     currentUserAvatarUrl,
     apiUrl: API_URL,

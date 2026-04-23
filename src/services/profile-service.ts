@@ -41,6 +41,311 @@ async function profileApi(path: string, options: RequestInit = {}) {
   return { res, data };
 }
 
+function normalizeKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function parseFollowingTargetsFromPayload(payload: unknown): {
+  userIds: number[];
+  usernames: string[];
+} {
+  const userIds = new Set<number>();
+  const usernames = new Set<string>();
+
+  const pushUser = (entry: unknown) => {
+    if (entry == null) return;
+    if (typeof entry === "number" && Number.isFinite(entry) && entry > 0) {
+      userIds.add(entry);
+      return;
+    }
+    if (typeof entry === "string") {
+      const numeric = Number(entry);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        userIds.add(numeric);
+        return;
+      }
+      const normalized = normalizeKey(entry);
+      if (normalized) usernames.add(normalized);
+      return;
+    }
+    if (typeof entry !== "object") return;
+
+    const row = entry as Record<string, unknown>;
+    const id = Number(
+      row.userId ??
+        row.id ??
+        row.usuarioId ??
+        row.usuario_id ??
+        row.seguidoId ??
+        row.seguido_id ??
+        row.followedId ??
+        row.followed_id ??
+        row.followingUserId ??
+        row.following_user_id ??
+        row.following_id ??
+        (row.usuario as { userId?: unknown } | undefined)?.userId ??
+        (row.user as { userId?: unknown } | undefined)?.userId
+    );
+    if (Number.isFinite(id) && id > 0) {
+      userIds.add(id);
+    }
+
+    const username = (
+      (typeof row.username === "string" && row.username) ||
+      (typeof row.user === "string" && row.user) ||
+      (typeof row.nombre === "string" && row.nombre) ||
+      ((row.usuario as { username?: unknown } | undefined)?.username as
+        | string
+        | undefined) ||
+      ((row.user as { username?: unknown } | undefined)?.username as
+        | string
+        | undefined) ||
+      ""
+    ).trim();
+    if (username) {
+      usernames.add(normalizeKey(username));
+    }
+  };
+
+  const root = (payload ?? {}) as Record<string, any>;
+  const perfil = (root?.perfil ?? {}) as Record<string, any>;
+  const seguimiento = (root?.seguimiento ??
+    perfil?.seguimiento ??
+    {}) as Record<string, any>;
+
+  const arrays = [
+    root?.siguiendo,
+    root?.seguidos,
+    root?.following,
+    root?.followingUsers,
+    root?.siguiendoUsuarios,
+    root?.seguidosUsuarios,
+    root?.usuariosSeguidos,
+    root?.follows,
+    seguimiento?.siguiendo,
+    seguimiento?.seguidos,
+    seguimiento?.following,
+    seguimiento?.followingUsers,
+    seguimiento?.siguiendoUsuarios,
+    seguimiento?.seguidosUsuarios,
+    seguimiento?.usuariosSeguidos,
+    seguimiento?.follows,
+    perfil?.siguiendo,
+    perfil?.seguidos,
+    perfil?.following,
+    perfil?.followingUsers,
+    perfil?.siguiendoUsuarios,
+    perfil?.seguidosUsuarios,
+    perfil?.usuariosSeguidos,
+    perfil?.follows,
+  ];
+
+  for (const candidate of arrays) {
+    if (!Array.isArray(candidate)) continue;
+    for (const row of candidate) {
+      pushUser(row);
+    }
+  }
+
+  return {
+    userIds: [...userIds],
+    usernames: [...usernames],
+  };
+}
+
+let followingEndpointProbeDone = false;
+let cachedFollowingEndpoint: string | null = null;
+let followStateProbeDone = false;
+let cachedFollowStateEndpointTemplate: string | null = null;
+
+function parseBooleanLike(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number" && (value === 0 || value === 1)) return value === 1;
+  if (typeof value === "string") {
+    const normalized = normalizeKey(value);
+    if (
+      [
+        "true",
+        "1",
+        "yes",
+        "si",
+        "siguiendo",
+        "following",
+        "followed",
+      ].includes(normalized)
+    ) {
+      return true;
+    }
+    if (
+      [
+        "false",
+        "0",
+        "no",
+        "not_following",
+        "no_siguiendo",
+        "unfollowed",
+      ].includes(normalized)
+    ) {
+      return false;
+    }
+  }
+  if (value && typeof value === "object") {
+    const row = value as Record<string, unknown>;
+    const nestedCandidates = [
+      row.isFollowing,
+      row.following,
+      row.followedByCurrentUser,
+      row.siguiendo,
+      row.sigue,
+      row.yaSigue,
+      row.value,
+      row.estado,
+      row.status,
+      (row.seguimiento as Record<string, unknown> | undefined)?.isFollowing,
+      (row.seguimiento as Record<string, unknown> | undefined)?.following,
+      (row.seguimiento as Record<string, unknown> | undefined)?.siguiendo,
+      (row.perfil as Record<string, unknown> | undefined)?.isFollowing,
+      (row.perfil as Record<string, unknown> | undefined)?.following,
+      (row.perfil as Record<string, unknown> | undefined)?.siguiendo,
+    ];
+    for (const nested of nestedCandidates) {
+      const parsed = parseBooleanLike(nested);
+      if (parsed != null) return parsed;
+    }
+  }
+  return null;
+}
+
+export async function fetchMyFollowingTargets(signal?: AbortSignal): Promise<{
+  userIds: number[];
+  usernames: string[];
+}> {
+  // 1) Intento principal: perfil actual (si ya expone listas de seguimiento).
+  try {
+    const myProfile = await fetchMyProfile(signal);
+    const parsed = parseFollowingTargetsFromPayload(myProfile);
+    if (parsed.userIds.length > 0 || parsed.usernames.length > 0) {
+      return parsed;
+    }
+  } catch {
+    // Seguimos con endpoints alternativos.
+  }
+
+  // 2) Si ya sabemos que no hay endpoint alternativo disponible, evitamos reintentos.
+  if (followingEndpointProbeDone && !cachedFollowingEndpoint) {
+    return { userIds: [], usernames: [] };
+  }
+
+  // 3) Endpoints alternativos según implementación de backend.
+  const candidatePaths = [
+    "/usuarios/seguidos",
+    "/usuarios/siguiendo",
+    "/usuarios/following",
+    "/usuarios/me/seguidos",
+    "/usuarios/me/siguiendo",
+    "/usuarios/perfil/seguidos",
+    "/usuarios/perfil/siguiendo",
+  ];
+
+  const pathsToTry = cachedFollowingEndpoint
+    ? [cachedFollowingEndpoint]
+    : candidatePaths;
+
+  for (const path of pathsToTry) {
+    try {
+      const { res, data } = await profileApi(path, {
+        method: "GET",
+        signal,
+      });
+      if (!res.ok) {
+        if (res.status === 404) {
+          cachedFollowingEndpoint = null;
+          followingEndpointProbeDone = true;
+          break;
+        }
+        continue;
+      }
+      const parsed = parseFollowingTargetsFromPayload(data);
+      cachedFollowingEndpoint = path;
+      followingEndpointProbeDone = true;
+      if (parsed.userIds.length > 0 || parsed.usernames.length > 0) {
+        return parsed;
+      }
+    } catch {
+      // Probamos siguiente ruta.
+    }
+  }
+
+  // Si llegamos aquí, no hay endpoint alternativo útil.
+  followingEndpointProbeDone = true;
+  cachedFollowingEndpoint = null;
+  return { userIds: [], usernames: [] };
+}
+
+export async function fetchIsFollowingUser(
+  userId: number,
+  signal?: AbortSignal
+): Promise<boolean | null> {
+  if (!Number.isFinite(userId) || userId <= 0) return null;
+
+  if (followStateProbeDone && !cachedFollowStateEndpointTemplate) {
+    return null;
+  }
+
+  const candidates = [
+    "/usuarios/{id}/seguir",
+    "/usuarios/{id}/seguimiento",
+    "/usuarios/{id}/following",
+    "/usuarios/perfil/{id}/seguimiento",
+    "/usuarios/perfil/{id}/following",
+  ];
+  const templatesToTry = cachedFollowStateEndpointTemplate
+    ? [cachedFollowStateEndpointTemplate]
+    : candidates;
+
+  for (const template of templatesToTry) {
+    const path = template.replace("{id}", String(userId));
+    try {
+      const { res, data } = await profileApi(path, {
+        method: "GET",
+        signal,
+      });
+      if (!res.ok) {
+        if (
+          (res.status === 404 || res.status === 405) &&
+          cachedFollowStateEndpointTemplate === template
+        ) {
+          cachedFollowStateEndpointTemplate = null;
+          followStateProbeDone = true;
+        }
+        continue;
+      }
+
+      const parsed =
+        parseBooleanLike((data as Record<string, unknown>)?.isFollowing) ??
+        parseBooleanLike((data as Record<string, unknown>)?.following) ??
+        parseBooleanLike((data as Record<string, unknown>)?.siguiendo) ??
+        parseBooleanLike(data);
+
+      cachedFollowStateEndpointTemplate = template;
+      followStateProbeDone = true;
+
+      if (parsed != null) return parsed;
+      return null;
+    } catch {
+      // Probamos siguiente ruta.
+    }
+  }
+
+  followStateProbeDone = true;
+  cachedFollowStateEndpointTemplate = null;
+  return null;
+}
+
 export async function uploadProfileImage(
   file: Blob,
   dataUrl?: string,
@@ -195,6 +500,27 @@ export type ProfileResponse = {
   };
 };
 
+export type UserFollower = {
+  userId?: number;
+  id?: number;
+  username?: string;
+  tipo?: string;
+  reputacion?: number;
+  avatarPath?: string | null;
+  avatarUrl?: string | null;
+};
+
+export type UserFollowersResponse = {
+  seguidores?: UserFollower[];
+  followers?: UserFollower[];
+  pagination?: {
+    page?: number;
+    pageSize?: number;
+    total?: number;
+    pages?: number;
+  };
+};
+
 export async function fetchMyProfile(
   signal?: AbortSignal
 ): Promise<ProfileResponse> {
@@ -229,6 +555,94 @@ export async function fetchUserProfile(
   }
 
   return data as ProfileResponse;
+}
+
+export async function fetchUserFollowers(
+  userId: number,
+  options?: {
+    page?: number;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }
+): Promise<{
+  followerIds: number[];
+  total: number;
+  page: number;
+  pages: number;
+}> {
+  const page = Number(options?.page ?? 1);
+  const pageSize = Number(options?.pageSize ?? 100);
+  const query = new URLSearchParams({
+    page: String(Number.isFinite(page) && page > 0 ? page : 1),
+    pageSize: String(Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 100),
+  });
+  const path = `/usuarios/${userId}/seguidores?${query.toString()}`;
+
+  const { res, data } = await profileApi(path, {
+    method: "GET",
+    signal: options?.signal,
+  });
+
+  if (!res.ok) {
+    const message = data?.message ?? "No se pudieron cargar los seguidores.";
+    throw new Error(message);
+  }
+
+  const payload = (data ?? {}) as UserFollowersResponse;
+  const rows = Array.isArray(payload.seguidores)
+    ? payload.seguidores
+    : Array.isArray(payload.followers)
+      ? payload.followers
+      : [];
+  const followerIds = rows
+    .map((row) => Number(row?.userId ?? row?.id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  const pages = Number(payload.pagination?.pages ?? 1);
+  const total = Number(payload.pagination?.total ?? followerIds.length);
+  const currentPage = Number(payload.pagination?.page ?? page);
+
+  return {
+    followerIds,
+    total: Number.isFinite(total) && total >= 0 ? total : followerIds.length,
+    page:
+      Number.isFinite(currentPage) && currentPage > 0
+        ? currentPage
+        : Number.isFinite(page) && page > 0
+          ? page
+          : 1,
+    pages: Number.isFinite(pages) && pages > 0 ? pages : 1,
+  };
+}
+
+export async function fetchAllUserFollowerIds(
+  userId: number,
+  signal?: AbortSignal
+): Promise<{ followerIds: number[]; total: number }> {
+  const dedupedIds = new Set<number>();
+  let page = 1;
+  let pages = 1;
+  let total = 0;
+  let guard = 0;
+
+  while (page <= pages && guard < 200) {
+    const result = await fetchUserFollowers(userId, {
+      page,
+      pageSize: 100,
+      signal,
+    });
+    for (const followerId of result.followerIds) {
+      dedupedIds.add(followerId);
+    }
+    total = result.total;
+    pages = result.pages;
+    page += 1;
+    guard += 1;
+  }
+
+  return {
+    followerIds: [...dedupedIds],
+    total: Number.isFinite(total) && total >= 0 ? total : dedupedIds.size,
+  };
 }
 
 export async function updateProfile(

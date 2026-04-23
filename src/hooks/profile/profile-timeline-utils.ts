@@ -1,5 +1,4 @@
 import type { TimelineItem } from "@/components/profile/profile-timeline";
-import { readProfileActivity } from "@/services/profile-activity";
 
 export type TimelineRecord = TimelineItem & { timestamp: number };
 
@@ -67,7 +66,7 @@ function normalizeTimelineType(value: unknown): TimelineItem["type"] {
 
 function statusLabel(value: unknown) {
   const normalized = typeof value === "string" ? value.toLowerCase() : "";
-  if (normalized === "watchlist") return "Quiero ver";
+  if (normalized === "watchlist") return "Pendientes";
   if (normalized === "in_progress") return "Viendo";
   if (normalized === "completed") return "Visto";
   if (normalized === "dropped") return "Abandonado";
@@ -267,16 +266,4 @@ export function buildTimelineFromPayload(payload: any) {
   return activityRows
     .map((record, index) => mapActivityRecord(record, index))
     .filter((record): record is TimelineRecord => record != null);
-}
-
-export function buildTimelineFromLocalActivity(username: string) {
-  const rows = readProfileActivity(username);
-  return rows.map((row, index) => {
-    const timestamp = parseDateMs(row.date) ?? Date.now() - index;
-    return {
-      ...row,
-      date: formatTimelineDate(timestamp),
-      timestamp,
-    };
-  });
 }

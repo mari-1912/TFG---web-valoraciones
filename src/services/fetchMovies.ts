@@ -5,6 +5,7 @@ const API_URL =
 
 type FetchListOptions = {
   q?: string;
+  query?: string;
   page?: number;
   pageSize?: number;
   generos?: string | string[];
@@ -19,7 +20,12 @@ type FetchListOptions = {
 
 const buildParams = (options: FetchListOptions) => {
   const params = new URLSearchParams();
-  if (options.q) params.set("q", options.q);
+  const searchTerm = options.q ?? options.query;
+  if (searchTerm) {
+    // Compatibilidad backend: algunos endpoints esperan `q` y otros `query`.
+    params.set("q", searchTerm);
+    params.set("query", searchTerm);
+  }
   if (options.page) params.set("page", String(options.page));
   if (options.pageSize) params.set("pageSize", String(options.pageSize));
   if (options.generos) {

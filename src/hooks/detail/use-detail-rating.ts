@@ -3,7 +3,6 @@ import {
   deleteContentRating,
   setContentRating,
 } from "@/services/content-rating";
-import { appendProfileActivity } from "@/services/profile-activity";
 import { parseRating } from "@/pages/detail-page.helpers";
 
 type UseDetailRatingArgs = {
@@ -11,9 +10,6 @@ type UseDetailRatingArgs = {
   isLoggedIn: boolean;
   canRate: boolean;
   normalizedId: string;
-  ratingCacheKey: string;
-  sessionUsername: string;
-  title: string;
 };
 
 export function useDetailRating({
@@ -21,9 +17,6 @@ export function useDetailRating({
   isLoggedIn,
   canRate,
   normalizedId,
-  ratingCacheKey,
-  sessionUsername,
-  title,
 }: UseDetailRatingArgs) {
   const [userRating, setUserRating] = useState<number | null>(null);
   const [ratingUpdating, setRatingUpdating] = useState(false);
@@ -32,16 +25,7 @@ export function useDetailRating({
   useEffect(() => {
     setUserRating(null);
     setRatingMessage(null);
-    if (!normalizedId) return;
-    try {
-      const cachedRating = parseRating(localStorage.getItem(ratingCacheKey));
-      if (cachedRating != null) {
-        setUserRating(cachedRating);
-      }
-    } catch {
-      // Si localStorage falla, seguimos sin caché.
-    }
-  }, [normalizedId, ratingCacheKey]);
+  }, [normalizedId]);
 
   useEffect(() => {
     if (!item) return;
@@ -61,10 +45,7 @@ export function useDetailRating({
     if (candidate == null) return;
 
     setUserRating((prev) => (prev === candidate ? prev : candidate));
-    if (ratingCacheKey) {
-      localStorage.setItem(ratingCacheKey, String(candidate));
-    }
-  }, [item, ratingCacheKey]);
+  }, [item]);
 
   const handleSetRating = useCallback(
     async (value: number) => {
@@ -85,15 +66,6 @@ export function useDetailRating({
       try {
         await setContentRating(normalizedId, value);
         setUserRating(value);
-        if (ratingCacheKey) {
-          localStorage.setItem(ratingCacheKey, String(value));
-        }
-        appendProfileActivity(sessionUsername, {
-          type: "rating",
-          title: `Valoraste ${title}`,
-          detail: `${value}/10`,
-          date: new Date().toISOString(),
-        });
       } catch (err) {
         setRatingMessage(
           err instanceof Error ? err.message : "No se pudo guardar la valoración."
@@ -102,7 +74,7 @@ export function useDetailRating({
         setRatingUpdating(false);
       }
     },
-    [isLoggedIn, canRate, normalizedId, ratingCacheKey, sessionUsername, title]
+    [isLoggedIn, canRate, normalizedId]
   );
 
   const handleClearRating = useCallback(async () => {
@@ -123,14 +95,6 @@ export function useDetailRating({
     try {
       await deleteContentRating(normalizedId);
       setUserRating(null);
-      if (ratingCacheKey) {
-        localStorage.removeItem(ratingCacheKey);
-      }
-      appendProfileActivity(sessionUsername, {
-        type: "rating",
-        title: `Quitaste tu valoración en ${title}`,
-        date: new Date().toISOString(),
-      });
     } catch (err) {
       setRatingMessage(
         err instanceof Error ? err.message : "No se pudo eliminar la valoración."
@@ -138,7 +102,7 @@ export function useDetailRating({
     } finally {
       setRatingUpdating(false);
     }
-  }, [isLoggedIn, canRate, normalizedId, ratingCacheKey, sessionUsername, title]);
+  }, [isLoggedIn, canRate, normalizedId]);
 
   return {
     userRating,

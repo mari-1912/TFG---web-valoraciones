@@ -4,23 +4,13 @@ import {
   updateContentStatus,
 } from "@/services/content-status";
 import { syncContentInStatusLists } from "@/services/status-lists-sync";
-import { appendProfileActivity } from "@/services/profile-activity";
 import { parseStoredStatus, pickString } from "@/pages/detail-page.helpers";
-
-type StatusOption = {
-  value: ContentStatus;
-  label: string;
-};
 
 type UseDetailStatusArgs = {
   item: any;
   isLoggedIn: boolean;
   normalizedId: string;
   normalizedType: string;
-  statusCacheKey: string;
-  sessionUsername: string;
-  title: string;
-  statusOptions: StatusOption[];
 };
 
 export function useDetailStatus({
@@ -28,10 +18,6 @@ export function useDetailStatus({
   isLoggedIn,
   normalizedId,
   normalizedType,
-  statusCacheKey,
-  sessionUsername,
-  title,
-  statusOptions,
 }: UseDetailStatusArgs) {
   const [currentStatus, setCurrentStatus] = useState<ContentStatus | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -40,16 +26,7 @@ export function useDetailStatus({
   useEffect(() => {
     setCurrentStatus(null);
     setStatusMessage(null);
-    if (!normalizedId) return;
-    try {
-      const cachedStatus = parseStoredStatus(localStorage.getItem(statusCacheKey));
-      if (cachedStatus) {
-        setCurrentStatus(cachedStatus);
-      }
-    } catch {
-      // Si localStorage falla, seguimos sin caché.
-    }
-  }, [normalizedId, statusCacheKey]);
+  }, [normalizedId]);
 
   useEffect(() => {
     if (!item) return;
@@ -68,10 +45,7 @@ export function useDetailStatus({
     if (candidate == null) return;
 
     setCurrentStatus((prev) => (prev === candidate ? prev : candidate));
-    if (statusCacheKey) {
-      localStorage.setItem(statusCacheKey, candidate);
-    }
-  }, [item, statusCacheKey]);
+  }, [item]);
 
   const handleSetStatus = useCallback(
     async (estado: ContentStatus | null) => {
@@ -86,14 +60,6 @@ export function useDetailStatus({
         );
         setCurrentStatus(null);
         setStatusMessage(null);
-        if (statusCacheKey) {
-          localStorage.removeItem(statusCacheKey);
-        }
-        appendProfileActivity(sessionUsername, {
-          type: "service",
-          title: `Quitaste el estado de ${title}`,
-          date: new Date().toISOString(),
-        });
         return;
       }
 
@@ -105,16 +71,6 @@ export function useDetailStatus({
           () => undefined
         );
         setCurrentStatus(estado);
-        if (statusCacheKey) {
-          localStorage.setItem(statusCacheKey, estado);
-        }
-        const statusOption = statusOptions.find((option) => option.value === estado);
-        appendProfileActivity(sessionUsername, {
-          type: "service",
-          title: `Actualizaste estado en ${title}`,
-          detail: statusOption?.label ?? estado,
-          date: new Date().toISOString(),
-        });
       } catch (err) {
         setStatusMessage(
           err instanceof Error ? err.message : "No se pudo actualizar el estado."
@@ -127,10 +83,6 @@ export function useDetailStatus({
       isLoggedIn,
       normalizedId,
       normalizedType,
-      statusCacheKey,
-      sessionUsername,
-      title,
-      statusOptions,
     ]
   );
 
