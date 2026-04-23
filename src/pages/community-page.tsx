@@ -11,8 +11,7 @@ import {
 } from "../services/apiCommunity";
 import { getMe } from "../services/auth-service";
 import {
-  fetchMyFollowingTargets,
-  fetchMyProfile,
+  fetchUserFollowingPage,
   fetchUserProfile,
 } from "../services/profile-service";
 import {
@@ -72,112 +71,12 @@ function pickString(...values: unknown[]) {
   return "";
 }
 
-type FollowTargets = {
-  userIds: Set<number>;
-  usernames: Set<string>;
-};
-
 function normalizeUsername(value: string) {
   return value
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-}
-
-function parseFollowingTargetsFromProfilePayload(payload: any): FollowTargets {
-  const userIds = new Set<number>();
-  const usernames = new Set<string>();
-
-  const pushUser = (entry: unknown) => {
-    if (entry == null) return;
-    if (typeof entry === "number" && Number.isFinite(entry) && entry > 0) {
-      userIds.add(entry);
-      return;
-    }
-    if (typeof entry === "string") {
-      const numeric = Number(entry);
-      if (Number.isFinite(numeric) && numeric > 0) {
-        userIds.add(numeric);
-        return;
-      }
-      const normalized = normalizeUsername(entry);
-      if (normalized) usernames.add(normalized);
-      return;
-    }
-    if (typeof entry !== "object") return;
-
-    const row = entry as Record<string, unknown>;
-    const id = Number(
-      row.userId ??
-        row.id ??
-        row.usuarioId ??
-        row.usuario_id ??
-        row.seguidoId ??
-        row.followedId ??
-        row.followingUserId ??
-        row.following_id ??
-        row.followed_id ??
-        (row.usuario as { userId?: unknown } | undefined)?.userId ??
-        (row.user as { userId?: unknown } | undefined)?.userId
-    );
-    if (Number.isFinite(id) && id > 0) {
-      userIds.add(id);
-    }
-
-    const username = (
-      (typeof row.username === "string" && row.username) ||
-      (typeof row.user === "string" && row.user) ||
-      (typeof row.nombre === "string" && row.nombre) ||
-      ((row.usuario as { username?: unknown } | undefined)?.username as
-        | string
-        | undefined) ||
-      ((row.user as { username?: unknown } | undefined)?.username as
-        | string
-        | undefined) ||
-      ""
-    ).trim();
-    if (username) {
-      usernames.add(normalizeUsername(username));
-    }
-  };
-
-  const root = payload ?? {};
-  const perfil = root?.perfil ?? {};
-  const seguimiento = root?.seguimiento ?? perfil?.seguimiento ?? {};
-  const arrays = [
-    root?.siguiendo,
-    root?.seguidos,
-    root?.following,
-    root?.followingUsers,
-    root?.siguiendoUsuarios,
-    root?.usuariosSeguidos,
-    root?.follows,
-    root?.seguidosUsuarios,
-    seguimiento?.siguiendo,
-    seguimiento?.seguidos,
-    seguimiento?.following,
-    seguimiento?.followingUsers,
-    seguimiento?.siguiendoUsuarios,
-    seguimiento?.usuariosSeguidos,
-    seguimiento?.follows,
-    perfil?.siguiendo,
-    perfil?.seguidos,
-    perfil?.following,
-    perfil?.followingUsers,
-    perfil?.siguiendoUsuarios,
-    perfil?.usuariosSeguidos,
-    perfil?.follows,
-  ];
-
-  for (const candidate of arrays) {
-    if (!Array.isArray(candidate)) continue;
-    for (const row of candidate) {
-      pushUser(row);
-    }
-  }
-
-  return { userIds, usernames };
 }
 
 function normalizeAction(value?: string): CommunityAction {
@@ -290,7 +189,7 @@ function normalizeDetailType(value: unknown): CommunityPost["detailType"] {
 
 function mapActivityToPost(activity: CommunityActivity, index: number): CommunityPost {
   const metadata = activity.metadata ?? {};
-  const metadataRecord = metadata as Record<string, any>;
+  const metadataRecord = metadata as Record<string, unknown>;
   const reactions = (metadataRecord.reacciones ?? metadataRecord.reactions ?? {}) as
     | Record<string, unknown>
     | undefined;
@@ -308,8 +207,8 @@ function mapActivityToPost(activity: CommunityActivity, index: number): Communit
       metadataRecord.commentId ??
         metadataRecord.comentarioId ??
         metadataRecord.idComentario ??
-        metadataRecord.comment?.commentId ??
-        metadataRecord.comentario?.commentId ??
+        (metadataRecord.comment as Record<string, unknown> | undefined)?.commentId ??
+        (metadataRecord.comentario as Record<string, unknown> | undefined)?.commentId ??
         0
     ) || null;
   const detailType = normalizeDetailType(
@@ -458,8 +357,6 @@ const DETAIL_TYPE_CATALOGS: Array<{
 ];
 
 const COMMUNITY_PAGE_SIZE = 20;
-const COMMUNITY_MAX_PAGES_TO_SCAN = 8;
-const COMMUNITY_TARGET_POSTS = 20;
 
 function normalizeKey(s?: string) {
   return (s ?? "")
@@ -592,23 +489,10 @@ export default function CommunityPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUsername, setCurrentUsername] = useState("");
   const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
-  const [followTargets, setFollowTargets] = useState<FollowTargets>({
-    userIds: new Set<number>(),
-    usernames: new Set<string>(),
-  });
-
-  const isOwnPost = useCallback(
-    (post: CommunityPost, userId: number | null, username: string) => {
-      if (userId != null && post.userId != null) {
-        return userId === post.userId;
-      }
-
-      const ownName = username.trim().toLowerCase();
-      if (!ownName) return false;
-      return post.user.trim().toLowerCase() === ownName;
-    },
-    []
-  );
+  const [followedUserIds, setFollowedUserIds] = useState<number[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const isOwnCommentPost = useCallback(
     (post: CommunityPost) => {
@@ -638,42 +522,33 @@ export default function CommunityPage() {
       createdAtMs: number;
     }> = [];
 
-    const pushComment = (node: any) => {
+    const pushComment = (node: unknown) => {
       if (!node || typeof node !== "object") return;
-      const id = Number(node?.commentId ?? node?.id ?? node?.comentarioId ?? 0);
+      const n = node as Record<string, unknown>;
+      const id = Number(n?.commentId ?? n?.id ?? n?.comentarioId ?? 0);
       const username = normalizeUsername(
         pickString(
-          node?.usuario?.username,
-          node?.user?.username,
-          node?.username,
-          node?.user,
-          node?.usuario,
-          node?.author
+          (n?.usuario as Record<string, unknown> | undefined)?.username,
+          (n?.user as Record<string, unknown> | undefined)?.username,
+          n?.username,
+          n?.user,
+          n?.usuario,
+          n?.author
         )
       );
       const message = normalizeCommentText(
-        pickString(
-          node?.mensaje,
-          node?.comment,
-          node?.texto,
-          node?.body
-        )
+        pickString(n?.mensaje, n?.comment, n?.texto, n?.body)
       );
       const createdAtMs = parseDateMs(
-        pickString(
-          node?.createDate,
-          node?.createdAt,
-          node?.date,
-          node?.fecha
-        )
+        pickString(n?.createDate, n?.createdAt, n?.date, n?.fecha)
       );
 
       if (Number.isFinite(id) && id > 0) {
         flattened.push({ id, username, message, createdAtMs });
       }
 
-      const replies = Array.isArray(node?.respuestas) ? node.respuestas : [];
-      replies.forEach((reply: any) => {
+      const replies = Array.isArray(n?.respuestas) ? n.respuestas : [];
+      replies.forEach((reply: unknown) => {
         if (reply && typeof reply === "object") pushComment(reply);
       });
     };
@@ -740,98 +615,46 @@ export default function CommunityPage() {
   const loadFeed = useCallback(
     async ({
       signal,
-      userId,
-      username,
-      followedTargets,
+      userIds,
       silent = false,
     }: {
       signal?: AbortSignal;
-      userId: number | null;
-      username: string;
-      followedTargets: FollowTargets;
+      userIds: number[];
       silent?: boolean;
     }) => {
-      if (!silent) {
-        setLoading(true);
-      }
-
+      if (!silent) setLoading(true);
       try {
-        const hasFollowTargets =
-          followedTargets.userIds.size > 0 || followedTargets.usernames.size > 0;
-        if (!hasFollowTargets) {
+        if (!userIds.length) {
           setFeed([]);
           setError(null);
           return;
         }
+        const payload = await getCommunityFeed({
+          page: 1,
+          pageSize: COMMUNITY_PAGE_SIZE,
+          userIds,
+          signal,
+        });
+        if (signal?.aborted) return;
 
-        const followedPosts: CommunityPost[] = [];
-        for (let page = 1; page <= COMMUNITY_MAX_PAGES_TO_SCAN; page += 1) {
-          if (signal?.aborted) return;
-          const payload = await getCommunityFeed({
-            page,
-            pageSize: COMMUNITY_PAGE_SIZE,
-            signal,
-          });
-          const activities = Array.isArray(payload?.actividades)
-            ? payload.actividades
-            : [];
-          if (!activities.length) break;
-
-          const mapped = activities.map(mapActivityToPost);
-          for (const post of mapped) {
-            if (isOwnPost(post, userId, username)) continue;
-            if (post.userId != null && followedTargets.userIds.has(post.userId)) {
-              followedPosts.push(post);
-              continue;
-            }
-            const normalizedPostUsername = normalizeUsername(post.user);
-            if (
-              normalizedPostUsername !== "" &&
-              followedTargets.usernames.has(normalizedPostUsername)
-            ) {
-              followedPosts.push(post);
-            }
-          }
-
-          if (followedPosts.length >= COMMUNITY_TARGET_POSTS) break;
-          const totalPages = Number(payload?.pagination?.pages ?? 0);
-          if (Number.isFinite(totalPages) && totalPages > 0 && page >= totalPages) {
-            break;
-          }
-        }
-
-        const dedupedById = new Map<string, CommunityPost>();
-        for (const post of followedPosts) {
-          if (!dedupedById.has(post.id)) {
-            dedupedById.set(post.id, post);
-          }
-        }
-
-        const hydrated = await hydrateAvatars(
-          [...dedupedById.values()].slice(0, COMMUNITY_TARGET_POSTS),
-          signal
-        );
+        const activities = Array.isArray(payload?.actividades) ? payload.actividades : [];
+        const mapped = activities.map(mapActivityToPost);
+        const hydrated = await hydrateAvatars(mapped, signal);
         if (signal?.aborted) return;
 
         setFeed(hydrated);
+        setCurrentPage(1);
+        setTotalPages(Number(payload?.pagination?.pages ?? 1));
         setError(null);
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
-        if (!silent) {
-          setFeed([]);
-        }
-        setError(
-          err instanceof Error
-            ? err.message
-            : "No se pudo cargar el feed de comunidad."
-        );
+        if (!silent) setFeed([]);
+        setError(err instanceof Error ? err.message : "No se pudo cargar el feed de comunidad.");
       } finally {
-        if (!silent) {
-          setLoading(false);
-        }
+        if (!silent) setLoading(false);
       }
     },
-    [isOwnPost]
+    []
   );
 
   useEffect(() => {
@@ -840,74 +663,38 @@ export default function CommunityPage() {
     setError(null);
 
     const initialize = async () => {
-      let userId: number | null = null;
-      let username = "";
-
       try {
         const me = await getMe();
         if (controller.signal.aborted) return;
 
+        let userId: number | null = null;
         if (me.success && me.user) {
           userId = Number(me.user.user_id) || null;
-          username = (me.user.username ?? "").trim();
+          setCurrentUserId(userId);
+          setCurrentUsername((me.user.username ?? "").trim());
           setCurrentUserIsAdmin((me.user.role ?? "").toLowerCase() === "admin");
-        } else {
-          setCurrentUserIsAdmin(false);
         }
-        setCurrentUserId(userId);
-        setCurrentUsername(username);
 
-        let serverFollowTargets: FollowTargets = {
-          userIds: new Set<number>(),
-          usernames: new Set<string>(),
-        };
+        // Obtener IDs de usuarios seguidos desde el endpoint existente
+        let userIds: number[] = [];
         if (userId != null) {
           try {
-            const profilePayload = await fetchMyProfile(controller.signal);
-            if (!controller.signal.aborted) {
-              serverFollowTargets =
-                parseFollowingTargetsFromProfilePayload(profilePayload);
-            }
+            const followingPage = await fetchUserFollowingPage(userId, {
+              pageSize: 200,
+              signal: controller.signal,
+            });
+            userIds = followingPage.users.map((u) => u.userId);
           } catch {
-            // Si falla esta lectura adicional, seguimos con objetivos vacíos.
-          }
-
-          if (
-            !controller.signal.aborted &&
-            serverFollowTargets.userIds.size === 0 &&
-            serverFollowTargets.usernames.size === 0
-          ) {
-            try {
-              const rawTargets = await fetchMyFollowingTargets(controller.signal);
-              if (!controller.signal.aborted) {
-                serverFollowTargets = {
-                  userIds: new Set(rawTargets.userIds),
-                  usernames: new Set(rawTargets.usernames),
-                };
-              }
-            } catch {
-              // Si también falla, mantenemos objetivos vacíos.
-            }
+            // Si falla, se muestra el feed vacío
           }
         }
 
-        setFollowTargets(serverFollowTargets);
-
-        await loadFeed({
-          signal: controller.signal,
-          userId,
-          username,
-          followedTargets: serverFollowTargets,
-          silent: false,
-        });
+        setFollowedUserIds(userIds);
+        await loadFeed({ signal: controller.signal, userIds });
       } catch (err) {
         if (!controller.signal.aborted) {
           setFeed([]);
-          setError(
-            err instanceof Error
-              ? err.message
-              : "No se pudo cargar el feed de comunidad."
-          );
+          setError(err instanceof Error ? err.message : "No se pudo cargar el feed de comunidad.");
           setLoading(false);
         }
       }
@@ -920,22 +707,12 @@ export default function CommunityPage() {
   useEffect(() => {
     if (loading) return;
 
-    const refresh = () => {
-      void loadFeed({
-        userId: currentUserId,
-        username: currentUsername,
-        followedTargets: followTargets,
-        silent: true,
-      });
-    };
+    const refresh = () => void loadFeed({ userIds: followedUserIds, silent: true });
 
-    const intervalId = window.setInterval(refresh, 30000);
-
+    const intervalId = window.setInterval(refresh, 30_000);
     const handleFocus = () => refresh();
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        refresh();
-      }
+      if (document.visibilityState === "visible") refresh();
     };
 
     window.addEventListener("focus", handleFocus);
@@ -946,27 +723,37 @@ export default function CommunityPage() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [
-    currentUserId,
-    currentUsername,
-    followTargets,
-    loadFeed,
-    loading,
-  ]);
+  }, [loading, loadFeed, followedUserIds]);
 
   const refreshFeedSilently = useCallback(async () => {
-    await loadFeed({
-      userId: currentUserId,
-      username: currentUsername,
-      followedTargets: followTargets,
-      silent: true,
-    });
-  }, [
-    currentUserId,
-    currentUsername,
-    followTargets,
-    loadFeed,
-  ]);
+    await loadFeed({ userIds: followedUserIds, silent: true });
+  }, [loadFeed, followedUserIds]);
+
+  const loadMoreFeed = useCallback(async () => {
+    const nextPage = currentPage + 1;
+    if (nextPage > totalPages || !followedUserIds.length) return;
+    setLoadingMore(true);
+    try {
+      const payload = await getCommunityFeed({
+        page: nextPage,
+        pageSize: COMMUNITY_PAGE_SIZE,
+        userIds: followedUserIds,
+      });
+      const activities = Array.isArray(payload?.actividades) ? payload.actividades : [];
+      const mapped = activities.map(mapActivityToPost);
+      const hydrated = await hydrateAvatars(mapped);
+      setFeed((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        return [...prev, ...hydrated.filter((p) => !existingIds.has(p.id))];
+      });
+      setCurrentPage(nextPage);
+      setTotalPages(Number(payload?.pagination?.pages ?? totalPages));
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "No se pudo cargar más actividad.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentPage, totalPages, followedUserIds]);
 
   const openPostDetail = useCallback(
     async (post: CommunityPost) => {
@@ -1478,6 +1265,19 @@ export default function CommunityPage() {
               );
             })}
           </section>
+
+          {currentPage < totalPages && rows.length > 0 ? (
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => void loadMoreFeed()}
+                disabled={loadingMore}
+                className="rounded-full border border-violet-300 bg-white px-6 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loadingMore ? "Cargando..." : "Cargar más"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </main>
 
