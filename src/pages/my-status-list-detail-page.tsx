@@ -127,7 +127,7 @@ export default function MyStatusListDetailPage() {
             ? await getListsByUser(targetUserId)
             : await getMyListsWithFallback();
 
-        const targetListIdsByCategory = new Map<CategoryKey, number[]>();
+        const targetListIdByCategory = new Map<CategoryKey, number>();
 
         for (const list of lists) {
           const listName = String(list.nombre ?? "");
@@ -138,18 +138,17 @@ export default function MyStatusListDetailPage() {
           if (!category) continue;
           const listId = Number(list.listaId);
           if (!Number.isFinite(listId) || listId <= 0) continue;
-          const current = targetListIdsByCategory.get(category) ?? [];
-          if (!current.includes(listId)) {
-            current.push(listId);
+          const current = targetListIdByCategory.get(category);
+          if (current == null || listId < current) {
+            targetListIdByCategory.set(category, listId);
           }
-          targetListIdsByCategory.set(category, current);
         }
 
         const nextSections: StatusCategorySection[] = [];
 
         for (const category of CATEGORY_ORDER) {
-          const listIds = targetListIdsByCategory.get(category) ?? [];
-          if (!listIds.length) {
+          const listId = targetListIdByCategory.get(category);
+          if (listId == null) {
             nextSections.push({ category, items: [] });
             continue;
           }
@@ -157,18 +156,16 @@ export default function MyStatusListDetailPage() {
           try {
             const dedupe = new Map<number, BackendContenidoListado & { tipo: string }>();
 
-            for (const listId of listIds) {
-              const data = await getListContents(listId);
-              const rawItems = Array.isArray(data?.contenidos) ? data.contenidos : [];
-              for (const raw of rawItems) {
-                const id = Number(raw.id);
-                if (!Number.isFinite(id) || id <= 0) continue;
-                if (dedupe.has(id)) continue;
-                dedupe.set(id, {
-                  ...raw,
-                  tipo: String(raw.tipo ?? category),
-                });
-              }
+            const data = await getListContents(listId);
+            const rawItems = Array.isArray(data?.contenidos) ? data.contenidos : [];
+            for (const raw of rawItems) {
+              const id = Number(raw.id);
+              if (!Number.isFinite(id) || id <= 0) continue;
+              if (dedupe.has(id)) continue;
+              dedupe.set(id, {
+                ...raw,
+                tipo: String(raw.tipo ?? category),
+              });
             }
 
             nextSections.push({

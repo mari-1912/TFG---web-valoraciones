@@ -751,11 +751,11 @@ export function Header() {
                 className="hover:bg-[hsl(var(--color-primary-soft))] text-white"
               >
                 <Link
-                  to="/listas/nuestras-listas"
+                  to="/listas/listas-opinify"
                   onClick={onNavigate}
                   className="block px-3 py-2 text-sm hover:bg-[hsl(var(--color-primary-soft))] text-white"
                 >
-                  Nuestras Listas
+                  Listas Opinify
                 </Link>
               </NavigationMenuLink>
             </li>

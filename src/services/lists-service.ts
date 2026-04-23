@@ -186,6 +186,37 @@ function parseListsPayload(payload: unknown): BackendLista[] {
   return [...deduped.values()];
 }
 
+function parsePaginationInfo(payload: unknown): {
+  page: number;
+  pages: number;
+  pageSize: number | null;
+} | null {
+  if (!isRecord(payload)) return null;
+  const root = payload as Record<string, unknown>;
+  const pagination = isRecord(root.pagination)
+    ? (root.pagination as Record<string, unknown>)
+    : root;
+
+  const page = pickPositiveNumber(pagination.page, root.page);
+  const pages = pickPositiveNumber(
+    pagination.pages,
+    pagination.totalPages,
+    pagination.total_pages,
+    root.pages,
+    root.totalPages,
+    root.total_pages
+  );
+  const pageSize = pickPositiveNumber(
+    pagination.pageSize,
+    pagination.page_size,
+    root.pageSize,
+    root.page_size
+  );
+
+  if (page == null || pages == null || pages <= 1) return null;
+  return { page, pages, pageSize };
+}
+
 function normalizeBackendContent(
   raw: unknown,
   fallbackType?: string
@@ -582,8 +613,46 @@ export async function getMyListsWithFallback(): Promise<BackendLista[]> {
  * -> { listas: BackendLista[] }
  */
 export async function getListsByUser(userId: number): Promise<BackendLista[]> {
-  const data = await apiGet<unknown>(`/listas/usuario/${userId}`);
-  return parseListsPayload(data);
+  const basePath = `/listas/usuario/${userId}`;
+  const candidatePaths = [`${basePath}?usePagination=false`, basePath];
+  let bestResult: BackendLista[] = [];
+  let lastError: unknown = null;
+
+  for (const path of candidatePaths) {
+    try {
+      const firstPayload = await apiGet<unknown>(path);
+      const merged = new Map<number, BackendLista>();
+      for (const list of parseListsPayload(firstPayload)) {
+        merged.set(list.listaId, list);
+      }
+
+      const pagination = parsePaginationInfo(firstPayload);
+      if (pagination != null) {
+        for (let page = 2; page <= pagination.pages; page++) {
+          const separator = path.includes("?") ? "&" : "?";
+          const pageSizeQuery =
+            pagination.pageSize != null ? `&pageSize=${pagination.pageSize}` : "";
+          const pagePath = `${path}${separator}page=${page}${pageSizeQuery}`;
+          const pagePayload = await apiGet<unknown>(pagePath);
+          const pageLists = parseListsPayload(pagePayload);
+          for (const list of pageLists) {
+            merged.set(list.listaId, list);
+          }
+        }
+      }
+
+      const currentResult = [...merged.values()];
+      if (currentResult.length > bestResult.length) {
+        bestResult = currentResult;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (bestResult.length > 0) return bestResult;
+  if (lastError) throw lastError;
+  return [];
 }
 
 /**

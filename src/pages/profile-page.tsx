@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ListCard, type Lista } from "@/components/lists/list-card";
 import Footer from "@/components/sections/footer";
-import { ProfileHero, type QuickStat } from "@/components/profile/profile-hero";
+import {
+  ProfileHero,
+  type CommentPreviewItem,
+  type CommentsPreviewDropdown,
+  type QuickStat,
+  type SocialConnectionsDropdown,
+  type SocialConnectionsPanel,
+} from "@/components/profile/profile-hero";
 import { ProfileStatsSection } from "@/components/profile/profile-stats-section";
 import { ProfileTimeline } from "@/components/profile/profile-timeline";
 import { StatusCardsSection, type StatusCardGroup } from "@/components/status/status-cards-section";
@@ -19,6 +26,8 @@ import {
 import {
   fetchAllUserFollowerIds,
   fetchMyProfile,
+  fetchUserFollowersPage,
+  fetchUserFollowingPage,
   fetchUserProfile,
   removeProfileImage,
   removeProfileCover,
@@ -27,6 +36,8 @@ import {
   uploadProfileCover,
 } from "@/services/profile-service";
 import { getMe } from "@/services/auth-service";
+import { getCommunityFeed, type CommunityActivity } from "@/services/apiCommunity";
+import { listContentComments, type ListCommentsPayload } from "@/services/content-comments";
 import { getListContents } from "@/services/lists-service";
 import { resolveBaseLists } from "@/services/listas/my-lists";
 import {
@@ -46,6 +57,333 @@ function parseUserId(value: unknown): number | null {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
+}
+
+function pickString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function normalizeVisibility(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function isPublicVisibility(value: unknown) {
+  const normalized = normalizeVisibility(value);
+  return normalized === "publica" || normalized === "public";
+}
+
+function formatRelativeDate(value?: string) {
+  if (typeof value !== "string" || !value.trim()) return "hace poco";
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return value;
+  const diffMs = Date.now() - parsed;
+  if (diffMs < 60 * 1000) return "ahora";
+  if (diffMs < 60 * 60 * 1000) return "hace unos minutos";
+  const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+  if (diffHours < 24) return `hace ${diffHours} h`;
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (diffDays < 7) return `hace ${diffDays} días`;
+  return new Date(parsed).toLocaleDateString("es-ES");
+}
+
+function parseDateMs(value?: string) {
+  if (typeof value !== "string" || !value.trim()) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function pickNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function extractRowUserId(row: any): number | null {
+  if (!row || typeof row !== "object") return null;
+  return parseUserId(
+    row?.userId ??
+      row?.user_id ??
+      row?.usuarioId ??
+      row?.usuario_id ??
+      row?.usuario?.userId ??
+      row?.usuario?.user_id ??
+      row?.usuario?.id ??
+      row?.metadata?.userId ??
+      row?.metadata?.usuarioId ??
+      row?.metadata?.usuario?.userId
+  );
+}
+
+function extractRowUsername(row: any): string {
+  if (!row || typeof row !== "object") return "";
+  return pickString(
+    row?.username,
+    row?.user?.username,
+    row?.usuario?.username,
+    row?.author?.username,
+    row?.autor?.username,
+    row?.metadata?.username,
+    row?.metadata?.user?.username,
+    row?.metadata?.usuario?.username,
+    row?.metadata?.author?.username,
+    row?.metadata?.autor?.username
+  );
+}
+
+function extractRowContentId(row: any): number | null {
+  if (!row || typeof row !== "object") return null;
+  return pickNumber(
+    row?.contenidoId,
+    row?.contentId,
+    row?.idContenido,
+    row?.contenido?.id,
+    row?.content?.id,
+    row?.metadata?.contenidoId,
+    row?.metadata?.contentId,
+    row?.metadata?.idContenido,
+    row?.metadata?.contenido?.id,
+    row?.metadata?.content?.id,
+    row?.metadata?.comment?.contenidoId,
+    row?.metadata?.comment?.contentId,
+    row?.metadata?.comentario?.contenidoId,
+    row?.metadata?.comentario?.contentId,
+    row?.metadata?.reply?.contenidoId,
+    row?.metadata?.reply?.contentId
+  );
+}
+
+function collectRowsFromProfilePayload(payload: any): any[] {
+  const root = payload ?? {};
+  const perfil = root?.perfil ?? {};
+  const candidates = [
+    root?.actividad,
+    root?.actividadReciente,
+    root?.timeline,
+    root?.estados,
+    root?.statuses,
+    root?.contenidosEstado,
+    perfil?.actividad,
+    perfil?.actividadReciente,
+    perfil?.timeline,
+    perfil?.estados,
+    perfil?.statuses,
+    perfil?.contenidosEstado,
+  ];
+  return candidates.flatMap((candidate) => (Array.isArray(candidate) ? candidate : []));
+}
+
+function collectProfilePayloadContentIds(
+  payload: any,
+  targetUserId: number | null,
+  targetUsernameNormalized: string
+): number[] {
+  const ids = new Set<number>();
+  const rows = collectRowsFromProfilePayload(payload);
+  for (const row of rows) {
+    const rowUserId = extractRowUserId(row);
+    const rowUsernameNormalized = normalizeIdentity(extractRowUsername(row));
+    const matchesTarget =
+      (targetUserId != null && rowUserId != null && rowUserId === targetUserId) ||
+      (targetUsernameNormalized.length > 0 &&
+        rowUsernameNormalized === targetUsernameNormalized) ||
+      (targetUserId != null && rowUserId == null && targetUsernameNormalized.length === 0);
+    if (!matchesTarget) {
+      continue;
+    }
+    const contentId = extractRowContentId(row);
+    if (contentId != null) ids.add(contentId);
+  }
+  return [...ids];
+}
+
+function normalizeIdentity(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeCommentPreviewFromActivity(
+  row: CommunityActivity,
+  index: number
+): CommentPreviewItem | null {
+  const metadata = (row.metadata ?? {}) as Record<string, any>;
+  const message = pickString(
+    row.textoComentario,
+    metadata?.textoComentario,
+    metadata?.comment?.mensaje,
+    metadata?.comentario?.mensaje,
+    metadata?.mensaje,
+    metadata?.texto
+  );
+  const titleSuffix = pickString(
+    row.tituloContenido,
+    metadata?.tituloContenido,
+    metadata?.content?.title,
+    metadata?.content?.titulo
+  );
+  const rawType = pickString(row.tipo, metadata?.tipo).toLowerCase();
+  const isReply =
+    rawType.includes("reply") ||
+    rawType.includes("respuest") ||
+    metadata?.parentId != null ||
+    metadata?.parent_id != null;
+  const isCommentType =
+    rawType.includes("comment") ||
+    rawType.includes("coment") ||
+    isReply ||
+    Boolean(message);
+  if (!isCommentType) return null;
+
+  const title = isReply
+    ? `Respondiste${titleSuffix ? ` en ${titleSuffix}` : ""}`
+    : `Comentaste${titleSuffix ? ` en ${titleSuffix}` : ""}`;
+
+  return {
+    id: String(row.actividadId ?? `activity-comment-${index}`),
+    title,
+    detail: message || undefined,
+    date: formatRelativeDate(row.createDate),
+  };
+}
+
+type TimedCommentPreviewItem = CommentPreviewItem & { __time: number };
+
+function extractUserCommentsFromContentPayload(
+  payload: ListCommentsPayload,
+  targetUserId: number,
+  contentId: number,
+  contentTitleById: Map<number, string>,
+  targetUsernameNormalized: string
+): TimedCommentPreviewItem[] {
+  const rows = Array.isArray(payload?.comentarios)
+    ? payload.comentarios
+    : Array.isArray((payload as { comments?: unknown[] })?.comments)
+      ? (((payload as { comments?: unknown[] }).comments ?? []) as Array<
+          Record<string, unknown>
+        >)
+      : [];
+  const items: TimedCommentPreviewItem[] = [];
+  const contentTitle = contentTitleById.get(contentId) ?? `contenido ${contentId}`;
+
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const row = node as Record<string, any>;
+    const userId = Number(
+      row?.userId ??
+        row?.usuario?.userId ??
+        row?.usuario?.id ??
+        row?.user?.userId ??
+        row?.user?.id ??
+        row?.author?.userId ??
+        row?.author?.id ??
+        row?.autor?.userId ??
+        row?.autor?.id ??
+        row?.usuarioId ??
+        row?.usuario_id ??
+        row?.idUsuario ??
+        row?.id_usuario ??
+        0
+    );
+    const rowUsernameNormalized = normalizeIdentity(
+      row?.username ??
+        row?.usuario?.username ??
+        row?.user?.username ??
+        row?.author?.username ??
+        row?.autor?.username ??
+        row?.nombreUsuario ??
+        row?.nombre_usuario
+    );
+    const matchesUser =
+      (Number.isFinite(userId) && userId === targetUserId) ||
+      (targetUsernameNormalized.length > 0 &&
+        rowUsernameNormalized === targetUsernameNormalized);
+    const commentId = Number(row?.commentId ?? row?.id ?? row?.comentarioId ?? 0);
+    const createdAt = pickString(
+      row?.createDate,
+      row?.createdAt,
+      row?.fecha,
+      row?.updateDate
+    );
+    const message = pickString(
+      row?.mensaje,
+      row?.textoComentario,
+      row?.comment,
+      row?.texto
+    );
+    const parentId = Number(row?.parentId ?? row?.parent_id ?? 0);
+    const isReply = Number.isFinite(parentId) && parentId > 0;
+
+    if (matchesUser) {
+      items.push({
+        id:
+          Number.isFinite(commentId) && commentId > 0
+            ? `comment-${commentId}`
+            : `content-${contentId}-${items.length}`,
+        title: isReply
+          ? `Respondiste en ${contentTitle}`
+          : `Comentaste en ${contentTitle}`,
+        detail: message || undefined,
+        date: formatRelativeDate(createdAt || undefined),
+        __time: parseDateMs(createdAt || undefined),
+      });
+    }
+
+    const replies = Array.isArray(row?.respuestas)
+      ? row.respuestas
+      : Array.isArray(row?.replies)
+        ? row.replies
+        : Array.isArray(row?.children)
+          ? row.children
+          : [];
+    for (const reply of replies) walk(reply);
+  };
+
+  for (const row of rows) walk(row);
+  return items;
+}
+
+async function fetchAllCommentPagesForContent(
+  contentId: number
+): Promise<ListCommentsPayload[]> {
+  const pages: ListCommentsPayload[] = [];
+
+  // Primera llamada sin query de paginación: algunos backends devuelven mejor así.
+  const firstPage = await listContentComments(contentId, { paginate: false });
+  pages.push(firstPage);
+
+  const totalPages = Number(firstPage?.pagination?.pages ?? 1);
+  const pageSize = Number(firstPage?.pagination?.pageSize ?? 10);
+  if (!Number.isFinite(totalPages) || totalPages <= 1) return pages;
+
+  const maxPages = Math.min(totalPages, 20);
+  for (let page = 2; page <= maxPages; page += 1) {
+    try {
+      const payload = await listContentComments(contentId, {
+        page,
+        pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 10,
+      });
+      pages.push(payload);
+    } catch {
+      // Si una página falla, devolvemos lo recopilado hasta ahora.
+      break;
+    }
+  }
+
+  return pages;
 }
 
 function parseFollowerIdsFromPayload(payload: any): number[] {
@@ -113,12 +451,31 @@ function parseFollowerIdsFromPayload(payload: any): number[] {
   return [...ids];
 }
 
+function dedupeConnectionUsers(
+  users: SocialConnectionsPanel["users"]
+): SocialConnectionsPanel["users"] {
+  const byUserId = new Map<number, SocialConnectionsPanel["users"][number]>();
+  for (const user of users) {
+    byUserId.set(user.userId, user);
+  }
+  return [...byUserId.values()];
+}
+
 type CompletedCounts = Record<CategoryKey, number>;
 type StatusCounts = Record<StatusKey, number>;
 
 type ProfileListsSummary = {
   statusCounts: StatusCounts;
   visibleCustomLists: Lista[];
+  candidateContentIds: number[];
+};
+
+type SocialListTarget = "following" | "followers";
+
+type SocialListState = SocialConnectionsPanel & {
+  page: number;
+  pages: number;
+  pageSize: number;
 };
 
 const EMPTY_COMPLETED_COUNTS: CompletedCounts = {
@@ -138,6 +495,20 @@ const EMPTY_STATUS_COUNTS: StatusCounts = {
 const EMPTY_PROFILE_LISTS_SUMMARY: ProfileListsSummary = {
   statusCounts: { ...EMPTY_STATUS_COUNTS },
   visibleCustomLists: [],
+  candidateContentIds: [],
+};
+
+const EMPTY_SOCIAL_LIST_STATE: SocialListState = {
+  users: [],
+  total: 0,
+  loaded: false,
+  loading: false,
+  loadingMore: false,
+  hasMore: false,
+  error: null,
+  page: 0,
+  pages: 1,
+  pageSize: 20,
 };
 
 async function loadCompletedCountsForProfile(
@@ -215,14 +586,19 @@ async function loadProfileListsSummary(
     completed: [],
     dropped: [],
   };
+  const listIdsForCommentCandidates: number[] = [];
   const visibleCustomLists: Lista[] = [];
 
   for (const list of baseLists) {
     const status = parseManagedStatus(String(list.nombre ?? ""), list.descripcion);
     const category = normalizeCategory(list.tipoContenidos);
     const listId = Number(list.listaId);
-    const visibility = String(list.visibilidad ?? "").trim().toLowerCase();
-    const isPublic = visibility === "publica";
+    const isPublic = isPublicVisibility(list.visibilidad);
+    const shouldShow = isOwnProfile || isPublic;
+
+    if (Number.isFinite(listId) && listId > 0 && shouldShow) {
+      listIdsForCommentCandidates.push(listId);
+    }
 
     if (status && category && Number.isFinite(listId) && listId > 0) {
       const shouldIncludeManaged = isOwnProfile || isPublic;
@@ -232,7 +608,6 @@ async function loadProfileListsSummary(
       continue;
     }
 
-    const shouldShow = isOwnProfile || isPublic;
     if (shouldShow) {
       visibleCustomLists.push(list as unknown as Lista);
     }
@@ -285,9 +660,19 @@ async function loadProfileListsSummary(
     })
   );
 
+  const candidateContentIds = new Set<number>();
+  const uniqueCandidateListIds = [...new Set(listIdsForCommentCandidates)];
+  const candidateListsContent = await Promise.all(
+    uniqueCandidateListIds.map((listId) => readContentIdsFromList(listId))
+  );
+  for (const contentIds of candidateListsContent) {
+    for (const contentId of contentIds) candidateContentIds.add(contentId);
+  }
+
   return {
     statusCounts,
     visibleCustomLists,
+    candidateContentIds: [...candidateContentIds],
   };
 }
 
@@ -329,6 +714,9 @@ export default function ProfilePage() {
   const [statusProgressCounts, setStatusProgressCounts] =
     useState<StatusCounts>(EMPTY_STATUS_COUNTS);
   const [visibleProfileLists, setVisibleProfileLists] = useState<Lista[]>([]);
+  const [commentCandidateContentIds, setCommentCandidateContentIds] = useState<
+    number[]
+  >([]);
   const [timelineRecords, setTimelineRecords] = useState<TimelineRecord[]>([]);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -339,9 +727,29 @@ export default function ProfilePage() {
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [openSocialTarget, setOpenSocialTarget] =
+    useState<SocialListTarget | null>(null);
+  const [commentsPreviewOpen, setCommentsPreviewOpen] = useState(false);
+  const [commentsActivityPreviewItems, setCommentsActivityPreviewItems] =
+    useState<CommentPreviewItem[]>([]);
+  const [commentsPreviewLoading, setCommentsPreviewLoading] = useState(false);
+  const [commentsPreviewLoaded, setCommentsPreviewLoaded] = useState(false);
+  const [commentsPreviewError, setCommentsPreviewError] = useState<string | null>(
+    null
+  );
+  const [followersList, setFollowersList] =
+    useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
+  const [followingList, setFollowingList] =
+    useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
+  const profileUserIdRef = useRef<number | null>(null);
+  const commentsPreviewRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    profileUserIdRef.current = profileUserId;
+  }, [profileUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -470,6 +878,17 @@ export default function ProfilePage() {
         if (controller.signal.aborted) return;
         setStatusProgressCounts(listsSummary.statusCounts);
         setVisibleProfileLists(listsSummary.visibleCustomLists);
+        const payloadDerivedContentIds = collectProfilePayloadContentIds(
+          data,
+          resolvedProfileUserId,
+          normalizeIdentity(perfil.username ?? username)
+        );
+        setCommentCandidateContentIds([
+          ...new Set([
+            ...listsSummary.candidateContentIds,
+            ...payloadDerivedContentIds,
+          ]),
+        ]);
 
         const backendTimelineRecords = buildTimelineFromPayload(data);
         setTimelineRecords(mergeTimelineRecords(backendTimelineRecords));
@@ -484,6 +903,7 @@ export default function ProfilePage() {
         );
         setStatusProgressCounts(EMPTY_STATUS_COUNTS);
         setVisibleProfileLists([]);
+        setCommentCandidateContentIds([]);
         setTimelineRecords([]);
       } finally {
         if (!controller.signal.aborted) {
@@ -537,11 +957,338 @@ export default function ProfilePage() {
   const displayName = useMemo(() => username || "Usuario", [username]);
   const displayRole = useMemo(() => role || "base", [role]);
 
+  useEffect(() => {
+    setOpenSocialTarget(null);
+    setCommentsPreviewOpen(false);
+    setCommentsActivityPreviewItems([]);
+    setCommentsPreviewError(null);
+    setCommentsPreviewLoading(false);
+    setCommentsPreviewLoaded(false);
+    setCommentCandidateContentIds([]);
+    setFollowersList(EMPTY_SOCIAL_LIST_STATE);
+    setFollowingList(EMPTY_SOCIAL_LIST_STATE);
+    commentsPreviewRequestIdRef.current += 1;
+  }, [profileUserId]);
+
+  const loadSocialConnections = async (
+    target: SocialListTarget,
+    options?: { page?: number; append?: boolean }
+  ) => {
+    const targetUserId = profileUserIdRef.current;
+    if (targetUserId == null) return;
+
+    const page = Number(options?.page ?? 1);
+    const append = options?.append === true;
+    const setListState =
+      target === "followers" ? setFollowersList : setFollowingList;
+
+    setListState((prev) => ({
+      ...prev,
+      error: null,
+      loading: append ? prev.loading : true,
+      loadingMore: append,
+    }));
+
+    try {
+      const result =
+        target === "followers"
+          ? await fetchUserFollowersPage(targetUserId, { page, pageSize: 20 })
+          : await fetchUserFollowingPage(targetUserId, { page, pageSize: 20 });
+
+      if (profileUserIdRef.current !== targetUserId) return;
+
+      setListState((prev) => {
+        const users = append
+          ? dedupeConnectionUsers([...prev.users, ...result.users])
+          : dedupeConnectionUsers(result.users);
+        return {
+          ...prev,
+          users,
+          total: result.total,
+          loaded: true,
+          loading: false,
+          loadingMore: false,
+          hasMore: result.page < result.pages,
+          page: result.page,
+          pages: result.pages,
+          pageSize: result.pageSize,
+          error: null,
+        };
+      });
+    } catch (error) {
+      if (profileUserIdRef.current !== targetUserId) return;
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los usuarios.";
+      setListState((prev) => ({
+        ...prev,
+        loading: false,
+        loadingMore: false,
+        error: message,
+      }));
+    }
+  };
+
+  const handleSocialDropdownOpenChange = (
+    target: SocialListTarget,
+    open: boolean
+  ) => {
+    if (!open) {
+      setOpenSocialTarget((current) => (current === target ? null : current));
+      return;
+    }
+
+    setCommentsPreviewOpen(false);
+    setOpenSocialTarget(target);
+    const currentList = target === "followers" ? followersList : followingList;
+    if (!currentList.loaded && !currentList.loading) {
+      void loadSocialConnections(target, { page: 1, append: false });
+    }
+  };
+
+  const handleSocialConnectionsLoadMore = (target: SocialListTarget) => {
+    const currentList = target === "followers" ? followersList : followingList;
+    if (currentList.loading || currentList.loadingMore || !currentList.hasMore) {
+      return;
+    }
+    void loadSocialConnections(target, {
+      page: currentList.page + 1,
+      append: true,
+    });
+  };
+
+  const handleSocialConnectionsRetry = (target: SocialListTarget) => {
+    void loadSocialConnections(target, { page: 1, append: false });
+  };
+
+  const socialConnectionsDropdown: SocialConnectionsDropdown = {
+    active: openSocialTarget,
+    followers: followersList,
+    following: followingList,
+    onOpenChange: handleSocialDropdownOpenChange,
+    onLoadMore: handleSocialConnectionsLoadMore,
+    onRetry: handleSocialConnectionsRetry,
+  };
+
   const quickStats: QuickStat[] = [
-    { label: "Siguiendo", value: followingCount },
-    { label: "Seguidores", value: followersCount },
-    { label: "Comentarios", value: commentsCount },
+    { id: "following", label: "Seguidos", value: followingCount },
+    { id: "followers", label: "Seguidores", value: followersCount },
+    ...(isOwnProfile
+      ? ([{ id: "comments", label: "Comentarios", value: commentsCount }] as const)
+      : []),
   ];
+
+  const timelineCommentPreviewItems = useMemo<CommentPreviewItem[]>(
+    () =>
+      timelineRecords
+        .filter((record) => record.type === "comment")
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10)
+        .map((record, index) => {
+          const title = record.title?.trim() || "Comentaste";
+          const detail = record.detail?.trim();
+          return {
+            id: `${record.id}-${index}`,
+            title,
+            detail: detail && detail !== title ? detail : undefined,
+            date: record.date,
+          };
+        }),
+    [timelineRecords]
+  );
+
+  const commentPreviewItems = useMemo<CommentPreviewItem[]>(() => {
+    const merged = new Map<string, CommentPreviewItem>();
+    for (const item of timelineCommentPreviewItems) {
+      if (!merged.has(item.id)) merged.set(item.id, item);
+    }
+    for (const item of commentsActivityPreviewItems) {
+      if (!merged.has(item.id)) merged.set(item.id, item);
+    }
+    return [...merged.values()].slice(0, 10);
+  }, [timelineCommentPreviewItems, commentsActivityPreviewItems]);
+
+  const loadCommentsPreview = async () => {
+    const targetUserId = profileUserIdRef.current;
+    if (targetUserId == null || commentsCount <= 0) return;
+    const targetUsernameNormalized = normalizeIdentity(username);
+
+    const requestId = commentsPreviewRequestIdRef.current + 1;
+    commentsPreviewRequestIdRef.current = requestId;
+    setCommentsPreviewLoading(true);
+    setCommentsPreviewError(null);
+
+    try {
+      const maxPreviewItems = 10;
+      const fallbackItems: TimedCommentPreviewItem[] = [];
+      const contentTitleById = new Map<number, string>();
+      const endpointItems: TimedCommentPreviewItem[] = [];
+      const scannedContentIds = new Set<number>();
+      const candidateFromLists = [...new Set(commentCandidateContentIds)].slice(0, 30);
+
+      for (const contentId of candidateFromLists) {
+        if (commentsPreviewRequestIdRef.current !== requestId) return;
+        scannedContentIds.add(contentId);
+        try {
+          const payloads = await fetchAllCommentPagesForContent(contentId);
+          for (const payload of payloads) {
+            const extracted = extractUserCommentsFromContentPayload(
+              payload,
+              targetUserId,
+              contentId,
+              contentTitleById,
+              targetUsernameNormalized
+            );
+            if (extracted.length) endpointItems.push(...extracted);
+            if (endpointItems.length >= maxPreviewItems) break;
+          }
+          if (endpointItems.length >= maxPreviewItems) break;
+        } catch {
+          // Ignoramos fallos puntuales para seguir explorando.
+        }
+      }
+
+      if (endpointItems.length < maxPreviewItems) {
+        const candidateFromActivity = new Set<number>();
+        let page = 1;
+        let guard = 0;
+        const MAX_ACTIVITY_PAGES = 30;
+        let reachedEnd = false;
+
+        while (!reachedEnd && guard < MAX_ACTIVITY_PAGES) {
+          if (commentsPreviewRequestIdRef.current !== requestId) return;
+          const payload = await getCommunityFeed({ page, pageSize: 50 });
+          const rows = Array.isArray(payload?.actividades) ? payload.actividades : [];
+          if (rows.length === 0) break;
+          for (const row of rows) {
+            const rowUserId = extractRowUserId(row);
+            const rowUsernameNormalized = normalizeIdentity(extractRowUsername(row));
+            const rowBelongsToTarget =
+              (rowUserId != null && rowUserId === targetUserId) ||
+              (targetUsernameNormalized.length > 0 &&
+                rowUsernameNormalized === targetUsernameNormalized);
+            if (!rowBelongsToTarget) continue;
+
+            const metadata = (row?.metadata ?? {}) as Record<string, any>;
+            const contentId = extractRowContentId(row);
+            if (
+              contentId != null &&
+              !scannedContentIds.has(contentId)
+            ) {
+              candidateFromActivity.add(contentId);
+              const title = pickString(
+                row?.tituloContenido,
+                metadata?.tituloContenido,
+                metadata?.content?.title,
+                metadata?.content?.titulo
+              );
+              if (title && !contentTitleById.has(contentId)) {
+                contentTitleById.set(contentId, title);
+              }
+            }
+
+            const normalized = normalizeCommentPreviewFromActivity(
+              row,
+              fallbackItems.length
+            );
+            if (!normalized) continue;
+            fallbackItems.push({
+              ...normalized,
+              id: `activity-${normalized.id}`,
+              __time: parseDateMs(row.createDate),
+            });
+          }
+
+          const payloadPages = Number(payload?.pagination?.pages ?? 0);
+          const hasValidPages = Number.isFinite(payloadPages) && payloadPages > 0;
+          if (hasValidPages && page >= payloadPages) {
+            reachedEnd = true;
+          }
+          if (!hasValidPages && rows.length < 50) {
+            reachedEnd = true;
+          }
+          if (candidateFromActivity.size >= 30) {
+            reachedEnd = true;
+          }
+          page += 1;
+          guard += 1;
+        }
+
+        const candidateIds = [...candidateFromActivity].slice(0, 30);
+        for (const contentId of candidateIds) {
+          if (commentsPreviewRequestIdRef.current !== requestId) return;
+          scannedContentIds.add(contentId);
+          try {
+            const payloads = await fetchAllCommentPagesForContent(contentId);
+            for (const payload of payloads) {
+              const extracted = extractUserCommentsFromContentPayload(
+                payload,
+                targetUserId,
+                contentId,
+                contentTitleById,
+                targetUsernameNormalized
+              );
+              if (extracted.length) endpointItems.push(...extracted);
+              if (endpointItems.length >= maxPreviewItems) break;
+            }
+            if (endpointItems.length >= maxPreviewItems) break;
+          } catch {
+            // Ignoramos fallos puntuales para seguir explorando.
+          }
+        }
+      }
+
+      if (commentsPreviewRequestIdRef.current !== requestId) return;
+
+      const sourceItems = endpointItems.length > 0 ? endpointItems : fallbackItems;
+      const deduped = new Map<string, TimedCommentPreviewItem>();
+      for (const item of sourceItems) deduped.set(item.id, item);
+      const sorted = [...deduped.values()]
+        .sort((a, b) => b.__time - a.__time)
+        .slice(0, maxPreviewItems)
+        .map(({ __time: _time, ...item }) => item);
+
+      setCommentsActivityPreviewItems(sorted);
+      setCommentsPreviewError(null);
+    } catch (error) {
+      if (commentsPreviewRequestIdRef.current !== requestId) return;
+      setCommentsPreviewError(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los comentarios."
+      );
+    } finally {
+      if (commentsPreviewRequestIdRef.current === requestId) {
+        setCommentsPreviewLoading(false);
+        setCommentsPreviewLoaded(true);
+      }
+    }
+  };
+
+  const commentsPreviewDropdown: CommentsPreviewDropdown = {
+    open: commentsPreviewOpen,
+    total: commentsCount,
+    items: commentPreviewItems,
+    loading: commentsPreviewLoading,
+    error: commentsPreviewError,
+    onRetry: () => {
+      void loadCommentsPreview();
+    },
+    onOpenChange: (open) => {
+      setCommentsPreviewOpen(open);
+      if (open) {
+        setOpenSocialTarget(null);
+        const needsFallback =
+          commentsCount > commentPreviewItems.length &&
+          !commentsPreviewLoading &&
+          !commentsPreviewLoaded;
+        if (needsFallback) {
+          void loadCommentsPreview();
+        }
+      }
+    },
+  };
 
   const timelineSourceRecords = useMemo(
     () =>
@@ -889,6 +1636,8 @@ export default function ProfilePage() {
         followDisabled={!isLoggedIn || currentUserId == null || followUpdating}
         onToggleFollow={handleToggleFollow}
         followMessage={followMessage}
+        socialConnections={socialConnectionsDropdown}
+        commentsPreview={isOwnProfile ? commentsPreviewDropdown : undefined}
         avatarInputRef={fileInputRef}
         coverInputRef={coverFileInputRef}
         onAvatarChange={handleAvatarChange}
@@ -941,7 +1690,7 @@ export default function ProfilePage() {
                     >
                       <ListCard
                         lista={lista}
-                        basePath={isOwnProfile ? "/listas/mis-listas" : "/listas/nuestras-listas"}
+                        basePath={isOwnProfile ? "/listas/mis-listas" : "/listas/listas-opinify"}
                       />
                     </div>
                   ))}

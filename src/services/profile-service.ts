@@ -510,9 +510,20 @@ export type UserFollower = {
   avatarUrl?: string | null;
 };
 
+export type UserConnection = {
+  userId: number;
+  username: string;
+  tipo?: string;
+  reputacion?: number;
+  avatarPath?: string | null;
+  avatarUrl?: string | null;
+};
+
 export type UserFollowersResponse = {
   seguidores?: UserFollower[];
   followers?: UserFollower[];
+  siguiendo?: UserFollower[];
+  following?: UserFollower[];
   pagination?: {
     page?: number;
     pageSize?: number;
@@ -520,6 +531,104 @@ export type UserFollowersResponse = {
     pages?: number;
   };
 };
+
+export type UserConnectionsPage = {
+  users: UserConnection[];
+  total: number;
+  page: number;
+  pages: number;
+  pageSize: number;
+};
+
+function normalizeConnectionUser(entry: unknown): UserConnection | null {
+  if (!entry || typeof entry !== "object") return null;
+  const row = entry as Record<string, unknown>;
+  const userId = Number(
+    row.userId ??
+      row.id ??
+      row.usuarioId ??
+      row.usuario_id ??
+      row.seguidorId ??
+      row.seguidor_id ??
+      row.seguidoId ??
+      row.seguido_id ??
+      row.followingUserId ??
+      row.following_user_id ??
+      row.following_id
+  );
+  if (!Number.isFinite(userId) || userId <= 0) return null;
+
+  const username = String(
+    row.username ??
+      row.nombreUsuario ??
+      row.nombre_usuario ??
+      row.nombre ??
+      row.user ??
+      ""
+  ).trim();
+
+  return {
+    userId,
+    username,
+    tipo: typeof row.tipo === "string" ? row.tipo : undefined,
+    reputacion:
+      typeof row.reputacion === "number" ? row.reputacion : undefined,
+    avatarPath:
+      typeof row.avatarPath === "string"
+        ? row.avatarPath
+        : typeof row.avatar_path === "string"
+          ? row.avatar_path
+          : null,
+    avatarUrl:
+      typeof row.avatarUrl === "string"
+        ? row.avatarUrl
+        : typeof row.avatar_url === "string"
+          ? row.avatar_url
+          : null,
+  };
+}
+
+function normalizeConnectionsPage(
+  payload: UserFollowersResponse,
+  rows: UserFollower[],
+  fallbackPage: number,
+  fallbackPageSize: number
+): UserConnectionsPage {
+  const dedupedUsers = new Map<number, UserConnection>();
+  for (const row of rows) {
+    const user = normalizeConnectionUser(row);
+    if (!user) continue;
+    dedupedUsers.set(user.userId, user);
+  }
+
+  const users = [...dedupedUsers.values()];
+  const pageFromPayload = Number(payload.pagination?.page ?? fallbackPage);
+  const pageSizeFromPayload = Number(
+    payload.pagination?.pageSize ?? fallbackPageSize
+  );
+  const pagesFromPayload = Number(payload.pagination?.pages ?? 1);
+  const totalFromPayload = Number(payload.pagination?.total ?? users.length);
+
+  return {
+    users,
+    total:
+      Number.isFinite(totalFromPayload) && totalFromPayload >= 0
+        ? totalFromPayload
+        : users.length,
+    page:
+      Number.isFinite(pageFromPayload) && pageFromPayload > 0
+        ? pageFromPayload
+        : fallbackPage,
+    pages:
+      Number.isFinite(pagesFromPayload) && pagesFromPayload > 0
+        ? pagesFromPayload
+        : 1,
+    pageSize:
+      Number.isFinite(pageSizeFromPayload) && pageSizeFromPayload > 0
+        ? pageSizeFromPayload
+        : fallbackPageSize,
+  };
+}
 
 export async function fetchMyProfile(
   signal?: AbortSignal
@@ -570,6 +679,23 @@ export async function fetchUserFollowers(
   page: number;
   pages: number;
 }> {
+  const pageData = await fetchUserFollowersPage(userId, options);
+  return {
+    followerIds: pageData.users.map((user) => user.userId),
+    total: pageData.total,
+    page: pageData.page,
+    pages: pageData.pages,
+  };
+}
+
+export async function fetchUserFollowersPage(
+  userId: number,
+  options?: {
+    page?: number;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }
+): Promise<UserConnectionsPage> {
   const page = Number(options?.page ?? 1);
   const pageSize = Number(options?.pageSize ?? 100);
   const query = new URLSearchParams({
@@ -594,24 +720,43 @@ export async function fetchUserFollowers(
     : Array.isArray(payload.followers)
       ? payload.followers
       : [];
-  const followerIds = rows
-    .map((row) => Number(row?.userId ?? row?.id))
-    .filter((id) => Number.isFinite(id) && id > 0);
-  const pages = Number(payload.pagination?.pages ?? 1);
-  const total = Number(payload.pagination?.total ?? followerIds.length);
-  const currentPage = Number(payload.pagination?.page ?? page);
+  return normalizeConnectionsPage(payload, rows, page, pageSize);
+}
 
-  return {
-    followerIds,
-    total: Number.isFinite(total) && total >= 0 ? total : followerIds.length,
-    page:
-      Number.isFinite(currentPage) && currentPage > 0
-        ? currentPage
-        : Number.isFinite(page) && page > 0
-          ? page
-          : 1,
-    pages: Number.isFinite(pages) && pages > 0 ? pages : 1,
-  };
+export async function fetchUserFollowingPage(
+  userId: number,
+  options?: {
+    page?: number;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }
+): Promise<UserConnectionsPage> {
+  const page = Number(options?.page ?? 1);
+  const pageSize = Number(options?.pageSize ?? 20);
+  const query = new URLSearchParams({
+    page: String(Number.isFinite(page) && page > 0 ? page : 1),
+    pageSize: String(Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 20),
+  });
+  const path = `/usuarios/${userId}/siguiendo?${query.toString()}`;
+
+  const { res, data } = await profileApi(path, {
+    method: "GET",
+    signal: options?.signal,
+  });
+
+  if (!res.ok) {
+    const message = data?.message ?? "No se pudieron cargar los seguidos.";
+    throw new Error(message);
+  }
+
+  const payload = (data ?? {}) as UserFollowersResponse;
+  const rows = Array.isArray(payload.siguiendo)
+    ? payload.siguiendo
+    : Array.isArray(payload.following)
+      ? payload.following
+      : [];
+
+  return normalizeConnectionsPage(payload, rows, page, pageSize);
 }
 
 export async function fetchAllUserFollowerIds(

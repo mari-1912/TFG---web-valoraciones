@@ -315,8 +315,8 @@ export default function ListsHome() {
           style={{ animation: "fadeUp 0.7s ease 0.1s both" }}
         >
           <SectionCard
-            to="/listas/nuestras-listas"
-            label="Nuestras listas"
+            to="/listas/listas-opinify"
+            label="Listas Opinify"
             subtitle="Descubre las colecciones de Opinify"
             images={movieImages}
             loadingImages={loadingMovies}
