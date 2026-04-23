@@ -114,11 +114,17 @@ function normalizeAction(value?: string): CommunityAction {
   ) {
     return "pending";
   }
-  if (key === "lista" || key === "list_add" || key === "list") {
+  if (
+    key === "lista_agregada" ||
+    key === "lista" ||
+    key === "list_add" ||
+    key === "list"
+  ) {
     return "list_add";
   }
 
-  return "comment";
+  // Fallback: tipo desconocido → list_add para que quede excluido del feed
+  return "list_add";
 }
 
 function normalizeRating(value?: number) {
