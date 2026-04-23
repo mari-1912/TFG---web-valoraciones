@@ -95,11 +95,11 @@ export function ProfileHero({
 
       <div className="relative mx-auto max-w-6xl px-4 py-10">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-3 sm:gap-4">
             <button
               type="button"
               onClick={onAvatarClick}
-              className={`flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 transition ${
+              className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 transition sm:h-20 sm:w-20 ${
                 canEdit && isEditing
                   ? "cursor-pointer hover:bg-white/15"
                   : "cursor-default"
@@ -114,7 +114,7 @@ export function ProfileHero({
                   className="h-full w-full rounded-full object-cover"
                 />
               ) : (
-                <UserCircle className="h-10 w-10 text-violet-200" />
+                <UserCircle className="h-8 w-8 text-violet-200 sm:h-10 sm:w-10" />
               )}
             </button>
 
@@ -133,17 +133,19 @@ export function ProfileHero({
               className="hidden"
             />
 
-            <div>
-              <p className="text-sm uppercase tracking-[0.28em] text-violet-200">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-violet-200 sm:text-sm sm:tracking-[0.28em]">
                 Perfil
               </p>
-              <h1 className="mt-1 text-3xl font-semibold">{displayName}</h1>
+              <h1 className="mt-1 break-words text-2xl font-semibold leading-tight sm:text-3xl">
+                {displayName}
+              </h1>
               <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-violet-100">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {displayRole}
               </div>
 
-              <div className="mt-3 max-w-md">
+              <div className="mt-3 w-full max-w-md">
               {canEdit && isEditing ? (
                   <textarea
                     value={bio}
@@ -166,36 +168,36 @@ export function ProfileHero({
                 )}
               </div>
 
-              <div className="mt-3 grid max-w-md grid-cols-3 gap-3 text-xs text-white/70">
-                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                  <Star className="h-4 w-4 text-violet-200" />
+              <div className="mt-3 grid w-full max-w-md grid-cols-3 gap-2 text-[11px] text-white/70 sm:gap-3 sm:text-xs">
+                <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center sm:flex-row sm:justify-start sm:gap-2 sm:px-3">
+                  <Star className="hidden h-4 w-4 text-violet-200 sm:block" />
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-base font-semibold leading-none text-white sm:text-sm">
                       {ratingsCount}
                     </p>
-                    <p className="text-[10px] uppercase tracking-widest">
+                    <p className="mt-1 text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
                       Valoraciones
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                  <StarHalf className="h-4 w-4 text-violet-200" />
+                <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center sm:flex-row sm:justify-start sm:gap-2 sm:px-3">
+                  <StarHalf className="hidden h-4 w-4 text-violet-200 sm:block" />
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-base font-semibold leading-none text-white sm:text-sm">
                       {averageRating.toFixed(1)}
                     </p>
-                    <p className="text-[10px] uppercase tracking-widest">
+                    <p className="mt-1 text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
                       Media
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                  <MessageSquareText className="h-4 w-4 text-violet-200" />
+                <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center sm:flex-row sm:justify-start sm:gap-2 sm:px-3">
+                  <MessageSquareText className="hidden h-4 w-4 text-violet-200 sm:block" />
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-base font-semibold leading-none text-white sm:text-sm">
                       {reviewsCount}
                     </p>
-                    <p className="text-[10px] uppercase tracking-widest">
+                    <p className="mt-1 text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
                       Reseñas
                     </p>
                   </div>

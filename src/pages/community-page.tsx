@@ -10,7 +10,11 @@ import {
   type CommunityActivity,
 } from "../services/apiCommunity";
 import { getMe } from "../services/auth-service";
-import { fetchMyProfile, fetchUserProfile } from "../services/profile-service";
+import {
+  fetchMyFollowingTargets,
+  fetchMyProfile,
+  fetchUserProfile,
+} from "../services/profile-service";
 import {
   createContentComment,
   deleteContentComment,
@@ -18,7 +22,6 @@ import {
   reactToContentComment,
   updateContentComment,
 } from "../services/content-comments";
-import { appendProfileActivity } from "../services/profile-activity";
 import { buildDetailPath } from "@/lib/detail-route";
 
 // Catálogos para sacar posters reales
@@ -75,35 +78,11 @@ type FollowTargets = {
 };
 
 function normalizeUsername(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function buildFollowStorageKey(currentUserId: number) {
-  return `followed-users:${currentUserId}`;
-}
-
-function buildLegacyFollowStorageKey(currentUserId: number) {
-  return `mock-following:${currentUserId}`;
-}
-
-function readFollowedIds(storageKey: string) {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed
-          .map((value) => Number(value))
-          .filter((value) => Number.isFinite(value) && value > 0)
-      : [];
-  } catch {
-    return [] as number[];
-  }
-}
-
-function readMergedFollowedIds(currentUserId: number) {
-  const nextIds = readFollowedIds(buildFollowStorageKey(currentUserId));
-  const legacyIds = readFollowedIds(buildLegacyFollowStorageKey(currentUserId));
-  return Array.from(new Set([...nextIds, ...legacyIds]));
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function parseFollowingTargetsFromProfilePayload(payload: any): FollowTargets {
@@ -132,9 +111,15 @@ function parseFollowingTargetsFromProfilePayload(payload: any): FollowTargets {
     const id = Number(
       row.userId ??
         row.id ??
+        row.usuarioId ??
+        row.usuario_id ??
         row.seguidoId ??
         row.followedId ??
-        row.followingUserId
+        row.followingUserId ??
+        row.following_id ??
+        row.followed_id ??
+        (row.usuario as { userId?: unknown } | undefined)?.userId ??
+        (row.user as { userId?: unknown } | undefined)?.userId
     );
     if (Number.isFinite(id) && id > 0) {
       userIds.add(id);
@@ -144,6 +129,12 @@ function parseFollowingTargetsFromProfilePayload(payload: any): FollowTargets {
       (typeof row.username === "string" && row.username) ||
       (typeof row.user === "string" && row.user) ||
       (typeof row.nombre === "string" && row.nombre) ||
+      ((row.usuario as { username?: unknown } | undefined)?.username as
+        | string
+        | undefined) ||
+      ((row.user as { username?: unknown } | undefined)?.username as
+        | string
+        | undefined) ||
       ""
     ).trim();
     if (username) {
@@ -153,6 +144,7 @@ function parseFollowingTargetsFromProfilePayload(payload: any): FollowTargets {
 
   const root = payload ?? {};
   const perfil = root?.perfil ?? {};
+  const seguimiento = root?.seguimiento ?? perfil?.seguimiento ?? {};
   const arrays = [
     root?.siguiendo,
     root?.seguidos,
@@ -160,12 +152,22 @@ function parseFollowingTargetsFromProfilePayload(payload: any): FollowTargets {
     root?.followingUsers,
     root?.siguiendoUsuarios,
     root?.usuariosSeguidos,
+    root?.follows,
+    root?.seguidosUsuarios,
+    seguimiento?.siguiendo,
+    seguimiento?.seguidos,
+    seguimiento?.following,
+    seguimiento?.followingUsers,
+    seguimiento?.siguiendoUsuarios,
+    seguimiento?.usuariosSeguidos,
+    seguimiento?.follows,
     perfil?.siguiendo,
     perfil?.seguidos,
     perfil?.following,
     perfil?.followingUsers,
     perfil?.siguiendoUsuarios,
     perfil?.usuariosSeguidos,
+    perfil?.follows,
   ];
 
   for (const candidate of arrays) {
@@ -455,6 +457,10 @@ const DETAIL_TYPE_CATALOGS: Array<{
   { type: "libro", list: BOOKS },
 ];
 
+const COMMUNITY_PAGE_SIZE = 20;
+const COMMUNITY_MAX_PAGES_TO_SCAN = 8;
+const COMMUNITY_TARGET_POSTS = 20;
+
 function normalizeKey(s?: string) {
   return (s ?? "")
     .trim()
@@ -585,17 +591,11 @@ export default function CommunityPage() {
   const [editingDraft, setEditingDraft] = useState("");
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUsername, setCurrentUsername] = useState("");
+  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
   const [followTargets, setFollowTargets] = useState<FollowTargets>({
     userIds: new Set<number>(),
     usernames: new Set<string>(),
   });
-  const currentUserIsAdmin =
-    (typeof window !== "undefined"
-      ? localStorage.getItem("userRole")
-      : "base"
-    )
-      ?.toString()
-      .toLowerCase() === "admin";
 
   const isOwnPost = useCallback(
     (post: CommunityPost, userId: number | null, username: string) => {
@@ -607,24 +607,6 @@ export default function CommunityPage() {
       if (!ownName) return false;
       return post.user.trim().toLowerCase() === ownName;
     },
-    []
-  );
-
-  const readLocalFollowTargets = useCallback((userId: number | null): FollowTargets => {
-    if (userId == null) {
-      return { userIds: new Set<number>(), usernames: new Set<string>() };
-    }
-    return {
-      userIds: new Set(readMergedFollowedIds(userId)),
-      usernames: new Set<string>(),
-    };
-  }, []);
-
-  const mergeFollowTargets = useCallback(
-    (base: FollowTargets, extra: FollowTargets): FollowTargets => ({
-      userIds: new Set([...base.userIds, ...extra.userIds]),
-      usernames: new Set([...base.usernames, ...extra.usernames]),
-    }),
     []
   );
 
@@ -774,33 +756,61 @@ export default function CommunityPage() {
       }
 
       try {
-        const payload = await getCommunityFeed({
-          page: 1,
-          pageSize: 20,
-          signal,
-        });
-
-        const activities = Array.isArray(payload?.actividades)
-          ? payload.actividades
-          : [];
-        const mapped = activities.map(mapActivityToPost);
         const hasFollowTargets =
           followedTargets.userIds.size > 0 || followedTargets.usernames.size > 0;
+        if (!hasFollowTargets) {
+          setFeed([]);
+          setError(null);
+          return;
+        }
 
-        const filtered = mapped.filter((post) => {
-          if (isOwnPost(post, userId, username)) return false;
-          if (!hasFollowTargets) return false;
-          if (post.userId != null && followedTargets.userIds.has(post.userId)) {
-            return true;
+        const followedPosts: CommunityPost[] = [];
+        for (let page = 1; page <= COMMUNITY_MAX_PAGES_TO_SCAN; page += 1) {
+          if (signal?.aborted) return;
+          const payload = await getCommunityFeed({
+            page,
+            pageSize: COMMUNITY_PAGE_SIZE,
+            signal,
+          });
+          const activities = Array.isArray(payload?.actividades)
+            ? payload.actividades
+            : [];
+          if (!activities.length) break;
+
+          const mapped = activities.map(mapActivityToPost);
+          for (const post of mapped) {
+            if (isOwnPost(post, userId, username)) continue;
+            if (post.userId != null && followedTargets.userIds.has(post.userId)) {
+              followedPosts.push(post);
+              continue;
+            }
+            const normalizedPostUsername = normalizeUsername(post.user);
+            if (
+              normalizedPostUsername !== "" &&
+              followedTargets.usernames.has(normalizedPostUsername)
+            ) {
+              followedPosts.push(post);
+            }
           }
-          const normalizedPostUsername = normalizeUsername(post.user);
-          return (
-            normalizedPostUsername !== "" &&
-            followedTargets.usernames.has(normalizedPostUsername)
-          );
-        });
 
-        const hydrated = await hydrateAvatars(filtered, signal);
+          if (followedPosts.length >= COMMUNITY_TARGET_POSTS) break;
+          const totalPages = Number(payload?.pagination?.pages ?? 0);
+          if (Number.isFinite(totalPages) && totalPages > 0 && page >= totalPages) {
+            break;
+          }
+        }
+
+        const dedupedById = new Map<string, CommunityPost>();
+        for (const post of followedPosts) {
+          if (!dedupedById.has(post.id)) {
+            dedupedById.set(post.id, post);
+          }
+        }
+
+        const hydrated = await hydrateAvatars(
+          [...dedupedById.values()].slice(0, COMMUNITY_TARGET_POSTS),
+          signal
+        );
         if (signal?.aborted) return;
 
         setFeed(hydrated);
@@ -840,11 +850,12 @@ export default function CommunityPage() {
         if (me.success && me.user) {
           userId = Number(me.user.user_id) || null;
           username = (me.user.username ?? "").trim();
+          setCurrentUserIsAdmin((me.user.role ?? "").toLowerCase() === "admin");
+        } else {
+          setCurrentUserIsAdmin(false);
         }
         setCurrentUserId(userId);
         setCurrentUsername(username);
-
-        const localFollowTargets = readLocalFollowTargets(userId);
 
         let serverFollowTargets: FollowTargets = {
           userIds: new Set<number>(),
@@ -858,18 +869,35 @@ export default function CommunityPage() {
                 parseFollowingTargetsFromProfilePayload(profilePayload);
             }
           } catch {
-            // Si falla esta lectura adicional, seguimos con lo guardado en local.
+            // Si falla esta lectura adicional, seguimos con objetivos vacíos.
+          }
+
+          if (
+            !controller.signal.aborted &&
+            serverFollowTargets.userIds.size === 0 &&
+            serverFollowTargets.usernames.size === 0
+          ) {
+            try {
+              const rawTargets = await fetchMyFollowingTargets(controller.signal);
+              if (!controller.signal.aborted) {
+                serverFollowTargets = {
+                  userIds: new Set(rawTargets.userIds),
+                  usernames: new Set(rawTargets.usernames),
+                };
+              }
+            } catch {
+              // Si también falla, mantenemos objetivos vacíos.
+            }
           }
         }
 
-        const targets = mergeFollowTargets(localFollowTargets, serverFollowTargets);
-        setFollowTargets(targets);
+        setFollowTargets(serverFollowTargets);
 
         await loadFeed({
           signal: controller.signal,
           userId,
           username,
-          followedTargets: targets,
+          followedTargets: serverFollowTargets,
           silent: false,
         });
       } catch (err) {
@@ -887,19 +915,16 @@ export default function CommunityPage() {
 
     void initialize();
     return () => controller.abort();
-  }, [loadFeed, mergeFollowTargets, readLocalFollowTargets]);
+  }, [loadFeed]);
 
   useEffect(() => {
     if (loading) return;
 
     const refresh = () => {
-      const localTargets = readLocalFollowTargets(currentUserId);
-      const effectiveTargets = mergeFollowTargets(followTargets, localTargets);
-      setFollowTargets(effectiveTargets);
       void loadFeed({
         userId: currentUserId,
         username: currentUsername,
-        followedTargets: effectiveTargets,
+        followedTargets: followTargets,
         silent: true,
       });
     };
@@ -927,18 +952,13 @@ export default function CommunityPage() {
     followTargets,
     loadFeed,
     loading,
-    mergeFollowTargets,
-    readLocalFollowTargets,
   ]);
 
   const refreshFeedSilently = useCallback(async () => {
-    const localTargets = readLocalFollowTargets(currentUserId);
-    const effectiveTargets = mergeFollowTargets(followTargets, localTargets);
-    setFollowTargets(effectiveTargets);
     await loadFeed({
       userId: currentUserId,
       username: currentUsername,
-      followedTargets: effectiveTargets,
+      followedTargets: followTargets,
       silent: true,
     });
   }, [
@@ -946,8 +966,6 @@ export default function CommunityPage() {
     currentUsername,
     followTargets,
     loadFeed,
-    mergeFollowTargets,
-    readLocalFollowTargets,
   ]);
 
   const openPostDetail = useCallback(
@@ -1039,15 +1057,6 @@ export default function CommunityPage() {
         setReplyDraft("");
         setReplyingPostId(null);
         setActionMessage("Respuesta publicada.");
-        appendProfileActivity(currentUsername, {
-          type: "comment",
-          title: `Respondiste en ${post.title?.trim() || "un título"}`,
-          detail:
-            message.length > 120
-              ? `“${message.slice(0, 119).trimEnd()}…”`
-              : `“${message}”`,
-          date: new Date().toISOString(),
-        });
         await refreshFeedSilently();
       } catch (err) {
         setActionError(
@@ -1057,7 +1066,7 @@ export default function CommunityPage() {
         setProcessingPostId(null);
       }
     },
-    [currentUsername, replyDraft, refreshFeedSilently, resolveCommentIdForPost]
+    [replyDraft, refreshFeedSilently, resolveCommentIdForPost]
   );
 
   const handleEditFromFeed = useCallback(

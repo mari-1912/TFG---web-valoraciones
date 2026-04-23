@@ -1,7 +1,7 @@
 type StatsCard = {
   title: string;
   value: number;
-  unit: string;
+  unit?: string;
 };
 
 type ProfileStatsSectionProps = {
@@ -42,7 +42,9 @@ export function ProfileStatsSection({
             <p className="mt-3 text-2xl font-semibold text-gray-900">
               {card.value}
             </p>
-            <p className="mt-1 text-xs text-gray-500">{card.unit}</p>
+            {card.unit ? (
+              <p className="mt-1 text-xs text-gray-500">{card.unit}</p>
+            ) : null}
           </div>
         ))}
       </div>

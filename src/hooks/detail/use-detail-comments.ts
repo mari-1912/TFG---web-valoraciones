@@ -7,7 +7,6 @@ import {
   reactToContentComment,
   updateContentComment,
 } from "@/services/content-comments";
-import { appendProfileActivity } from "@/services/profile-activity";
 import {
   formatRatingOutOfTen,
   IMAGE_ONLY_COMMENT_PLACEHOLDER,
@@ -15,7 +14,6 @@ import {
   parseRating,
   resolveAssetUrl,
   toFiveStars,
-  truncateText,
 } from "@/pages/detail-page.helpers";
 import { fetchUserProfile } from "@/services/profile-service";
 import { searchUsers } from "@/services/search-service";
@@ -25,7 +23,6 @@ type UseDetailCommentsArgs = {
   isLoggedIn: boolean;
   canDeleteAnyComment?: boolean;
   sessionUsername: string;
-  title: string;
   currentUserId: number | null;
   currentUserAvatarUrl: string | null;
   apiUrl: string;
@@ -36,7 +33,6 @@ export function useDetailComments({
   isLoggedIn,
   canDeleteAnyComment = false,
   sessionUsername,
-  title,
   currentUserId,
   currentUserAvatarUrl,
   apiUrl,
@@ -549,14 +545,6 @@ export function useDetailComments({
           // Si falla el refresco de la lista, mantenemos al menos el comentario insertado.
         }
         setCommentMessage("Comentario publicado.");
-        appendProfileActivity(sessionUsername, {
-          type: "comment",
-          title: `Comentaste en ${title}`,
-          detail: normalizedMessage
-            ? `“${truncateText(normalizedMessage)}”`
-            : "Comentario con imagen",
-          date: new Date().toISOString(),
-        });
         return {
           commentId: createdCommentId,
           parentId,
@@ -578,7 +566,6 @@ export function useDetailComments({
       sessionUsername,
       currentUserAvatarUrl,
       apiUrl,
-      title,
       mapAndHydrateComments,
     ]
   );

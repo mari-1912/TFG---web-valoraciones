@@ -9,15 +9,13 @@ import { getMe } from "@/services/auth-service";
 import { getCommunityFeed, resolveAssetUrl } from "@/services/apiCommunity";
 import {
   addContentToList,
-  createUserList,
   getListContents,
-  getListsByUser,
-  getMyLists,
   removeContentFromList,
   type BackendContenidoListado,
   type BackendLista,
 } from "@/services/lists-service";
 import { fetchMyProfile, fetchUserProfile } from "@/services/profile-service";
+import { useBaseLists } from "@/hooks/lists/use-my-lists";
 
 type CategoryKey = "pelicula" | "serie" | "libro" | "videojuego";
 type StatusKey = "watchlist" | "in_progress" | "completed" | "dropped";
@@ -68,13 +66,12 @@ const API_URL =
 const STATUS_DEFINITIONS: StatusListDefinition[] = [
   {
     status: "watchlist",
-    listName: "proximamente",
-    label: "Quiero ver",
+    listName: "pendientes",
+    label: "Pendientes",
     aliases: [
+      "pendientes",
       "proximamente",
       "próximamente",
-      "quiero_ver",
-      "quiero ver",
       "watchlist",
     ],
   },
@@ -128,7 +125,7 @@ const STATUS_ORDER: StatusKey[] = [
 ];
 
 const STATUS_LABELS: Record<StatusKey, string> = {
-  watchlist: "Quiero ver",
+  watchlist: "Pendientes",
   in_progress: "En progreso",
   completed: "Completado",
   dropped: "Abandonado",
@@ -209,6 +206,11 @@ function normalizeStatus(value: unknown): StatusKey | null {
   if (key === "in_progress") return "in_progress";
   if (key === "completed") return "completed";
   if (key === "dropped") return "dropped";
+  if (key === "pendientes") return "watchlist";
+  if (key === "proximamente") return "watchlist";
+  if (key === "en_progreso") return "in_progress";
+  if (key === "completado") return "completed";
+  if (key === "abandonado") return "dropped";
   return null;
 }
 
@@ -428,9 +430,7 @@ async function fetchCommunityContentIdsForUser(
 }
 
 async function ensureStatusLists(
-  existingLists: BackendLista[],
-  canManageLists: boolean,
-  targetUserId: number | null
+  existingLists: BackendLista[]
 ): Promise<StatusListBinding[]> {
   const resolved: StatusListBinding[] = [];
 
@@ -447,25 +447,6 @@ async function ensureStatusLists(
         list: findListByAliases(existingLists, aliases, category),
         contents: [],
       });
-    }
-  }
-
-  if (!canManageLists) return resolved;
-
-  for (const binding of resolved) {
-    if (binding.list) continue;
-    try {
-      const created = await createUserList({
-        nombre: binding.listName,
-        tipoContenidos: binding.category,
-        descripcion: `Lista automática de estado: ${binding.label}`,
-        visibilidad: "publica",
-        imagen: "",
-        userId: targetUserId ?? undefined,
-      });
-      binding.list = created;
-    } catch {
-      // Si falla la creación (permisos/validación), continuamos sin bloquear la pantalla.
     }
   }
 
@@ -629,6 +610,25 @@ function buildEntriesFromBindings(
     }
   }
 
+  // Fallback: si por cualquier motivo fallan las lecturas de /listas/{id}/contenidos
+  // pero sí tenemos snapshot con estado/categoría, mostramos igualmente la entrada.
+  for (const snapshot of snapshots.values()) {
+    if (snapshot.status == null || snapshot.category == null) continue;
+    const dedupeKey = `${snapshot.status}:${snapshot.id}`;
+    if (dedupe.has(dedupeKey)) continue;
+    dedupe.add(dedupeKey);
+
+    entries.push({
+      key: dedupeKey,
+      id: snapshot.id,
+      status: snapshot.status,
+      category: snapshot.category,
+      title: snapshot.title || `Contenido ${snapshot.id}`,
+      image: resolveAssetUrl(snapshot.image ?? undefined),
+      timestamp: snapshot.statusTimestamp ?? 0,
+    });
+  }
+
   return entries.sort((a, b) => b.timestamp - a.timestamp);
 }
 
@@ -640,18 +640,36 @@ export default function ProfileStatsPage() {
   );
 
   const [entries, setEntries] = useState<StatusEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("Usuario");
   const [activeStatus, setActiveStatus] = useState<StatusKey>("completed");
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all");
+  const [targetUserId, setTargetUserId] = useState<number | null>(null);
+  const [myUserId, setMyUserId] = useState<number | null>(null);
+  const [profileRows, setProfileRows] = useState<unknown[]>([]);
+  const [profileReady, setProfileReady] = useState(false);
+  const [identityLoading, setIdentityLoading] = useState(true);
+
+  const {
+    lists: baseLists,
+    loading: listsLoading,
+    error: listsError,
+    canManageLists,
+  } = useBaseLists({
+    requestedUserId,
+    targetUserId,
+    myUserId,
+    enabled: targetUserId != null || requestedUserId == null,
+  });
 
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
 
-    const load = async () => {
-      setLoading(true);
+    const loadIdentity = async () => {
+      setIdentityLoading(true);
+      setProfileReady(false);
       setError(null);
 
       try {
@@ -661,37 +679,70 @@ export default function ProfileStatsPage() {
             : await fetchMyProfile(controller.signal);
         if (cancelled) return;
 
-        const targetUserId = parseUserId(
+        const resolvedTargetUserId = parseUserId(
           profilePayload?.perfil?.userId ?? requestedUserId
         );
         const resolvedProfileName =
           pickString(profilePayload?.perfil?.username) || "Usuario";
 
         setProfileName(resolvedProfileName);
+        setTargetUserId(resolvedTargetUserId);
+        setProfileRows(collectRows(profilePayload));
 
         const me = await getMe().catch(() => null);
-        const myUserId = parseUserId(me?.success ? me.user?.user_id : null);
+        if (cancelled) return;
+        const resolvedMyUserId = parseUserId(me?.success ? me.user?.user_id : null);
+        setMyUserId(resolvedMyUserId);
+        setProfileReady(true);
+      } catch (err) {
+        if (cancelled) return;
+        setEntries([]);
+        setProfileRows([]);
+        setProfileReady(false);
+        setTargetUserId(null);
+        setMyUserId(null);
+        setProfileName("Usuario");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudieron cargar las estadísticas detalladas."
+        );
+      } finally {
+        if (!cancelled) setIdentityLoading(false);
+      }
+    };
 
-        const canManageLists =
-          requestedUserId == null ||
-          (targetUserId != null && myUserId != null && targetUserId === myUserId);
+    void loadIdentity();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [requestedUserId]);
 
-        const baseLists =
-          canManageLists || targetUserId == null
-            ? await getMyLists().catch(() => [])
-            : await getListsByUser(targetUserId).catch(() => []);
+  useEffect(() => {
+    if (!profileReady) return;
+    if (listsLoading) return;
+    if (listsError) {
+      setEntries([]);
+      setError(listsError);
+      setLoading(false);
+      return;
+    }
 
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const loadStats = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
         let bindings = await ensureStatusLists(
-          baseLists,
-          canManageLists,
-          targetUserId
+          baseLists
         );
         bindings = await loadStatusListContents(bindings);
 
         const knownIds = new Set<number>();
-
-        const idsFromAllLists = await collectIdsFromLists(baseLists);
-        for (const id of idsFromAllLists) knownIds.add(id);
 
         for (const binding of bindings) {
           for (const item of binding.contents) {
@@ -700,22 +751,29 @@ export default function ProfileStatsPage() {
           }
         }
 
-        const profileRows = collectRows(profilePayload);
-        for (const row of profileRows) {
-          if (targetUserId != null) {
-            const rowUserId = extractRowUserId(row);
-            if (rowUserId != null && rowUserId !== targetUserId) continue;
-          }
-          const id = extractRowContentId(row);
-          if (id != null) knownIds.add(id);
-        }
+        // Para el propio usuario, usamos únicamente lo que hay en listas de estado,
+        // igual que en list-categories-page.
+        // Para perfiles ajenos, mantenemos ayudas de perfil/comunidad.
+        if (!canManageLists) {
+          const idsFromAllLists = await collectIdsFromLists(baseLists);
+          for (const id of idsFromAllLists) knownIds.add(id);
 
-        if (targetUserId != null) {
-          const communityIds = await fetchCommunityContentIdsForUser(
-            targetUserId,
-            controller.signal
-          ).catch(() => new Set<number>());
-          for (const id of communityIds) knownIds.add(id);
+          for (const row of profileRows) {
+            if (targetUserId != null) {
+              const rowUserId = extractRowUserId(row);
+              if (rowUserId != null && rowUserId !== targetUserId) continue;
+            }
+            const id = extractRowContentId(row);
+            if (id != null) knownIds.add(id);
+          }
+
+          if (targetUserId != null) {
+            const communityIds = await fetchCommunityContentIdsForUser(
+              targetUserId,
+              controller.signal
+            ).catch(() => new Set<number>());
+            for (const id of communityIds) knownIds.add(id);
+          }
         }
 
         const snapshots = new Map<number, ContentSnapshot>();
@@ -740,7 +798,7 @@ export default function ProfileStatsPage() {
         const nextEntries = buildEntriesFromBindings(
           bindings,
           snapshots,
-          canManageLists
+          !canManageLists
         );
         if (!cancelled) {
           setEntries(nextEntries);
@@ -758,12 +816,20 @@ export default function ProfileStatsPage() {
       }
     };
 
-    void load();
+    void loadStats();
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [requestedUserId]);
+  }, [
+    profileReady,
+    listsLoading,
+    listsError,
+    baseLists,
+    canManageLists,
+    targetUserId,
+    profileRows,
+  ]);
 
   const grouped = useMemo(() => {
     const init: Record<StatusKey, StatusEntry[]> = {
@@ -840,6 +906,7 @@ export default function ProfileStatsPage() {
     activeCategory === "all"
       ? grouped[activeStatus]
       : groupedByCategory[activeStatus][activeCategory];
+  const isLoading = identityLoading || listsLoading || loading;
 
   return (
     <>
@@ -857,11 +924,11 @@ export default function ProfileStatsPage() {
               Estadísticas detalladas
             </h1>
             <p className="mt-2 text-sm text-gray-600">
-              {`Listas de estado de ${profileName}: Quiero ver, En progreso, Completado y Abandonado.`}
+              {`Listas de estado de ${profileName}: Pendientes, En progreso, Completado y Abandonado.`}
             </p>
           </div>
 
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, idx) => (

@@ -4,7 +4,8 @@ import type { ContentStatus } from "@/services/content-status";
 import {
   addContentToList,
   createUserList,
-  getMyLists,
+  getListContents,
+  getMyListsWithFallback,
   removeContentFromList,
 } from "@/services/lists-service";
 import {
@@ -62,10 +63,17 @@ type ManagedStatusMeta = {
 };
 
 const MANAGED_STATUS_BASE: Record<string, ContentStatus> = {
+  pendientes: "watchlist",
   proximamente: "watchlist",
+  watchlist: "watchlist",
   en_progreso: "in_progress",
+  enprogreso: "in_progress",
+  in_progress: "in_progress",
   completado: "completed",
+  completed: "completed",
   abandonado: "dropped",
+  dropped: "dropped",
+  dejado: "dropped",
 };
 
 function normalizeKey(value: string) {
@@ -103,7 +111,7 @@ function parseManagedStatusMeta(name: string, tipoContenidos?: string): ManagedS
   }
 
   const match = normalized.match(
-    /^(proximamente|en_progreso|completado|abandonado)[ _](peliculas?|series?|libros?|videojuegos?)$/
+    /^(pendientes|proximamente|watchlist|en_progreso|enprogreso|in_progress|completado|completed|abandonado|dropped|dejado)[ _](peliculas?|series?|libros?|videojuegos?)$/
   );
   if (!match) return null;
 
@@ -122,22 +130,8 @@ function isManagedStatusList(
   return normalizedDescription.startsWith("lista_automatica_de_estado");
 }
 
-function getWatchlistLabel(category: CategoryKey) {
-  if (category === "libro") return "Quiero leer";
-  if (category === "videojuego") return "Quiero jugar";
-  return "Quiero ver";
-}
-
-function normalizeStorageUser() {
-  if (typeof window === "undefined") return "anon";
-  const raw = localStorage.getItem("currentUser") ?? "";
-  const normalized = raw.trim().toLowerCase();
-  return normalized || "anon";
-}
-
-function normalizeContentListKey(contentListKey: string | undefined, title: string) {
-  const source = (contentListKey ?? title).trim().toLowerCase();
-  return source.replace(/\s+/g, "-");
+function getWatchlistLabel(_category: CategoryKey) {
+  return "Pendientes";
 }
 
 function resolveListContentType(value?: string) {
@@ -150,7 +144,6 @@ function resolveListContentType(value?: string) {
 }
 
 export function DetailHero({
-  contentListKey,
   contentId,
   listContentType,
   typeLabel,
@@ -186,10 +179,9 @@ export function DetailHero({
   const [newListName, setNewListName] = useState("");
   const [newListError, setNewListError] = useState<string | null>(null);
   const videoRef = useRef<HTMLDivElement | null>(null);
-  const storageUser = normalizeStorageUser();
-  const normalizedListKey = normalizeContentListKey(contentListKey, title);
-  const contentListsStorageKey = `mock-content-lists:${storageUser}:${normalizedListKey}`;
   const currentCategory = resolveListContentType(listContentType) as CategoryKey;
+  const numericContentId = Number(contentId);
+  const hasValidNumericContentId = Number.isFinite(numericContentId);
 
   useEffect(() => {
     if (!showVideo) return;
@@ -197,12 +189,11 @@ export function DetailHero({
   }, [showVideo]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     let cancelled = false;
 
     const loadLists = async () => {
       try {
-        const backendLists = await getMyLists();
+        const backendLists = await getMyListsWithFallback();
         if (cancelled) return;
 
         const visibleLists: UserList[] = [];
@@ -246,23 +237,32 @@ export function DetailHero({
           : visibleLists;
         setUserLists(nextLists);
 
-        try {
-          const rawSelected = localStorage.getItem(contentListsStorageKey);
-          const parsed = rawSelected ? JSON.parse(rawSelected) : [];
-          const validIds = Array.isArray(parsed)
-            ? parsed
-                .map((value) => (typeof value === "string" ? value : ""))
-                .filter(
-                  (value) =>
-                    value &&
-                    Number.isFinite(Number(value)) &&
-                    nextLists.some((nl) => nl.id === value)
-                )
-            : [];
-          setSelectedListIds(validIds);
-        } catch {
+        if (!hasValidNumericContentId) {
           setSelectedListIds([]);
+          return;
         }
+
+        const memberships = await Promise.all(
+          nextLists.map(async (list) => {
+            const listId = Number(list.id);
+            if (!Number.isFinite(listId)) return null;
+            try {
+              const payload = await getListContents(listId);
+              const items = Array.isArray(payload?.contenidos) ? payload.contenidos : [];
+              const existsInList = items.some(
+                (entry) => Number(entry?.id) === numericContentId
+              );
+              return existsInList ? list.id : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        if (cancelled) return;
+
+        setSelectedListIds(
+          memberships.filter((value): value is string => typeof value === "string")
+        );
       } catch {
         if (cancelled) return;
         setUserLists([]);
@@ -275,7 +275,7 @@ export function DetailHero({
     return () => {
       cancelled = true;
     };
-  }, [contentListsStorageKey, currentCategory]);
+  }, [currentCategory, hasValidNumericContentId, numericContentId]);
 
   const openRatingModal = () => {
     if (!ratingEnabled) return;
@@ -292,24 +292,10 @@ export function DetailHero({
   const currentStatusLabel = statusOptions.find(
     (option) => option.value === currentStatus
   )?.label;
-  const numericContentId = Number(contentId);
-  const hasValidNumericContentId = Number.isFinite(numericContentId);
-
-  const persistSelectedListIds = (nextIds: string[]) => {
-    if (typeof window === "undefined") return;
-    if (!nextIds.length) {
-      localStorage.removeItem(contentListsStorageKey);
-      return;
-    }
-    localStorage.setItem(contentListsStorageKey, JSON.stringify(nextIds));
-  };
-
   const toggleListAssignment = (listId: string) => {
     setSelectedListIds((prev) => {
       const exists = prev.includes(listId);
-      const next = exists ? prev.filter((id) => id !== listId) : [...prev, listId];
-      persistSelectedListIds(next);
-      return next;
+      return exists ? prev.filter((id) => id !== listId) : [...prev, listId];
     });
   };
 
@@ -317,12 +303,7 @@ export function DetailHero({
     const isSelected = selectedListIds.includes(listId);
     const parsedListId = Number(listId);
     if (!Number.isFinite(parsedListId)) {
-      toggleListAssignment(listId);
-      if (!isSelected) {
-        setNewListError("Esta lista es local y no está sincronizada con el servidor.");
-      } else {
-        setNewListError(null);
-      }
+      setNewListError("No se pudo identificar la lista.");
       return;
     }
 
@@ -403,9 +384,7 @@ export function DetailHero({
       const nextLists = [created, ...userLists.filter((ul) => ul.id !== created.id)];
       setUserLists(nextLists);
       setSelectedListIds((prev) => {
-        const next = prev.includes(created.id) ? prev : [created.id, ...prev];
-        persistSelectedListIds(next);
-        return next;
+        return prev.includes(created.id) ? prev : [created.id, ...prev];
       });
       setNewListName("");
       setNewListError(null);

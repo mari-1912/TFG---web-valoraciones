@@ -1,88 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  StatusCategoryContentSections,
+  type StatusCategorySection,
+} from "@/components/status/status-category-content-sections";
 import PageLayout from "@/layouts/layout";
-import ContentCard from "@/components/content-card";
-import { buildDetailPath } from "@/lib/detail-route";
-import { getListContents, getMyLists } from "@/services/lists-service";
+import {
+  CATEGORY_ORDER,
+  STATUS_META,
+  isManagedStatusList,
+  normalizeCategory,
+  normalizeKey,
+  parseManagedStatus,
+  type CategoryKey,
+  type StatusKey,
+} from "@/lib/status-lists";
+import {
+  getListContents,
+  getListsByUser,
+  getMyListsWithFallback,
+} from "@/services/lists-service";
+import { fetchUserProfile } from "@/services/profile-service";
 import type { BackendContenidoListado } from "@/services/lists-service";
-
-type StatusKey = "watchlist" | "in_progress" | "completed" | "dropped";
-type CategoryKey = "pelicula" | "serie" | "libro" | "videojuego";
-
-type CategorySection = {
-  category: CategoryKey;
-  title: string;
-  items: Array<BackendContenidoListado & { tipo: string }>;
-};
-
-const STATUS_META: Record<StatusKey, { title: string; subtitle: string }> = {
-  watchlist: { title: "Pendientes", subtitle: "Pendientes" },
-  in_progress: { title: "En progreso", subtitle: "Actualmente en curso" },
-  completed: { title: "Finalizado", subtitle: "Completados" },
-  dropped: { title: "Abandonado", subtitle: "Dejados" },
-};
-
-const CATEGORY_ORDER: CategoryKey[] = [
-  "pelicula",
-  "serie",
-  "libro",
-  "videojuego",
-];
-
-const CATEGORY_LABELS: Record<CategoryKey, string> = {
-  pelicula: "Películas",
-  serie: "Series",
-  libro: "Libros",
-  videojuego: "Videojuegos",
-};
-
-function normalizeKey(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function normalizeCategory(value: unknown): CategoryKey | null {
-  const key = normalizeKey(typeof value === "string" ? value : "");
-  if (!key) return null;
-  if (["pelicula", "peliculas", "movie", "movies"].includes(key)) return "pelicula";
-  if (["serie", "series", "tv"].includes(key)) return "serie";
-  if (["libro", "libros", "book", "books"].includes(key)) return "libro";
-  if (["videojuego", "videojuegos", "game", "games", "juego_mesa"].includes(key)) {
-    return "videojuego";
-  }
-  return null;
-}
-
-function parseManagedStatus(name: string): StatusKey | null {
-  const normalized = normalizeKey(name);
-  if (!normalized) return null;
-
-  const exact = normalized.match(
-    /^(proximamente|en_progreso|completado|abandonado)(?:[ _](peliculas?|series?|libros?|videojuegos?))?$/
-  );
-  if (!exact) return null;
-
-  const statusKey = exact[1];
-  if (statusKey === "proximamente") return "watchlist";
-  if (statusKey === "en_progreso") return "in_progress";
-  if (statusKey === "completado") return "completed";
-  if (statusKey === "abandonado") return "dropped";
-  return null;
-}
-
-function isManagedStatusList(name: string, description: string | null | undefined): boolean {
-  if (parseManagedStatus(name) != null) return true;
-  const normalizedDescription = normalizeKey(description ?? "");
-  return normalizedDescription.startsWith("lista_automatica_de_estado");
-}
 
 function isStatusKey(value: string): value is StatusKey {
   return ["watchlist", "in_progress", "completed", "dropped"].includes(value);
+}
+
+function parseUserId(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
 function ContentSkeleton() {
@@ -114,16 +63,45 @@ function ContentSkeleton() {
 
 export default function MyStatusListDetailPage() {
   const { estado } = useParams<{ estado: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const targetUserId = parseUserId(searchParams.get("userId"));
 
   const normalizedStatus = normalizeKey(estado ?? "");
   const status = (isStatusKey(normalizedStatus) ? normalizedStatus : null) as StatusKey | null;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sections, setSections] = useState<CategorySection[]>([]);
+  const [sections, setSections] = useState<StatusCategorySection[]>([]);
+  const [targetUsername, setTargetUsername] = useState<string | null>(null);
 
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (targetUserId == null) {
+      setTargetUsername(null);
+      return;
+    }
+
+    const loadTargetUser = async () => {
+      try {
+        const data = await fetchUserProfile(targetUserId);
+        if (cancelled) return;
+        const username = String(data?.perfil?.username ?? "").trim();
+        setTargetUsername(username || null);
+      } catch {
+        if (cancelled) return;
+        setTargetUsername(null);
+      }
+    };
+
+    void loadTargetUser();
+    return () => {
+      cancelled = true;
+    };
+  }, [targetUserId]);
 
   useEffect(() => {
     const load = async () => {
@@ -144,14 +122,17 @@ export default function MyStatusListDetailPage() {
       }
 
       try {
-        const lists = await getMyLists();
+        const lists =
+          targetUserId != null
+            ? await getListsByUser(targetUserId)
+            : await getMyListsWithFallback();
 
         const targetListIdsByCategory = new Map<CategoryKey, number[]>();
 
         for (const list of lists) {
           const listName = String(list.nombre ?? "");
           if (!isManagedStatusList(listName, list.descripcion)) continue;
-          const listStatus = parseManagedStatus(listName);
+          const listStatus = parseManagedStatus(listName, list.descripcion);
           if (!listStatus || listStatus !== status) continue;
           const category = normalizeCategory(list.tipoContenidos);
           if (!category) continue;
@@ -164,12 +145,12 @@ export default function MyStatusListDetailPage() {
           targetListIdsByCategory.set(category, current);
         }
 
-        const nextSections: CategorySection[] = [];
+        const nextSections: StatusCategorySection[] = [];
 
         for (const category of CATEGORY_ORDER) {
           const listIds = targetListIdsByCategory.get(category) ?? [];
           if (!listIds.length) {
-            nextSections.push({ category, title: CATEGORY_LABELS[category], items: [] });
+            nextSections.push({ category, items: [] });
             continue;
           }
 
@@ -192,11 +173,10 @@ export default function MyStatusListDetailPage() {
 
             nextSections.push({
               category,
-              title: CATEGORY_LABELS[category],
               items: [...dedupe.values()],
             });
           } catch {
-            nextSections.push({ category, title: CATEGORY_LABELS[category], items: [] });
+            nextSections.push({ category, items: [] });
           }
         }
 
@@ -218,10 +198,14 @@ export default function MyStatusListDetailPage() {
     };
 
     load();
-  }, [isLoggedIn, navigate, status]);
+  }, [isLoggedIn, navigate, status, targetUserId]);
 
   const title = status ? STATUS_META[status].title : "Estado";
   const subtitle = status ? STATUS_META[status].subtitle : "";
+  const ownerLabel =
+    targetUserId != null
+      ? `@${targetUsername && targetUsername.length > 0 ? targetUsername : `user-${targetUserId}`}`
+      : null;
   const totalItems = useMemo(
     () => sections.reduce((sum, section) => sum + section.items.length, 0),
     [sections]
@@ -251,7 +235,17 @@ export default function MyStatusListDetailPage() {
           >
             <Link to="/listas" style={{ color: "hsl(268 84% 62%)" }} className="hover:underline">Listas</Link>
             <span>/</span>
-            <Link to="/listas/mis-listas" style={{ color: "hsl(268 84% 62%)" }} className="hover:underline">Mis listas</Link>
+            {targetUserId != null ? (
+              <Link
+                to={`/perfil?userId=${targetUserId}`}
+                style={{ color: "hsl(268 84% 62%)" }}
+                className="hover:underline"
+              >
+                {ownerLabel ? `Perfil ${ownerLabel}` : "Perfil"}
+              </Link>
+            ) : (
+              <Link to="/listas/mis-listas" style={{ color: "hsl(268 84% 62%)" }} className="hover:underline">Mis listas</Link>
+            )}
             <span>/</span>
             <span>{title}</span>
           </nav>
@@ -295,53 +289,12 @@ export default function MyStatusListDetailPage() {
                   </span>
                 </div>
                 <p className="text-sm" style={{ color: "hsl(258 16% 40%)" }}>
+                  {ownerLabel ? `Listas de estado de ${ownerLabel} · ` : ""}
                   {totalItems} {totalItems === 1 ? "contenido" : "contenidos"}
                 </p>
               </div>
 
-              <div className="space-y-10">
-                {sections.map((section) => (
-                  <section key={section.category}>
-                    <div className="mb-4 flex items-center justify-between">
-                      <h2 className="text-xl font-black tracking-tight" style={{ color: "hsl(258 24% 16%)" }}>
-                        {section.title}
-                      </h2>
-                      <span className="text-xs" style={{ color: "hsl(258 16% 45%)" }}>
-                        {section.items.length} {section.items.length === 1 ? "contenido" : "contenidos"}
-                      </span>
-                    </div>
-
-                    {section.items.length === 0 ? (
-                      <div
-                        className="rounded-3xl p-6 max-w-md"
-                        style={{
-                          background: "hsl(270 40% 96%)",
-                          border: "1.5px solid hsl(270 30% 88%)",
-                        }}
-                      >
-                        <p className="text-sm" style={{ color: "hsl(258 16% 40%)" }}>
-                          No hay contenidos en esta categoría.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 items-stretch">
-                        {section.items.map((item, i) => (
-                          <div key={`${section.category}-${item.id}`} className="flex" style={{ animation: `fadeUp 0.35s ease ${i * 0.04}s both` }}>
-                            <ContentCard
-                              title={item.titulo}
-                              image={item.portada ?? undefined}
-                              type={item.tipo}
-                              score={item.puntuacion ?? item.puntuacionApi}
-                              to={buildDetailPath(item.tipo, item.id, item.titulo)}
-                              state={{ item: { id: item.id, titulo: item.titulo, tipo: item.tipo } }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                ))}
-              </div>
+              <StatusCategoryContentSections sections={sections} />
             </>
           )}
         </div>

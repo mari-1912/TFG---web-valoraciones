@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { ListCard, type Lista } from "@/components/lists/list-card";
 import Footer from "@/components/sections/footer";
 import { ProfileHero, type QuickStat } from "@/components/profile/profile-hero";
 import { ProfileStatsSection } from "@/components/profile/profile-stats-section";
 import { ProfileTimeline } from "@/components/profile/profile-timeline";
+import { StatusCardsSection, type StatusCardGroup } from "@/components/status/status-cards-section";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createCroppedImage, type CropAreaPixels } from "@/lib/image-crop";
 import {
+  STATUS_ORDER,
+  normalizeCategory,
+  parseManagedStatus,
+  type CategoryKey,
+  type StatusKey,
+} from "@/lib/status-lists";
+import {
+  fetchAllUserFollowerIds,
   fetchMyProfile,
   fetchUserProfile,
   removeProfileImage,
@@ -17,8 +27,9 @@ import {
   uploadProfileCover,
 } from "@/services/profile-service";
 import { getMe } from "@/services/auth-service";
+import { getListContents } from "@/services/lists-service";
+import { resolveBaseLists } from "@/services/listas/my-lists";
 import {
-  buildTimelineFromLocalActivity,
   buildTimelineFromPayload,
   mergeTimelineRecords,
   type TimelineRecord,
@@ -31,61 +42,256 @@ const MAX_IMAGE_MB = 5;
 const COVER_OUTPUT_WIDTH = 1280;
 const COVER_OUTPUT_HEIGHT = 720;
 
-function parseFollowFlag(value: unknown): boolean | null {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number" && (value === 0 || value === 1)) {
-    return value === 1;
-  }
-  if (typeof value !== "string") return null;
-
-  const normalized = value.trim().toLowerCase();
-  if (["true", "1", "yes", "si", "sí"].includes(normalized)) return true;
-  if (["false", "0", "no"].includes(normalized)) return false;
-  return null;
-}
-
-function getInitialFollowStateFromPayload(data: any): boolean | null {
-  const candidates = [
-    data?.siguesAlUsuario,
-    data?.loSigues,
-    data?.followedByCurrentUser,
-    data?.isFollowedByCurrentUser,
-    data?.isFollowing,
-    data?.following,
-    data?.followingUser,
-    data?.sigue,
-    data?.yaSigue,
-    data?.seguimiento?.isFollowing,
-    data?.seguimiento?.following,
-    data?.seguimiento?.siguiendo,
-    data?.seguimiento?.sigue,
-    data?.perfil?.siguesAlUsuario,
-    data?.perfil?.loSigues,
-    data?.perfil?.followedByCurrentUser,
-    data?.perfil?.isFollowedByCurrentUser,
-    data?.perfil?.isFollowing,
-    data?.perfil?.following,
-    data?.perfil?.followingUser,
-    data?.perfil?.sigue,
-    data?.perfil?.yaSigue,
-  ];
-
-  for (const value of candidates) {
-    const parsed = parseFollowFlag(value);
-    if (parsed != null) return parsed;
-  }
-
-  return null;
-}
-
 function parseUserId(value: unknown): number | null {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
 }
 
+function parseFollowerIdsFromPayload(payload: any): number[] {
+  const ids = new Set<number>();
+
+  const pushFollower = (entry: unknown) => {
+    if (entry == null) return;
+    if (typeof entry === "number" && Number.isFinite(entry) && entry > 0) {
+      ids.add(entry);
+      return;
+    }
+    if (typeof entry === "string") {
+      const numeric = Number(entry);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        ids.add(numeric);
+      }
+      return;
+    }
+    if (typeof entry !== "object") return;
+    const row = entry as Record<string, unknown>;
+    const parsed = Number(
+      row.userId ??
+        row.id ??
+        row.usuarioId ??
+        row.usuario_id ??
+        row.seguidorId ??
+        row.seguidor_id ??
+        row.followerId ??
+        row.follower_id ??
+        (row.usuario as { userId?: unknown } | undefined)?.userId ??
+        (row.user as { userId?: unknown } | undefined)?.userId
+    );
+    if (Number.isFinite(parsed) && parsed > 0) {
+      ids.add(parsed);
+    }
+  };
+
+  const root = payload ?? {};
+  const perfil = root?.perfil ?? {};
+  const seguimiento = root?.seguimiento ?? perfil?.seguimiento ?? {};
+  const arrays = [
+    root?.seguidores,
+    root?.followers,
+    root?.usuariosSeguidores,
+    root?.seguidoresUsuarios,
+    seguimiento?.seguidores,
+    seguimiento?.followers,
+    seguimiento?.usuariosSeguidores,
+    perfil?.seguidores,
+    perfil?.followers,
+    perfil?.usuariosSeguidores,
+    perfil?.seguidoresUsuarios,
+    perfil?.seguimiento?.seguidores,
+    perfil?.seguimiento?.followers,
+    perfil?.seguimiento?.usuariosSeguidores,
+  ];
+
+  for (const candidate of arrays) {
+    if (!Array.isArray(candidate)) continue;
+    for (const row of candidate) {
+      pushFollower(row);
+    }
+  }
+
+  return [...ids];
+}
+
+type CompletedCounts = Record<CategoryKey, number>;
+type StatusCounts = Record<StatusKey, number>;
+
+type ProfileListsSummary = {
+  statusCounts: StatusCounts;
+  visibleCustomLists: Lista[];
+};
+
+const EMPTY_COMPLETED_COUNTS: CompletedCounts = {
+  pelicula: 0,
+  serie: 0,
+  libro: 0,
+  videojuego: 0,
+};
+
+const EMPTY_STATUS_COUNTS: StatusCounts = {
+  watchlist: 0,
+  in_progress: 0,
+  completed: 0,
+  dropped: 0,
+};
+
+const EMPTY_PROFILE_LISTS_SUMMARY: ProfileListsSummary = {
+  statusCounts: { ...EMPTY_STATUS_COUNTS },
+  visibleCustomLists: [],
+};
+
+async function loadCompletedCountsForProfile(
+  targetUserId: number | null,
+  canManageLists: boolean
+): Promise<CompletedCounts> {
+  const baseLists = await resolveBaseLists({ targetUserId, canManageLists });
+  const completedListIdsByCategory: Record<CategoryKey, number[]> = {
+    pelicula: [],
+    serie: [],
+    libro: [],
+    videojuego: [],
+  };
+
+  for (const list of baseLists) {
+    const status = parseManagedStatus(
+      String(list.nombre ?? ""),
+      list.descripcion
+    );
+    if (status !== "completed") continue;
+
+    const category = normalizeCategory(list.tipoContenidos);
+    if (!category) continue;
+
+    const listId = Number(list.listaId);
+    if (!Number.isFinite(listId) || listId <= 0) continue;
+    completedListIdsByCategory[category].push(listId);
+  }
+
+  const completedCounts: CompletedCounts = { ...EMPTY_COMPLETED_COUNTS };
+
+  await Promise.all(
+    (Object.keys(completedListIdsByCategory) as CategoryKey[]).map(
+      async (category) => {
+        const uniqueListIds = [...new Set(completedListIdsByCategory[category])];
+        if (!uniqueListIds.length) return;
+
+        const contentIds = new Set<number>();
+        await Promise.all(
+          uniqueListIds.map(async (listId) => {
+            try {
+              const data = await getListContents(listId);
+              const contenidos = Array.isArray(data?.contenidos)
+                ? data.contenidos
+                : [];
+              for (const contenido of contenidos) {
+                const contentId = Number(contenido?.id);
+                if (Number.isFinite(contentId) && contentId > 0) {
+                  contentIds.add(contentId);
+                }
+              }
+            } catch {
+              // Ignoramos listas que fallen para no romper el perfil.
+            }
+          })
+        );
+
+        completedCounts[category] = contentIds.size;
+      }
+    )
+  );
+
+  return completedCounts;
+}
+
+async function loadProfileListsSummary(
+  targetUserId: number | null,
+  canManageLists: boolean,
+  isOwnProfile: boolean
+): Promise<ProfileListsSummary> {
+  const baseLists = await resolveBaseLists({ targetUserId, canManageLists });
+  const listIdsByStatus: Record<StatusKey, number[]> = {
+    watchlist: [],
+    in_progress: [],
+    completed: [],
+    dropped: [],
+  };
+  const visibleCustomLists: Lista[] = [];
+
+  for (const list of baseLists) {
+    const status = parseManagedStatus(String(list.nombre ?? ""), list.descripcion);
+    const category = normalizeCategory(list.tipoContenidos);
+    const listId = Number(list.listaId);
+    const visibility = String(list.visibilidad ?? "").trim().toLowerCase();
+    const isPublic = visibility === "publica";
+
+    if (status && category && Number.isFinite(listId) && listId > 0) {
+      const shouldIncludeManaged = isOwnProfile || isPublic;
+      if (shouldIncludeManaged) {
+        listIdsByStatus[status].push(listId);
+      }
+      continue;
+    }
+
+    const shouldShow = isOwnProfile || isPublic;
+    if (shouldShow) {
+      visibleCustomLists.push(list as unknown as Lista);
+    }
+  }
+
+  const listContentCache = new Map<number, Promise<number[]>>();
+  const readContentIdsFromList = (listId: number) => {
+    const cached = listContentCache.get(listId);
+    if (cached) return cached;
+
+    const request = (async () => {
+      try {
+        const data = await getListContents(listId);
+        const contenidos = Array.isArray(data?.contenidos) ? data.contenidos : [];
+        const ids: number[] = [];
+        for (const contenido of contenidos) {
+          const contentId = Number(contenido?.id);
+          if (Number.isFinite(contentId) && contentId > 0) {
+            ids.push(contentId);
+          }
+        }
+        return ids;
+      } catch {
+        return [];
+      }
+    })();
+
+    listContentCache.set(listId, request);
+    return request;
+  };
+
+  const computeUniqueContentCount = async (ids: number[]) => {
+    const uniqueListIds = [...new Set(ids)];
+    if (!uniqueListIds.length) return 0;
+
+    const results = await Promise.all(
+      uniqueListIds.map((listId) => readContentIdsFromList(listId))
+    );
+    const uniqueContentIds = new Set<number>();
+    for (const contentIds of results) {
+      for (const contentId of contentIds) uniqueContentIds.add(contentId);
+    }
+    return uniqueContentIds.size;
+  };
+
+  const statusCounts: StatusCounts = { ...EMPTY_STATUS_COUNTS };
+  await Promise.all(
+    STATUS_ORDER.map(async (status) => {
+      statusCounts[status] = await computeUniqueContentCount(listIdsByStatus[status]);
+    })
+  );
+
+  return {
+    statusCounts,
+    visibleCustomLists,
+  };
+}
+
 export default function ProfilePage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get("userId");
   const requestedUserId = useMemo(() => {
@@ -97,6 +303,7 @@ export default function ProfilePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [profileUserId, setProfileUserId] = useState<number | null>(null);
+  const [profileFollowerIds, setProfileFollowerIds] = useState<number[]>([]);
   const [initialIsFollowing, setInitialIsFollowing] = useState<boolean | null>(
     null
   );
@@ -119,6 +326,9 @@ export default function ProfilePage() {
   const [moviesCount, setMoviesCount] = useState(0);
   const [booksCount, setBooksCount] = useState(0);
   const [gamesCount, setGamesCount] = useState(0);
+  const [statusProgressCounts, setStatusProgressCounts] =
+    useState<StatusCounts>(EMPTY_STATUS_COUNTS);
+  const [visibleProfileLists, setVisibleProfileLists] = useState<Lista[]>([]);
   const [timelineRecords, setTimelineRecords] = useState<TimelineRecord[]>([]);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -165,6 +375,7 @@ export default function ProfilePage() {
     setProfileLoading(true);
     setProfileError(null);
     setInitialIsFollowing(null);
+    setProfileFollowerIds([]);
 
     const controller = new AbortController();
 
@@ -183,8 +394,39 @@ export default function ProfilePage() {
           setIsLoggedIn(true);
           setCurrentUserId((prev) => prev ?? parseUserId(perfil.userId));
         }
-        setProfileUserId(parseUserId(perfil.userId ?? requestedUserId));
-        setInitialIsFollowing(getInitialFollowStateFromPayload(data));
+        const resolvedProfileUserId = parseUserId(perfil.userId ?? requestedUserId);
+        setProfileUserId(resolvedProfileUserId);
+        let followerIds = parseFollowerIdsFromPayload(data);
+        let resolvedFollowersCount = Number(stats.seguidores ?? followerIds.length);
+
+        if (resolvedProfileUserId != null) {
+          try {
+            const followersResult = await fetchAllUserFollowerIds(
+              resolvedProfileUserId,
+              controller.signal
+            );
+            if (!controller.signal.aborted) {
+              followerIds = followersResult.followerIds;
+              resolvedFollowersCount = followersResult.total;
+            }
+          } catch {
+            // Si el endpoint de seguidores falla, mantenemos el fallback del perfil.
+          }
+        }
+
+        setProfileFollowerIds(followerIds);
+
+        if (requestedUserId === null) {
+          setInitialIsFollowing(null);
+        } else if (currentUserId != null && resolvedProfileUserId != null) {
+          if (currentUserId === resolvedProfileUserId) {
+            setInitialIsFollowing(null);
+          } else {
+            setInitialIsFollowing(followerIds.includes(currentUserId));
+          }
+        } else {
+          setInitialIsFollowing(null);
+        }
 
         setUsername(perfil.username ?? "");
         setRole((perfil.tipo ?? "Base").toString());
@@ -195,29 +437,42 @@ export default function ProfilePage() {
         setAverageRating(stats.media ?? 0);
         setReviewsCount(stats.comentarios ?? 0);
         setFollowingCount(stats.siguiendo ?? 0);
-        setFollowersCount(stats.seguidores ?? 0);
+        setFollowersCount(
+          Number.isFinite(resolvedFollowersCount) && resolvedFollowersCount >= 0
+            ? resolvedFollowersCount
+            : followerIds.length
+        );
         setCommentsCount(stats.comentarios ?? 0);
-        setSeriesCount(stats.series ?? 0);
-        setMoviesCount(stats.peliculas ?? 0);
-        setBooksCount(stats.libros ?? 0);
-        setGamesCount(stats.videojuegos ?? 0);
+
+        const canManageListsForTarget =
+          requestedUserId === null ||
+          (currentUserId != null &&
+            resolvedProfileUserId != null &&
+            currentUserId === resolvedProfileUserId);
+        const completedCounts = await loadCompletedCountsForProfile(
+          resolvedProfileUserId,
+          canManageListsForTarget
+        ).catch(() => EMPTY_COMPLETED_COUNTS);
+        if (controller.signal.aborted) return;
+        setSeriesCount(completedCounts.serie);
+        setMoviesCount(completedCounts.pelicula);
+        setBooksCount(completedCounts.libro);
+        setGamesCount(completedCounts.videojuego);
+
+        const listsSummary = await loadProfileListsSummary(
+          resolvedProfileUserId,
+          canManageListsForTarget,
+          requestedUserId === null ||
+            (currentUserId != null &&
+              resolvedProfileUserId != null &&
+              currentUserId === resolvedProfileUserId)
+        ).catch(() => EMPTY_PROFILE_LISTS_SUMMARY);
+        if (controller.signal.aborted) return;
+        setStatusProgressCounts(listsSummary.statusCounts);
+        setVisibleProfileLists(listsSummary.visibleCustomLists);
 
         const backendTimelineRecords = buildTimelineFromPayload(data);
-        const localTimelineRecords =
-          requestedUserId === null
-            ? [
-                ...buildTimelineFromLocalActivity(perfil.username ?? ""),
-                ...buildTimelineFromLocalActivity(
-                  (typeof window !== "undefined"
-                    ? localStorage.getItem("currentUser")
-                    : "") ?? ""
-                ),
-              ]
-            : [];
-
-        setTimelineRecords(
-          mergeTimelineRecords([...backendTimelineRecords, ...localTimelineRecords])
-        );
+        setTimelineRecords(mergeTimelineRecords(backendTimelineRecords));
       } catch (error) {
         if (controller.signal.aborted) return;
         setProfileUserId(null);
@@ -227,6 +482,8 @@ export default function ProfilePage() {
             ? error.message
             : "No se pudo cargar el perfil."
         );
+        setStatusProgressCounts(EMPTY_STATUS_COUNTS);
+        setVisibleProfileLists([]);
         setTimelineRecords([]);
       } finally {
         if (!controller.signal.aborted) {
@@ -238,14 +495,30 @@ export default function ProfilePage() {
     loadProfile();
 
     return () => controller.abort();
-  }, [requestedUserId, isLoggedIn]);
+  }, [requestedUserId, isLoggedIn, currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId == null) return;
+    if (profileUserId == null) return;
+    if (requestedUserId == null || !isLoggedIn) return;
+    if (currentUserId === profileUserId) {
+      setInitialIsFollowing(null);
+      return;
+    }
+    setInitialIsFollowing(profileFollowerIds.includes(currentUserId));
+  }, [
+    requestedUserId,
+    isLoggedIn,
+    currentUserId,
+    profileUserId,
+    profileFollowerIds,
+  ]);
 
   const isOwnProfile =
     requestedUserId === null ||
     (currentUserId !== null &&
       requestedUserId !== null &&
       Number(requestedUserId) === Number(currentUserId));
-  const statsTargetUserId = requestedUserId ?? profileUserId;
   const canEdit = isOwnProfile;
 
   useEffect(() => {
@@ -279,11 +552,19 @@ export default function ProfilePage() {
   );
 
   const activityCards = [
-    { title: "Series", value: seriesCount, unit: "totales" },
-    { title: "Películas", value: moviesCount, unit: "totales" },
-    { title: "Libros", value: booksCount, unit: "totales" },
-    { title: "Videojuegos", value: gamesCount, unit: "totales" },
+    { title: "Series vistas", value: seriesCount },
+    { title: "Películas vistas", value: moviesCount },
+    { title: "Libros leídos", value: booksCount },
+    { title: "Videojuegos jugados", value: gamesCount },
   ];
+  const statusGroups = useMemo<StatusCardGroup[]>(
+    () =>
+      STATUS_ORDER.map((status) => ({
+        status,
+        totalItems: statusProgressCounts[status] ?? 0,
+      })),
+    [statusProgressCounts]
+  );
   const {
     timelineItems,
     canToggleTimelineHistory,
@@ -618,33 +899,56 @@ export default function ProfilePage() {
         <>
           <ProfileStatsSection
             cards={activityCards}
-            showViewAll
-            onViewAll={() =>
-              navigate(
-                statsTargetUserId != null
-                  ? `/perfil/estadisticas?userId=${statsTargetUserId}`
-                  : "/perfil/estadisticas"
-              )
-            }
+            showViewAll={false}
           />
 
-          {isOwnProfile ? (
-            <>
-              <div className="mt-10 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">Listas</h2>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-violet-700 hover:text-violet-800"
-                >
-                  Ver todo
-                </button>
+          <div className="mt-10 space-y-10">
+            <section>
+              <h2 className="mb-4 text-xl font-semibold text-gray-900">Listas</h2>
+              <StatusCardsSection
+                groups={statusGroups}
+                buildStatusHref={(status) => {
+                  if (isOwnProfile) return `/listas/mis-listas/estado/${status}`;
+                  if (profileUserId == null) return null;
+                  return `/listas/mis-listas/estado/${status}?userId=${profileUserId}`;
+                }}
+              />
+            </section>
+
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {isOwnProfile ? "Listas creadas" : "Listas públicas"}
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {visibleProfileLists.length}{" "}
+                  {visibleProfileLists.length === 1 ? "lista" : "listas"}
+                </span>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-white p-6 text-sm text-gray-600">
-                Aquí aparecerán tus listas guardadas y tus favoritos.
-              </div>
-            </>
-          ) : null}
+              {visibleProfileLists.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-violet-200 bg-white p-6 text-sm text-gray-600">
+                  {isOwnProfile
+                    ? "No tienes listas personalizadas todavía."
+                    : "Este perfil no tiene listas públicas todavía."}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {visibleProfileLists.map((lista, index) => (
+                    <div
+                      key={lista.listaId}
+                      style={{ animation: `fadeUp 0.4s ease ${index * 0.05}s both` }}
+                    >
+                      <ListCard
+                        lista={lista}
+                        basePath={isOwnProfile ? "/listas/mis-listas" : "/listas/nuestras-listas"}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
 
           <div className="mt-10">
             <ProfileTimeline

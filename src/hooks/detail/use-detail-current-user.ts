@@ -35,18 +35,13 @@ export function useDetailCurrentUser({
         const perfilRole = (perfil as { role?: unknown }).role;
         setCurrentUserId(Number(perfil.userId ?? 0) || null);
         setCurrentUserAvatarUrl(perfil.avatarUrl ?? null);
-        const role =
-          (perfil.tipo ?? perfilRole ?? localStorage.getItem("userRole") ?? "base")
-            .toString()
-            .toLowerCase();
+        const role = (perfil.tipo ?? perfilRole ?? "base").toString().toLowerCase();
         setCurrentUserRole(role);
       } catch {
         if (isMounted) {
           setCurrentUserId(null);
           setCurrentUserAvatarUrl(null);
-          setCurrentUserRole(
-            (localStorage.getItem("userRole") ?? "base").toString().toLowerCase()
-          );
+          setCurrentUserRole("base");
         }
       }
     };
