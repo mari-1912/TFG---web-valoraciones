@@ -43,6 +43,7 @@ export type CommunityFeedPayload = {
 type GetCommunityFeedOptions = {
   page?: number;
   pageSize?: number;
+  userIds?: number[];
   signal?: AbortSignal;
 };
 
@@ -77,6 +78,10 @@ export async function getCommunityFeed(
   const params = new URLSearchParams();
   params.set("page", String(Math.max(1, page)));
   params.set("pageSize", String(Math.max(1, pageSize)));
+
+  if (options.userIds && options.userIds.length > 0) {
+    params.set("userIds", options.userIds.join(","));
+  }
 
   const path = `/actividad?${params.toString()}`;
   const res = await fetch(`${API_URL}${path}`, {
