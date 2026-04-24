@@ -8,37 +8,6 @@ export type TimelineItem = {
   date: string;
 };
 
-export const DEFAULT_TIMELINE: TimelineItem[] = [
-  {
-    id: "t-1",
-    type: "comment",
-    title: "Comentaste en Dune",
-    detail: "“Fotografía impecable y ritmo constante.”",
-    date: "Hace 2 días",
-  },
-  {
-    id: "t-2",
-    type: "rating",
-    title: "Valoraste Arcane",
-    detail: "4.5/5",
-    date: "Hace 4 días",
-  },
-  {
-    id: "t-3",
-    type: "service",
-    title: "Añadiste a favoritos: The Witcher 3",
-    detail: "Videojuegos",
-    date: "Hace 1 semana",
-  },
-  {
-    id: "t-4",
-    type: "list",
-    title: "Añadiste un servicio a tu lista",
-    detail: "Mis listas • Fantasía oscura",
-    date: "Hace 2 semanas",
-  },
-];
-
 type ProfileTimelineProps = {
   items: TimelineItem[];
   actionLabel?: string;
