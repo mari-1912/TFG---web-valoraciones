@@ -44,6 +44,8 @@ type ProfileTimelineProps = {
   actionLabel?: string;
   showAction?: boolean;
   onAction?: () => void;
+  titleClassName?: string;
+  centerTitle?: boolean;
 };
 
 export function ProfileTimeline({
@@ -51,23 +53,42 @@ export function ProfileTimeline({
   actionLabel = "Ver más",
   showAction = false,
   onAction,
+  titleClassName,
+  centerTitle = false,
 }: ProfileTimelineProps) {
+  const headingClassName = titleClassName ?? "text-xl font-semibold text-gray-900";
+
   return (
     <section>
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Actividad reciente
-        </h2>
-        {showAction ? (
-          <button
-            type="button"
-            onClick={onAction}
-            className="text-sm font-medium text-violet-700 hover:text-violet-800"
-          >
-            {actionLabel}
-          </button>
-        ) : null}
-      </div>
+      {centerTitle ? (
+        <>
+          <h2 className={headingClassName}>Actividad reciente</h2>
+          {showAction ? (
+            <div className="mt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={onAction}
+                className="text-sm font-medium text-violet-700 hover:text-violet-800"
+              >
+                {actionLabel}
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex items-center justify-between">
+          <h2 className={headingClassName}>Actividad reciente</h2>
+          {showAction ? (
+            <button
+              type="button"
+              onClick={onAction}
+              className="text-sm font-medium text-violet-700 hover:text-violet-800"
+            >
+              {actionLabel}
+            </button>
+          ) : null}
+        </div>
+      )}
 
       <div className="relative mt-4 pl-8">
         <div className="absolute left-3 top-0 h-full w-px bg-violet-100" />

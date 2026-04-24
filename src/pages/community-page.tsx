@@ -890,8 +890,19 @@ export default function CommunityPage() {
   if (loading) {
     return (
       <>
-        <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
+        <main className="min-h-screen pt-4 bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
           <div className="mx-auto max-w-6xl space-y-4 px-6 pb-10">
+            <div className="mb-6 text-center">
+              <h1
+                className="text-3xl font-black tracking-tight"
+                style={{ color: "hsl(268 84% 62%)" }}
+              >
+                Actividad reciente
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Estás visualizando las últimas valoraciones y comentarios de los usuarios que sigues
+              </p>
+            </div>
             {Array.from({ length: 3 }).map((_, index) => (
               <div
                 key={`community-skeleton-${index}`}
@@ -921,12 +932,23 @@ export default function CommunityPage() {
   }
 
   return (
-    <>
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
-        <div className="mx-auto max-w-6xl px-6 pb-10">
-          {error ? (
-            <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
-              {error}
+      <>
+      <main className="min-h-screen pt-4 bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
+          <div className="mx-auto max-w-6xl px-6 pb-10">
+            <div className="mb-6 text-center">
+              <h1
+                className="text-3xl font-black tracking-tight"
+                style={{ color: "hsl(268 84% 62%)" }}
+              >
+                Actividad reciente
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Estás visualizando las últimas valoraciones y comentarios de los usuarios que sigues
+              </p>
+            </div>
+            {error ? (
+              <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+                {error}
             </p>
           ) : null}
           {actionMessage ? (

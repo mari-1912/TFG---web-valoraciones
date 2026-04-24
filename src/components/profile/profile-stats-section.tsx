@@ -8,27 +8,64 @@ type ProfileStatsSectionProps = {
   cards: StatsCard[];
   showViewAll?: boolean;
   onViewAll?: () => void;
+  titleClassName?: string;
+  centerTitle?: boolean;
+  subtitle?: string;
+  subtitleClassName?: string;
 };
 
 export function ProfileStatsSection({
   cards,
   showViewAll = true,
   onViewAll,
+  titleClassName,
+  centerTitle = false,
+  subtitle,
+  subtitleClassName,
 }: ProfileStatsSectionProps) {
+  const headingClassName = titleClassName ?? "text-xl font-semibold text-gray-900";
+  const resolvedSubtitleClassName =
+    subtitleClassName ?? "mt-2 text-center text-sm text-gray-600";
+
   return (
     <section>
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Estadísticas</h2>
-        {showViewAll ? (
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="text-sm font-medium text-violet-700 hover:text-violet-800"
-          >
-            Ver todo
-          </button>
-        ) : null}
-      </div>
+      {centerTitle ? (
+        <>
+          <h2 className={headingClassName}>Estadísticas</h2>
+          {subtitle ? (
+            <p className={resolvedSubtitleClassName}>{subtitle}</p>
+          ) : null}
+          {showViewAll ? (
+            <div className="mt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={onViewAll}
+                className="text-sm font-medium text-violet-700 hover:text-violet-800"
+              >
+                Ver todo
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className={headingClassName}>Estadísticas</h2>
+            {subtitle ? (
+              <p className={resolvedSubtitleClassName}>{subtitle}</p>
+            ) : null}
+          </div>
+          {showViewAll ? (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className="text-sm font-medium text-violet-700 hover:text-violet-800"
+            >
+              Ver todo
+            </button>
+          ) : null}
+        </div>
+      )}
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (

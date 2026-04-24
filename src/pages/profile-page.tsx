@@ -53,6 +53,14 @@ const MAX_IMAGE_MB = 5;
 const COVER_OUTPUT_WIDTH = 1280;
 const COVER_OUTPUT_HEIGHT = 720;
 
+const PROFILE_CONTENT_TABS = [
+  { id: "stats", label: "Estadísticas" },
+  { id: "lists", label: "Listas" },
+  { id: "activity", label: "Actividad reciente" },
+] as const;
+
+type ProfileContentTabId = (typeof PROFILE_CONTENT_TABS)[number]["id"];
+
 function parseUserId(value: unknown): number | null {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
@@ -701,6 +709,7 @@ export default function ProfilePage() {
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [bio, setBio] = useState("");
+  const [savedBio, setSavedBio] = useState("");
   const [ratingsCount, setRatingsCount] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
   const [reviewsCount, setReviewsCount] = useState(0);
@@ -741,6 +750,8 @@ export default function ProfilePage() {
     useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
   const [followingList, setFollowingList] =
     useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
+  const [activeContentTab, setActiveContentTab] =
+    useState<ProfileContentTabId>("stats");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -838,7 +849,9 @@ export default function ProfilePage() {
 
         setUsername(perfil.username ?? "");
         setRole((perfil.tipo ?? "Base").toString());
-        setBio(perfil.descripcion ?? "");
+        const resolvedBio = perfil.descripcion ?? "";
+        setBio(resolvedBio);
+        setSavedBio(resolvedBio);
         setProfileImage(perfil.avatarUrl ?? null);
         setCoverImage(perfil.bannerUrl ?? null);
         setRatingsCount(stats.valoraciones ?? 0);
@@ -1332,17 +1345,29 @@ export default function ProfilePage() {
         setFollowersCount((prev) => Math.max(0, prev + delta)),
     });
 
-  const handleToggleEdit = async () => {
+  const handleStartEdit = () => {
     if (!canEdit) return;
-    if (isEditing) {
-      setSaveError(null);
-      const result = await updateProfile({ descripcion: bio });
-      if (!result.success) {
-        setSaveError(result.message ?? "No se pudo actualizar el perfil.");
-        return;
-      }
+    setSaveError(null);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (!canEdit) return;
+    setSaveError(null);
+    setBio(savedBio);
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!canEdit || !isEditing) return;
+    setSaveError(null);
+    const result = await updateProfile({ descripcion: bio });
+    if (!result.success) {
+      setSaveError(result.message ?? "No se pudo actualizar el perfil.");
+      return;
     }
-    setIsEditing((prev) => !prev);
+    setSavedBio(bio);
+    setIsEditing(false);
   };
 
   const handleAvatarClick = () => {
@@ -1532,7 +1557,7 @@ export default function ProfilePage() {
         if (result.success && result.url) {
           applyCoverImage(result.url);
         } else if (!result.success) {
-          setCoverError(result.message ?? "No se pudo subir la portada.");
+          setCoverError(result.message ?? "No se pudo subir el banner.");
         }
       } finally {
         window.clearTimeout(timeoutId);
@@ -1543,7 +1568,7 @@ export default function ProfilePage() {
           "La subida ha tardado demasiado. Se guardó localmente."
         );
       } else {
-        setCoverError("No se pudo guardar la portada.");
+        setCoverError("No se pudo guardar el banner.");
       }
     } finally {
       setCoverUploading(false);
@@ -1558,10 +1583,10 @@ export default function ProfilePage() {
     try {
       const result = await removeProfileCover();
       if (!result.success) {
-        setCoverError(result.message ?? "No se pudo eliminar la portada.");
+        setCoverError(result.message ?? "No se pudo eliminar el banner.");
       }
     } catch {
-      setCoverError("No se pudo eliminar la portada.");
+      setCoverError("No se pudo eliminar el banner.");
     } finally {
       applyCoverImage(null);
       setCoverUploading(false);
@@ -1571,8 +1596,7 @@ export default function ProfilePage() {
   if (profileLoading) {
     return (
       <main className="min-h-screen bg-white">
-        <div className="h-32 md:h-36" />
-        <div className="mx-auto max-w-6xl px-4 pb-10 pt-3">
+        <div className="mx-auto max-w-6xl px-4 pb-10">
           <div className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm">
             <Skeleton className="h-28 w-full rounded-2xl" />
             <div className="mt-5 flex items-center gap-4">
@@ -1602,9 +1626,8 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="h-32 md:h-36" />
       {profileError && (
-        <div className="mx-auto max-w-6xl px-4 pb-4 pt-3 text-sm text-rose-600">
+        <div className="mx-auto max-w-6xl px-4 pb-4 text-sm text-rose-600">
           {profileError}
         </div>
       )}
@@ -1629,7 +1652,9 @@ export default function ProfilePage() {
         onCoverClick={handleCoverClick}
         onRemoveAvatar={handleRemoveAvatar}
         onRemoveCover={handleRemoveCover}
-        onToggleEdit={handleToggleEdit}
+        onStartEdit={handleStartEdit}
+        onSaveEdit={handleSaveEdit}
+        onCancelEdit={handleCancelEdit}
         onBioChange={applyProfileBio}
         showFollowAction={!canEdit && profileUserId != null}
         isFollowing={isFollowingProfile}
@@ -1645,17 +1670,58 @@ export default function ProfilePage() {
       />
 
       <section className="mx-auto max-w-6xl px-4 py-10">
-        <>
-          <ProfileStatsSection
-            cards={activityCards}
-            showViewAll={false}
-          />
+        <div className="border-b border-gray-200">
+          <div className="flex min-w-0 items-center gap-6 overflow-x-auto">
+            {PROFILE_CONTENT_TABS.map((tab) => {
+              const isActive = activeContentTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveContentTab(tab.id)}
+                  className={[
+                    "relative whitespace-nowrap pb-3 pt-1 text-lg font-semibold transition",
+                    isActive
+                      ? "text-gray-900"
+                      : "text-gray-400 hover:text-gray-700",
+                  ].join(" ")}
+                  aria-pressed={isActive}
+                >
+                  {tab.label}
+                  {isActive ? (
+                    <span className="absolute inset-x-0 -bottom-px h-[3px] rounded-full bg-sky-500" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-          <div className="mt-10 space-y-10">
+        {activeContentTab === "stats" ? (
+          <div className="pt-6">
+            <ProfileStatsSection
+              cards={activityCards}
+              showViewAll={false}
+              centerTitle
+              titleClassName="text-center text-3xl font-black tracking-tight text-[hsl(268_84%_62%)]"
+              subtitle="Aquí aparece todo el contenido marcado como finalizado"
+            />
+          </div>
+        ) : null}
+
+        {activeContentTab === "lists" ? (
+          <div className="space-y-10 pt-6">
             <section>
-              <h2 className="mb-4 text-xl font-semibold text-gray-900">Listas</h2>
+              <h2 className="mb-1 text-center text-3xl font-black tracking-tight text-[hsl(268_84%_62%)]">
+                Listas
+              </h2>
+              <p className="mb-4 text-center text-sm text-gray-600">
+                Aquí aparecen las listas de progreso y las listas creadas por el usuario
+              </p>
               <StatusCardsSection
                 groups={statusGroups}
+                title="Tu progreso"
+                helperText=""
                 buildStatusHref={(status) => {
                   if (isOwnProfile) return `/listas/mis-listas/estado/${status}`;
                   if (profileUserId == null) return null;
@@ -1666,10 +1732,13 @@ export default function ProfilePage() {
 
             <section>
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {isOwnProfile ? "Listas creadas" : "Listas públicas"}
+                <h3
+                  className="text-xl font-black tracking-tight"
+                  style={{ color: "hsl(258 24% 16%)" }}
+                >
+                  Tus listas creadas
                 </h3>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs" style={{ color: "hsl(258 16% 45%)" }}>
                   {visibleProfileLists.length}{" "}
                   {visibleProfileLists.length === 1 ? "lista" : "listas"}
                 </span>
@@ -1698,16 +1767,20 @@ export default function ProfilePage() {
               )}
             </section>
           </div>
+        ) : null}
 
-          <div className="mt-10">
+        {activeContentTab === "activity" ? (
+          <div className="pt-6">
             <ProfileTimeline
               items={timelineItems}
               actionLabel={timelineActionLabel}
               showAction={canToggleTimelineHistory}
               onAction={handleToggleTimelineHistory}
+              centerTitle
+              titleClassName="text-center text-3xl font-black tracking-tight text-[hsl(268_84%_62%)]"
             />
           </div>
-        </>
+        ) : null}
       </section>
 
       <ImageCropModal
@@ -1727,8 +1800,8 @@ export default function ProfilePage() {
       <ImageCropModal
         open={isCoverCropOpen && Boolean(coverPreviewUrl)}
         imageSrc={coverPreviewUrl}
-        title="Recortar portada"
-        description="Ajusta el encuadre horizontal de la portada."
+        title="Recortar banner"
+        description="Ajusta el encuadre horizontal del banner."
         aspect={COVER_OUTPUT_WIDTH / COVER_OUTPUT_HEIGHT}
         cropShape="rect"
         panelClassName="max-w-2xl"
