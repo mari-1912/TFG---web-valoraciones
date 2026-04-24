@@ -414,7 +414,9 @@ export function DetailHero({
       : `En ${selectedLists.length} listas`;
 
   const ratingBlockedMessage = "Disponible al marcar como completado.";
+  const [expanded, setExpanded] = useState(false);
 
+  const hasText = description?.trim();
   return (
     <section className="relative overflow-hidden rounded-3xl border border-gray-200 bg-neutral-900 text-white shadow-sm">
       {image ? (
@@ -428,17 +430,17 @@ export function DetailHero({
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-transparent pointer-events-none" />
 
-      <div className="relative z-10 grid gap-8 p-6 sm:p-8 lg:grid-cols-[220px_minmax(0,1fr)_240px]">
+      <div className="relative z-10 grid grid-cols-[minmax(120px,34vw)_minmax(0,1fr)] gap-4 p-4 sm:gap-6 sm:p-6 md:grid-cols-[minmax(190px,28vh)_minmax(0,1fr)] md:gap-8 md:p-8 lg:grid-cols-[minmax(220px,32vh)_minmax(0,1fr)_240px]">
         {/* Columna portada */}
-        <div className="space-y-4">
+        <div className="w-full max-w-[min(34vh,280px)] space-y-3 sm:space-y-4">
           {image ? (
             <img
-              src={image}
-              alt={title}
-              className="w-full rounded-2xl object-cover aspect-[2/3] shadow-lg"
+            src={image}
+            alt={title}
+            className="w-full aspect-[2/3] object-cover rounded-2xl shadow-lg"
             />
           ) : (
-            <div className="aspect-[2/3] w-full rounded-2xl bg-black/50 flex items-center justify-center text-sm text-gray-300">
+            <div className="flex h-[min(38vh,320px)] min-h-[180px] w-full items-center justify-center rounded-2xl bg-black/50 text-sm text-gray-300 md:h-[min(48vh,420px)]">
               Sin portada
             </div>
           )}
@@ -446,7 +448,7 @@ export function DetailHero({
             <button
               type="button"
               onClick={() => setShowVideo(true)}
-              className="flex items-center justify-center gap-2 rounded-full border border-yellow-400/80 px-4 py-2 text-sm font-semibold text-yellow-300 hover:bg-yellow-400/10"
+              className="flex items-center justify-center gap-2 rounded-full border border-purple-400/80 px-4 py-2 text-sm font-semibold text-white-300 hover:bg-purple-400/10"
             >
               ▶ Reproducir tráiler
             </button>
@@ -454,56 +456,69 @@ export function DetailHero({
         </div>
 
         {/* Columna información */}
-        <div className="space-y-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-yellow-400">
+        <div className="min-w-0 space-y-3 sm:space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white-400">
             {typeLabel}
           </p>
-          <h1 className="text-3xl font-semibold text-white sm:text-4xl lg:text-5xl">
+          <h1 className="text-2xl font-semibold leading-tight text-white sm:text-4xl lg:text-5xl">
             {title}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-yellow-200">
-            <span className="rounded-full border border-yellow-400/40 px-3 py-1">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-white-200">
+            <span className="rounded-full border border-purple-400/40 px-3 py-1">
               ⭐ {apiRatingText}
             </span>
-            <span className="rounded-full border border-yellow-400/40 px-3 py-1">
+            <span className="rounded-full border border-purple-400/40 px-3 py-1">
               ⭐ Opinify {ourRatingLabel}
             </span>
             {userRating != null ? (
-              <span className="rounded-full border border-blue-300/40 px-3 py-1 text-blue-200">
+              <span className="rounded-full border border-purple-300/40 px-3 py-1 text-white-200">
                 ⭐ Tu puntuación {userRating}/10
               </span>
             ) : null}
           </div>
 
-          <p className="max-w-2xl text-sm leading-relaxed text-gray-200">
-            {description?.trim() ? description : "Sin descripción disponible."}
+          <p
+            className={`max-w-2xl text-sm leading-relaxed text-gray-200 ${
+              expanded ? "" : "line-clamp-6"
+            }`}
+          >
+            {hasText ? description : "Sin descripción disponible."}
           </p>
 
-          {meta.length > 0 ? (
-            <div className="pt-4 border-t border-white/10">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-yellow-300">
-                Ficha técnica
-              </h2>
-              <dl className="mt-3 grid grid-cols-1 gap-3 text-sm text-gray-200 sm:grid-cols-2">
-                {meta.map((entry) => (
-                  <div
-                    key={`${entry.label}-${entry.value}`}
-                    className="rounded-lg border border-white/10 bg-black/40 px-3 py-2"
-                  >
-                    <dt className="text-[11px] uppercase tracking-wider text-gray-400">
-                      {entry.label}
-                    </dt>
-                    <dd className="mt-1 text-sm text-white">{entry.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ) : null}
+          {hasText && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-white-500 mt-2 cursor-pointer"
+            >
+              {expanded ? "Leer menos" : "Leer más"}
+            </button>
+          )}
         </div>
 
+        {meta.length > 0 ? (
+          <div className="col-span-2 border-t border-white/10 pt-4 lg:col-span-1 lg:col-start-2 lg:row-start-2">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white-300">
+              Ficha técnica
+            </h2>
+            <dl className="mt-3 grid grid-cols-2 gap-3 text-sm text-gray-200 sm:grid-cols-2">
+              {meta.map((entry) => (
+                <div
+                  key={`${entry.label}-${entry.value}`}
+                  className="rounded-lg border border-white/10 bg-black/40 px-3 py-2"
+                >
+                  <dt className="text-[11px] uppercase tracking-wider text-gray-400">
+                    {entry.label}
+                  </dt>
+                  <dd className="mt-1 text-sm text-white">{entry.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
+
         {/* Columna acciones */}
-        <div className="space-y-5">
+        <div className="col-span-2 space-y-5 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
           <div className="space-y-3">
             {/* Estado */}
             <DropdownMenu>
@@ -512,8 +527,8 @@ export function DetailHero({
                   type="button"
                   disabled={statusUpdating}
                   className={[
-                    "flex w-full items-center justify-between rounded-xl border border-yellow-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-yellow-200 transition",
-                    "hover:bg-yellow-400/10",
+                    "flex w-full items-center justify-between rounded-xl border border-purple-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-white-200 transition",
+                    "hover:bg-purple-400/10",
                     statusUpdating ? "cursor-not-allowed opacity-60" : "",
                   ].join(" ")}
                 >
@@ -529,7 +544,7 @@ export function DetailHero({
                   const isActive = option.value === currentStatus;
                   const tone =
                     option.value === "watchlist"
-                      ? "border-yellow-400/70 text-yellow-200"
+                      ? "border-purple-400/70 text-white-200"
                       : option.value === "in_progress"
                         ? "border-sky-400/70 text-sky-200"
                         : option.value === "completed"
@@ -537,7 +552,7 @@ export function DetailHero({
                           : "border-rose-400/70 text-rose-200";
                   const activeBg =
                     option.value === "watchlist"
-                      ? "bg-yellow-400/20"
+                      ? "bg-purple-400/20"
                       : option.value === "in_progress"
                         ? "bg-sky-400/20"
                         : option.value === "completed"
@@ -545,7 +560,7 @@ export function DetailHero({
                           : "bg-rose-400/20";
                   const hoverBg =
                     option.value === "watchlist"
-                      ? "hover:bg-yellow-400/10"
+                      ? "hover:bg-purple-400/10"
                       : option.value === "in_progress"
                         ? "hover:bg-sky-400/10"
                         : option.value === "completed"
@@ -576,7 +591,7 @@ export function DetailHero({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-xl border border-yellow-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-yellow-200 transition hover:bg-yellow-400/10"
+                  className="flex w-full items-center justify-between rounded-xl border border-purple-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-white-200 transition hover:bg-purple-400/10"
                 >
                   <span>{listTriggerLabel}</span>
                   <ChevronDown className="h-4 w-4" />
@@ -586,7 +601,7 @@ export function DetailHero({
                 align="end"
                 className="w-[260px] space-y-2 rounded-2xl border border-white/10 bg-neutral-900/95 p-3 text-white shadow-2xl backdrop-blur"
               >
-                <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-300/90">
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white-300/90">
                   Mis listas
                 </p>
                 {filteredLists.length === 0 ? (
@@ -608,7 +623,7 @@ export function DetailHero({
                           "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
                           assigningListId === ul.id ? "cursor-not-allowed opacity-60" : "",
                           isSelected
-                            ? "border-yellow-400/70 bg-yellow-400/20 text-yellow-200"
+                            ? "border-purple-400/70 bg-purple-400/20 text-white-200"
                             : "border-white/15 text-white/90 hover:bg-white/10",
                         ].join(" ")}
                       >
@@ -648,13 +663,13 @@ export function DetailHero({
                           }
                         }}
                         placeholder="Nombre de la lista"
-                        className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-yellow-300/70 focus:outline-none"
+                        className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-purple-300/70 focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleCreateList}
                         disabled={isCreatingListLoading}
-                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-400/70 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-yellow-200 transition hover:bg-yellow-400/10"
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-purple-400/70 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white-200 transition hover:bg-purple-400/10"
                       >
                         <ListPlus className="h-4 w-4" />
                         {isCreatingListLoading ? "Creando..." : "Crear y añadir"}
@@ -675,7 +690,7 @@ export function DetailHero({
 
           {/* Valoración */}
           <div className="pt-2 border-t border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-yellow-300">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white-300">
               Tu valoración
             </p>
             <button
@@ -683,10 +698,10 @@ export function DetailHero({
               onClick={openRatingModal}
               disabled={!ratingEnabled || ratingUpdating}
               className={[
-                "mt-3 w-full rounded-xl border border-yellow-400/60 px-4 py-3 text-sm font-semibold text-yellow-200 transition",
+                "mt-3 w-full rounded-xl border border-purple-400/60 px-4 py-3 text-sm font-semibold text-white-200 transition",
                 !ratingEnabled || ratingUpdating
                   ? "cursor-not-allowed opacity-60"
-                  : "hover:bg-yellow-400/10",
+                  : "hover:bg-purple-400/10",
               ].join(" ")}
             >
               <span className="inline-flex items-center justify-center gap-2">
@@ -695,7 +710,7 @@ export function DetailHero({
               </span>
             </button>
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-yellow-200/80">
+              <span className="text-xs text-white-200/80">
                 {userRating ? "Gracias por tu valoración." : "Sin valorar"}
               </span>
               {userRating != null ? (
@@ -710,7 +725,7 @@ export function DetailHero({
               ) : null}
             </div>
             {!ratingEnabled ? (
-              <p className="mt-2 text-xs text-yellow-200/80">{ratingBlockedMessage}</p>
+              <p className="mt-2 text-xs text-white-200/80">{ratingBlockedMessage}</p>
             ) : null}
             {ratingMessage ? (
               <p className="mt-2 text-xs text-white/80">{ratingMessage}</p>
@@ -727,13 +742,13 @@ export function DetailHero({
           className="relative z-10 mt-8 w-full rounded-2xl border border-white/10 bg-black/80 p-5 shadow-xl"
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-yellow-300">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-white-300">
               Tráiler
             </h2>
             <button
               type="button"
               onClick={() => setShowVideo(false)}
-              className="rounded-full border border-yellow-400/60 bg-yellow-400/15 px-3 py-1 text-sm font-semibold text-yellow-200 transition hover:bg-yellow-400/30"
+              className="rounded-full border border-purple-400/60 bg-purple-400/15 px-3 py-1 text-sm font-semibold text-white-200 transition hover:bg-purple-400/30"
               aria-label="Cerrar tráiler"
             >
               ✕
@@ -784,11 +799,11 @@ export function DetailHero({
               <X className="h-4 w-4" />
             </button>
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20 text-blue-200">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/20 text-yellow-200">
                 <Star className="h-6 w-6" fill="currentColor" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-yellow-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white-300">
                   Puntúame
                 </p>
                 <h3 className="text-xl font-semibold text-white">{title}</h3>
@@ -808,7 +823,7 @@ export function DetailHero({
                     aria-label={`Puntuación ${value}`}
                   >
                     <Star
-                      className={isActive ? "h-6 w-6 text-yellow-300" : "h-6 w-6 text-white/30"}
+                      className={isActive ? "h-6 w-6 text-white-300" : "h-6 w-6 text-white/30"}
                       fill={isActive ? "currentColor" : "none"}
                     />
                   </button>

@@ -561,10 +561,10 @@ export function DetailPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-gray-50 px-6 pb-12">
+      <main className="min-h-screen bg-gray-50 pb-12">
         <div className="mx-auto w-full max-w-none">
           {!item ? (
-            <div className="space-y-6">
+            <div className="space-y-6 px-6">
               <section className="rounded-2xl border border-gray-200 bg-white p-6">
                 <div className="grid gap-6 md:grid-cols-[220px_1fr]">
                   <Skeleton className="h-[300px] w-full rounded-2xl" />
@@ -616,6 +616,7 @@ export function DetailPage() {
                 ratingEnabled={isCompletedForRating}
               />
 
+              <div className="space-y-10 px-6">
               {(watchProviders?.flatrate?.length ||
                 watchProviders?.rent?.length ||
                 watchProviders?.buy?.length ||
@@ -698,7 +699,7 @@ export function DetailPage() {
                   <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-700">
                     Reparto principal
                   </h2>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
                     {cast.slice(0, 12).map((member: any) => {
                       const avatar = member?.profile_path
                         ? `${TMDB_IMG_BASE}w185${member.profile_path}`
@@ -755,6 +756,7 @@ export function DetailPage() {
               />
 
               <DetailRelated type={type} />
+              </div>
             </div>
           )}
         </div>
