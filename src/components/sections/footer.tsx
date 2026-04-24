@@ -4,7 +4,7 @@ import LogoPng from "@/assets/LOGO.png";
 
 export default function Footer() {
   return (
-    <footer className="bg-linear-to-r from-indigo-500 to-purple-600 text-white text-center px-6">
+    <footer className="w-full bg-linear-to-r from-indigo-500 to-purple-600 px-6 text-center text-white">
       <div className="max-w-7xl mx-auto px-6 py-3.5 grid md:grid-cols-3 gap-4">
         {/* Logo / Nombre */}
         <div className="flex flex-col items-center">

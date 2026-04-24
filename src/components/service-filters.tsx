@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export type ServiceCategory = "peliculas" | "series" | "videojuegos" | "libros";
 export type SortKey =
   | "none"
@@ -60,12 +62,25 @@ type Props = {
 
   // Nuevo: mostrar filtros completos solo si hay categoría
   showFullFilters?: boolean;
+  searchBar?: ReactNode;
 };
 
 
-const tabBase = "rounded-md border px-4 py-2 text-sm transition";
-const tabActive = "bg-gray-100 font-medium";
-const tabIdle = "bg-white hover:bg-gray-50";
+const tabBase =
+  "w-full rounded-full border px-2 py-2 text-[11px] font-semibold leading-tight tracking-wide transition-all duration-200 sm:w-auto sm:px-4 sm:py-2.5 sm:text-sm";
+const tabActive =
+  "border-violet-300 bg-[linear-gradient(135deg,rgba(76,29,149,0.92),rgba(124,58,237,0.9),rgba(224,0,255,0.84))] text-white shadow-[0_8px_22px_rgba(88,28,135,0.32)]";
+const tabIdle =
+  "border-violet-200 bg-white/95 text-violet-700 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800";
+const selectBaseClass =
+  "w-full min-w-0 rounded-xl border border-violet-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(245,243,255,0.98))] px-2 py-2 text-xs font-semibold text-violet-700 shadow-[0_6px_16px_rgba(91,33,182,0.08)] outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-200 sm:w-auto sm:min-w-[10.5rem] sm:shrink-0 sm:px-3 sm:text-sm";
+
+const CATEGORY_OPTIONS: Array<{ key: ServiceCategory; label: string }> = [
+  { key: "peliculas", label: "Películas" },
+  { key: "series", label: "Series" },
+  { key: "videojuegos", label: "Videojuegos" },
+  { key: "libros", label: "Libros" },
+];
 
 
 export function ServicesFilters({
@@ -77,21 +92,16 @@ export function ServicesFilters({
   onSortChange,
   genre,
   onGenreChange,
-  duration,
-  onDurationChange,
-  seasons,
-  onSeasonsChange,
-  bookSeries,
-  onBookSeriesChange,
   platform,
   onPlatformChange,
   genres = [],
   showFullFilters = false,
+  searchBar,
 }: Props) {
   return (
     <section className="mx-auto max-w-7xl px-6">
       {/* ----------------- Categorías siempre visibles ----------------- */}
-      <div className="mb-3">
+      <div className="mb-2">
         {showCategoryHeading ? (
           <h1
             className="text-3xl font-black tracking-tight text-center"
@@ -102,22 +112,17 @@ export function ServicesFilters({
         ) : (
           <span className="text-lg font-semibold text-gray-900">Categoría</span>
         )}
-        <div className={`flex flex-wrap gap-3 ${showCategoryHeading ? "mt-4" : "mt-3"}`}>
-          {(
-            [
-              "peliculas",
-              "series",
-              "videojuegos",
-              "libros",
-            ] as ServiceCategory[]
-          ).map((cat) => (
+        <div
+          className={`mt-2 grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:gap-2.5 ${showCategoryHeading ? "sm:mt-3 sm:justify-center" : "sm:justify-start"}`}
+        >
+          {CATEGORY_OPTIONS.map(({ key, label }) => (
             <button
-              key={cat}
+              key={key}
               type="button"
-              onClick={() => onCategoryChange(category === cat ? null : cat)}
-              className={`${tabBase} ${category === cat ? tabActive : tabIdle}`}
+              onClick={() => onCategoryChange(category === key ? null : key)}
+              className={`${tabBase} ${category === key ? tabActive : tabIdle}`}
             >
-              {cat[0].toUpperCase() + cat.slice(1)}
+              {label}
             </button>
           ))}
         </div>
@@ -126,12 +131,15 @@ export function ServicesFilters({
 
       {/* ----------------- Filtros completos solo si showFullFilters ----------------- */}
       {showFullFilters && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+        <div className="mb-4 space-y-2.5">
+          {searchBar}
+
+          <div className="grid w-full grid-cols-2 gap-2 pb-1 sm:flex sm:flex-wrap sm:gap-2.5">
           {sort && onSortChange && (
             <select
               value={sort}
               onChange={(e) => onSortChange(e.target.value as SortKey)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              className={selectBaseClass}
             >
               <option value="none">Ordenar por</option>
               <option value="az">Nombre (A-Z)</option>
@@ -148,7 +156,7 @@ export function ServicesFilters({
             <select
               value={genre}
               onChange={(e) => onGenreChange(e.target.value)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              className={selectBaseClass}
             >
               <option value="">Géneros</option>
               {genres.map((g) => (
@@ -160,55 +168,11 @@ export function ServicesFilters({
           )}
 
 
-          {category === "peliculas" && duration && onDurationChange && (
-            <select
-              value={duration}
-              onChange={(e) => onDurationChange(e.target.value as DurationKey)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="all">Duración</option>
-              <option value="short">Corta</option>
-              <option value="medium">Media</option>
-              <option value="long">Larga</option>
-            </select>
-          )}
-
-          {category === "series" && seasons && onSeasonsChange && (
-            <select
-              value={seasons}
-              onChange={(e) => onSeasonsChange(e.target.value as SeasonKey)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="all">Temporadas</option>
-              <option value="1">1 temporada</option>
-              <option value="2-3">2-3 temporadas</option>
-              <option value="4-6">4-6 temporadas</option>
-              <option value="7+">7+ temporadas</option>
-            </select>
-          )}
-
-          {category === "libros" && bookSeries && onBookSeriesChange && (
-            <select
-              value={bookSeries}
-              onChange={(e) =>
-                onBookSeriesChange(e.target.value as BookSeriesKey)
-              }
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="all">Saga/Serie</option>
-              <option value="autoconclusivo">Autoconclusivo</option>
-              <option value="bilogia">Bilogia</option>
-              <option value="trilogia">Trilogia</option>
-              <option value="serie">Serie</option>
-              <option value="saga">Saga</option>
-            </select>
-          )}
-
           {category === "videojuegos" && platform && onPlatformChange && (
             <select
               value={platform}
               onChange={(e) => onPlatformChange(e.target.value as PlatformKey)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              className={selectBaseClass}
             >
               <option value="all">Plataforma</option>
               <option value="pc">PC</option>
@@ -219,6 +183,7 @@ export function ServicesFilters({
               <option value="other">Otras</option>
             </select>
           )}
+          </div>
         </div>
       )}
     </section>

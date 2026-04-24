@@ -341,14 +341,6 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
       <main className="min-h-screen px-6 pt-6 pb-16" style={{ background: "hsl(264 100% 99%)" }}>
         {/* Cabecera */}
         <div className="max-w-6xl mx-auto mb-10" style={{ animation: "fadeUp 0.5s ease both" }}>
-          <div className="flex items-center gap-2 text-xs mb-4" style={{ color: "hsl(258 16% 55%)" }}>
-            <Link to="/listas" style={{ color: "hsl(268 84% 62%)" }} className="hover:underline">
-              Listas
-            </Link>
-            <span>/</span>
-            <span>{title}</span>
-          </div>
-
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h1 className="text-3xl font-black tracking-tight" style={{ color: "hsl(268 84% 62%)" }}>

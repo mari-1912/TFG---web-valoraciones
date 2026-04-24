@@ -155,16 +155,16 @@ export default function ServiceSection({
 
   if (fullWidth) {
     return (
-      <section className="my-8 max-w-7xl mx-auto px-4">
+      <section className="my-5 w-full px-0 sm:my-6">
         {icon && (
-          <h2 className="text-3xl font-extrabold mb-4 flex items-center gap-2 text-[hsl(var(--color-primary))] [&_svg]:h-7 [&_svg]:w-7">
+          <h2 className="mb-3 flex items-center gap-2 text-3xl font-extrabold text-[hsl(var(--color-primary))] [&_svg]:h-7 [&_svg]:w-7">
             {icon} {title}
           </h2>
         )}
 
 
         {showFilters && (
-          <div className="mb-6">
+          <div className="mb-4">
             <ServicesFilters
               category={null}
               onCategoryChange={() => {}}
@@ -184,7 +184,7 @@ export default function ServiceSection({
         {filteredItems.length === 0 ? (
           <p className="text-gray-500">No hay elementos para mostrar.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid w-full grid-cols-3 gap-1 sm:gap-3 md:grid-cols-4 lg:grid-cols-4">
             {filteredItems.map((item) => (
               <div
                 key={item.id}
@@ -205,15 +205,15 @@ export default function ServiceSection({
   // Render carrusel (estilo shadcn)
   // -------------------------
   return (
-    <section className="my-10 max-w-7xl mx-auto px-4">
+    <section className="my-7 mx-auto max-w-7xl px-4 sm:my-8">
       {icon && (
-        <h2 className="text-3xl font-extrabold mb-4 flex items-center gap-2 text-[hsl(var(--color-primary))] [&_svg]:h-7 [&_svg]:w-7">
+        <h2 className="mb-3 flex items-center gap-2 text-3xl font-extrabold text-[hsl(var(--color-primary))] [&_svg]:h-7 [&_svg]:w-7">
           {icon} {title}
         </h2>
       )}
 
       <Carousel className="relative">
-        <CarouselContent className="py-2">
+        <CarouselContent className="py-1">
           {items.map((item) => (
             <CarouselItem
               key={item.id}

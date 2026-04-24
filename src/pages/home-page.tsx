@@ -10,6 +10,13 @@ import { fetchMostViewedWeek, type MostViewedWeekResponse } from "../services/fe
 import MostViewedCard from "@/components/most-viewed-card";
 import LogoPng from "@/assets/LOGO.png";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 
 export default function HomePage() {
@@ -156,13 +163,24 @@ useEffect(() => {
   )}
 
   {!featuredLoading && !featuredError && featured && (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <FeaturedCard label="Película" item={featured?.pelicula ?? null} />
-<FeaturedCard label="Serie" item={featured?.serie ?? null} />
-<FeaturedCard label="Libro" item={featured?.libro ?? null} />
-<FeaturedCard label="Videojuego" item={featured?.videojuego ?? null} />
-
-    </div>
+    <Carousel className="relative">
+      <CarouselContent className="py-2">
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <FeaturedCard label="Película" item={featured.pelicula ?? null} />
+        </CarouselItem>
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <FeaturedCard label="Serie" item={featured.serie ?? null} />
+        </CarouselItem>
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <FeaturedCard label="Libro" item={featured.libro ?? null} />
+        </CarouselItem>
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <FeaturedCard label="Videojuego" item={featured.videojuego ?? null} />
+        </CarouselItem>
+      </CarouselContent>
+      <CarouselPrevious className="-left-3 md:-left-5" />
+      <CarouselNext className="-right-3 md:-right-5" />
+    </Carousel>
   )}
 </section>
 
@@ -189,53 +207,65 @@ useEffect(() => {
   )}
 
   {!mostViewedLoading && !mostViewedError && mostViewed && (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <MostViewedCard label="Película" item={mostViewed.pelicula ?? null} />
-      <MostViewedCard label="Serie" item={mostViewed.serie ?? null} />
-      <MostViewedCard label="Libro" item={mostViewed.libro ?? null} />
-      <MostViewedCard label="Videojuego" item={mostViewed.videojuego ?? null} />
-    </div>
+    <Carousel className="relative">
+      <CarouselContent className="py-2">
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <MostViewedCard label="Película" item={mostViewed.pelicula ?? null} />
+        </CarouselItem>
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <MostViewedCard label="Serie" item={mostViewed.serie ?? null} />
+        </CarouselItem>
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <MostViewedCard label="Libro" item={mostViewed.libro ?? null} />
+        </CarouselItem>
+        <CarouselItem className="basis-1/2 sm:basis-1/3 md:basis-1/4">
+          <MostViewedCard label="Videojuego" item={mostViewed.videojuego ?? null} />
+        </CarouselItem>
+      </CarouselContent>
+      <CarouselPrevious className="-left-3 md:-left-5" />
+      <CarouselNext className="-right-3 md:-right-5" />
+    </Carousel>
   )}
 </section>
 
 
         {/* COMUNIDAD */}
-        <section className="bg-white py-12 border-t border-gray-100 rounded-xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            <div className="text-center space-y-3">
-              <div className="mx-auto h-12 w-12 rounded-full bg-violet-100 flex items-center justify-center">
-                <span className="text-violet-700 text-xl">⭐</span>
+        <section className="rounded-xl border-t border-gray-100 bg-white py-8 md:py-10">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+            <div className="space-y-2 text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-violet-100">
+                <span className="text-lg text-violet-700">⭐</span>
               </div>
               <h3 className="font-medium text-gray-900">
                 Lleva un registro de lo que te gusta
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm leading-snug text-gray-600">
                 Crea tu propia lista personalizada de películas, libros y juegos
                 favoritos.
               </p>
             </div>
 
-            <div className="text-center space-y-3">
-              <div className="mx-auto h-12 w-12 rounded-full bg-violet-100 flex items-center justify-center">
-                <span className="text-violet-700 text-xl">🔍</span>
+            <div className="space-y-2 text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-violet-100">
+                <span className="text-lg text-violet-700">🔍</span>
               </div>
               <h3 className="font-medium text-gray-900">
                 Guarda y reseña tus experiencias
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm leading-snug text-gray-600">
                 Añade reseñas y valoraciones para recordar lo que más
                 disfrutaste.
               </p>
             </div>
 
-            <div className="text-center space-y-3">
-              <div className="mx-auto h-12 w-12 rounded-full bg-violet-100 flex items-center justify-center">
-                <span className="text-violet-700 text-xl">👥</span>
+            <div className="space-y-2 text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-violet-100">
+                <span className="text-lg text-violet-700">👥</span>
               </div>
               <h3 className="font-medium text-gray-900">
                 Dile a tus amigos cuáles valen la pena
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm leading-snug text-gray-600">
                 Comparte tus opiniones y descubre nuevas recomendaciones de la
                 comunidad.
               </p>
