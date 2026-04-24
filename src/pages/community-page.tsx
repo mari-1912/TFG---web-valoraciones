@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -891,8 +890,7 @@ export default function CommunityPage() {
   if (loading) {
     return (
       <>
-        <Header />
-        <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)] pt-28 md:pt-32">
+        <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
           <div className="mx-auto max-w-6xl space-y-4 px-6 pb-10">
             {Array.from({ length: 3 }).map((_, index) => (
               <div
@@ -924,9 +922,7 @@ export default function CommunityPage() {
 
   return (
     <>
-      <Header />
-
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)] pt-28 md:pt-32">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
         <div className="mx-auto max-w-6xl px-6 pb-10">
           {error ? (
             <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">

@@ -1,5 +1,5 @@
 import { Search, Menu, UserCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LogoPng from "@/assets/LOGO.png";
 import {
@@ -114,6 +114,7 @@ export function Header() {
   });
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const MIN_QUERY_LENGTH = 2;
@@ -153,6 +154,26 @@ export function Header() {
     tipo
       .replace(/[-_]/g, " ")
       .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  useLayoutEffect(() => {
+    const headerEl = headerRef.current;
+    if (!headerEl || typeof window === "undefined") return;
+
+    const root = document.documentElement;
+    const updateOffset = () => {
+      root.style.setProperty("--app-header-offset", `${headerEl.offsetHeight}px`);
+    };
+
+    updateOffset();
+    const resizeObserver = new ResizeObserver(updateOffset);
+    resizeObserver.observe(headerEl);
+    window.addEventListener("resize", updateOffset);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateOffset);
+    };
+  }, []);
 
   const scoreExternalMatch = (item: ExternalSearchItem, q: string) => {
     const normalizedQuery = normalizeText(q);
@@ -804,7 +825,10 @@ export function Header() {
 
 
   return (
-    <header className="fixed left-0 top-0 z-50 w-full [background-image:var(--gradient-primary)]">
+    <header
+      ref={headerRef}
+      className="fixed left-0 top-0 z-50 w-full [background-image:var(--gradient-primary)]"
+    >
       <div className="flex w-full items-center justify-between px-6 py-4 text-white lg:grid lg:min-w-0 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
         {/* LOGO */}
         <div

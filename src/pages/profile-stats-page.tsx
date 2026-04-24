@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Header } from "@/components/sections/header";
 import Footer from "@/components/sections/footer";
 import { Skeleton } from "@/components/ui/skeleton";
 import ContentCard from "@/components/content-card";
@@ -910,8 +909,7 @@ export default function ProfileStatsPage() {
 
   return (
     <>
-      <Header />
-      <main className="min-h-screen bg-white pt-32">
+      <main className="min-h-screen bg-white">
         <div className="mx-auto max-w-7xl px-4 pb-12">
           <div className="mb-8">
             <div className="mb-2 text-xs text-gray-500">

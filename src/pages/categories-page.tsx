@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import { fetchBookById, fetchBooks } from "@/services/fetchBooks";
 import { fetchMovieById, fetchMovies } from "@/services/fetchMovies";
@@ -1003,8 +1002,7 @@ export default function CategoriesPage() {
   // -------------------------
   return (
     <>
-      <Header />
-      <main className="bg-white min-h-screen pt-38">
+      <main className="bg-white min-h-screen">
         <section className="flex flex-col gap-8">
           <ServicesFilters
             category={category}

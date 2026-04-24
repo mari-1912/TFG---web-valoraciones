@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 
 
@@ -11,11 +10,9 @@ type PageLayoutProps = {
 export default function PageLayout({ children }: PageLayoutProps) {
   return (
     <>
-      <Header />
-      <main className="min-h-screen bg-gray-50 pt-6">{children}</main>
+      <main className="min-h-screen bg-gray-50">{children}</main>
       <Footer />
     </>
   );
 }
-
 

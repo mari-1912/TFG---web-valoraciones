@@ -216,13 +216,14 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
   const title = type === "nuestras" ? "Listas Opinify" : "Mis listas";
   const isManagedListsView = type === "mis";
 
-  // Listas sin las gestionadas por estado (solo para "mis listas")
-  const visibleLists = useMemo(() => {
-    if (!isManagedListsView) return lists;
-    return lists.filter(
-      (list) => !isManagedStatusList(String(list.nombre ?? ""), list.descripcion)
-    );
-  }, [lists, isManagedListsView]);
+  // Las listas automáticas de estado no se muestran en el grid de tarjetas.
+  const visibleLists = useMemo(
+    () =>
+      lists.filter(
+        (list) => !isManagedStatusList(String(list.nombre ?? ""), list.descripcion)
+      ),
+    [lists]
+  );
 
   const statusGroups = useMemo<StatusCardGroup[]>(() => {
     return STATUS_ORDER.map((status) => ({

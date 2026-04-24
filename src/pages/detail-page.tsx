@@ -561,7 +561,7 @@ export function DetailPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-gray-50 px-6 pb-12 pt-32">
+      <main className="min-h-screen bg-gray-50 px-6 pb-12">
         <div className="mx-auto w-full max-w-none">
           {!item ? (
             <div className="space-y-6">

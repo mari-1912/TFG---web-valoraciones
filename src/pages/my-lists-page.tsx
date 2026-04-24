@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "../components/sections/footer";
-import { Header } from "../components/sections/header";
 import { getMe, isSessionValid } from "@/services/auth-service";
 import {
   getListContents,
@@ -177,8 +176,7 @@ export default function MyListsPage() {
 
   return (
     <>
-      <Header />
-      <main className="min-h-screen bg-gray-50 px-6 pb-12 pt-32">
+      <main className="min-h-screen bg-gray-50 px-6 pb-12">
         <div className="mx-auto w-full max-w-6xl">
           <h1 className="text-3xl font-semibold text-gray-900 text-center">
             Mis listas

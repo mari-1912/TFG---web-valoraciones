@@ -1,13 +1,9 @@
-import { Header } from "@/components/sections/header";
 import Footer from "@/components/sections/footer";
 import { Users, Sparkles, Heart, Rocket, MessageCircle } from "lucide-react";
 
 export default function AboutPage() {
   return (
     <main className="min-h-screen bg-white">
-      <Header />
-      <div className="h-28 md:h-32" />
-
       <section className="mx-auto max-w-5xl px-4 py-10">
         <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           <h1 className="text-3xl font-semibold text-gray-900">

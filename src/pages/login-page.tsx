@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, User } from "lucide-react";
 
-import { Header } from "@/components/sections/header";
 import Footer from "@/components/sections/footer";
 import { loginUser } from "@/services/auth-service";
 
@@ -53,8 +52,6 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex flex-col bg-white">
-      <Header />
-      <div className="h-16" />
       <section className="relative flex-1 flex items-center justify-center px-4 py-20">
         <button
           type="button"
