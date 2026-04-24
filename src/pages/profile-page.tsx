@@ -117,63 +117,67 @@ function pickNumber(...values: unknown[]): number | null {
   return null;
 }
 
-function extractRowUserId(row: any): number | null {
+function extractRowUserId(row: unknown): number | null {
   if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
   return parseUserId(
-    row?.userId ??
-      row?.user_id ??
-      row?.usuarioId ??
-      row?.usuario_id ??
-      row?.usuario?.userId ??
-      row?.usuario?.user_id ??
-      row?.usuario?.id ??
-      row?.metadata?.userId ??
-      row?.metadata?.usuarioId ??
-      row?.metadata?.usuario?.userId
+    r?.userId ??
+      r?.user_id ??
+      r?.usuarioId ??
+      r?.usuario_id ??
+      (r?.usuario as Record<string, unknown> | undefined)?.userId ??
+      (r?.usuario as Record<string, unknown> | undefined)?.user_id ??
+      (r?.usuario as Record<string, unknown> | undefined)?.id ??
+      (r?.metadata as Record<string, unknown> | undefined)?.userId ??
+      (r?.metadata as Record<string, unknown> | undefined)?.usuarioId ??
+      ((r?.metadata as Record<string, unknown> | undefined)?.usuario as Record<string, unknown> | undefined)?.userId
   );
 }
 
-function extractRowUsername(row: any): string {
+function extractRowUsername(row: unknown): string {
   if (!row || typeof row !== "object") return "";
+  const r = row as Record<string, unknown>;
   return pickString(
-    row?.username,
-    row?.user?.username,
-    row?.usuario?.username,
-    row?.author?.username,
-    row?.autor?.username,
-    row?.metadata?.username,
-    row?.metadata?.user?.username,
-    row?.metadata?.usuario?.username,
-    row?.metadata?.author?.username,
-    row?.metadata?.autor?.username
+    r?.username,
+    (r?.user as Record<string, unknown> | undefined)?.username,
+    (r?.usuario as Record<string, unknown> | undefined)?.username,
+    (r?.author as Record<string, unknown> | undefined)?.username,
+    (r?.autor as Record<string, unknown> | undefined)?.username,
+    (r?.metadata as Record<string, unknown> | undefined)?.username,
+    ((r?.metadata as Record<string, unknown> | undefined)?.user as Record<string, unknown> | undefined)?.username,
+    ((r?.metadata as Record<string, unknown> | undefined)?.usuario as Record<string, unknown> | undefined)?.username,
+    ((r?.metadata as Record<string, unknown> | undefined)?.author as Record<string, unknown> | undefined)?.username,
+    ((r?.metadata as Record<string, unknown> | undefined)?.autor as Record<string, unknown> | undefined)?.username
   );
 }
 
-function extractRowContentId(row: any): number | null {
+function extractRowContentId(row: unknown): number | null {
   if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  const meta = (r?.metadata as Record<string, unknown> | undefined) ?? {};
   return pickNumber(
-    row?.contenidoId,
-    row?.contentId,
-    row?.idContenido,
-    row?.contenido?.id,
-    row?.content?.id,
-    row?.metadata?.contenidoId,
-    row?.metadata?.contentId,
-    row?.metadata?.idContenido,
-    row?.metadata?.contenido?.id,
-    row?.metadata?.content?.id,
-    row?.metadata?.comment?.contenidoId,
-    row?.metadata?.comment?.contentId,
-    row?.metadata?.comentario?.contenidoId,
-    row?.metadata?.comentario?.contentId,
-    row?.metadata?.reply?.contenidoId,
-    row?.metadata?.reply?.contentId
+    r?.contenidoId,
+    r?.contentId,
+    r?.idContenido,
+    (r?.contenido as Record<string, unknown> | undefined)?.id,
+    (r?.content as Record<string, unknown> | undefined)?.id,
+    meta?.contenidoId,
+    meta?.contentId,
+    meta?.idContenido,
+    (meta?.contenido as Record<string, unknown> | undefined)?.id,
+    (meta?.content as Record<string, unknown> | undefined)?.id,
+    (meta?.comment as Record<string, unknown> | undefined)?.contenidoId,
+    (meta?.comment as Record<string, unknown> | undefined)?.contentId,
+    (meta?.comentario as Record<string, unknown> | undefined)?.contenidoId,
+    (meta?.comentario as Record<string, unknown> | undefined)?.contentId,
+    (meta?.reply as Record<string, unknown> | undefined)?.contenidoId,
+    (meta?.reply as Record<string, unknown> | undefined)?.contentId
   );
 }
 
-function collectRowsFromProfilePayload(payload: any): any[] {
-  const root = payload ?? {};
-  const perfil = root?.perfil ?? {};
+function collectRowsFromProfilePayload(payload: unknown): unknown[] {
+  const root = (payload as Record<string, unknown>) ?? {};
+  const perfil = (root?.perfil as Record<string, unknown>) ?? {};
   const candidates = [
     root?.actividad,
     root?.actividadReciente,
@@ -192,7 +196,7 @@ function collectRowsFromProfilePayload(payload: any): any[] {
 }
 
 function collectProfilePayloadContentIds(
-  payload: any,
+  payload: unknown,
   targetUserId: number | null,
   targetUsernameNormalized: string
 ): number[] {
@@ -228,22 +232,22 @@ function normalizeCommentPreviewFromActivity(
   row: CommunityActivity,
   index: number
 ): CommentPreviewItem | null {
-  const metadata = (row.metadata ?? {}) as Record<string, any>;
+  const metadata = (row.metadata ?? {}) as Record<string, unknown>;
   const message = pickString(
     row.textoComentario,
     metadata?.textoComentario,
-    metadata?.comment?.mensaje,
-    metadata?.comentario?.mensaje,
+    (metadata?.comment as Record<string, unknown> | undefined)?.mensaje,
+    (metadata?.comentario as Record<string, unknown> | undefined)?.mensaje,
     metadata?.mensaje,
     metadata?.texto
   );
   const titleSuffix = pickString(
     row.tituloContenido,
     metadata?.tituloContenido,
-    metadata?.content?.title,
-    metadata?.content?.titulo
+    (metadata?.content as Record<string, unknown> | undefined)?.title,
+    (metadata?.content as Record<string, unknown> | undefined)?.titulo
   );
-  const rawType = pickString(row.tipo, metadata?.tipo).toLowerCase();
+  const rawType = pickString(row.tipo, String(metadata?.tipo ?? "")).toLowerCase();
   const isReply =
     rawType.includes("reply") ||
     rawType.includes("respuest") ||
@@ -289,17 +293,17 @@ function extractUserCommentsFromContentPayload(
 
   const walk = (node: unknown) => {
     if (!node || typeof node !== "object") return;
-    const row = node as Record<string, any>;
+    const row = node as Record<string, unknown>;
     const userId = Number(
       row?.userId ??
-        row?.usuario?.userId ??
-        row?.usuario?.id ??
-        row?.user?.userId ??
-        row?.user?.id ??
-        row?.author?.userId ??
-        row?.author?.id ??
-        row?.autor?.userId ??
-        row?.autor?.id ??
+        (row?.usuario as Record<string, unknown> | undefined)?.userId ??
+        (row?.usuario as Record<string, unknown> | undefined)?.id ??
+        (row?.user as Record<string, unknown> | undefined)?.userId ??
+        (row?.user as Record<string, unknown> | undefined)?.id ??
+        (row?.author as Record<string, unknown> | undefined)?.userId ??
+        (row?.author as Record<string, unknown> | undefined)?.id ??
+        (row?.autor as Record<string, unknown> | undefined)?.userId ??
+        (row?.autor as Record<string, unknown> | undefined)?.id ??
         row?.usuarioId ??
         row?.usuario_id ??
         row?.idUsuario ??
@@ -307,13 +311,16 @@ function extractUserCommentsFromContentPayload(
         0
     );
     const rowUsernameNormalized = normalizeIdentity(
-      row?.username ??
-        row?.usuario?.username ??
-        row?.user?.username ??
-        row?.author?.username ??
-        row?.autor?.username ??
-        row?.nombreUsuario ??
-        row?.nombre_usuario
+      String(
+        row?.username ??
+          (row?.usuario as Record<string, unknown> | undefined)?.username ??
+          (row?.user as Record<string, unknown> | undefined)?.username ??
+          (row?.author as Record<string, unknown> | undefined)?.username ??
+          (row?.autor as Record<string, unknown> | undefined)?.username ??
+          row?.nombreUsuario ??
+          row?.nombre_usuario ??
+          ""
+      )
     );
     const matchesUser =
       (Number.isFinite(userId) && userId === targetUserId) ||
@@ -369,7 +376,6 @@ async function fetchAllCommentPagesForContent(
 ): Promise<ListCommentsPayload[]> {
   const pages: ListCommentsPayload[] = [];
 
-  // Primera llamada sin query de paginación: algunos backends devuelven mejor así.
   const firstPage = await listContentComments(contentId, { paginate: false });
   pages.push(firstPage);
 
@@ -386,7 +392,6 @@ async function fetchAllCommentPagesForContent(
       });
       pages.push(payload);
     } catch {
-      // Si una página falla, devolvemos lo recopilado hasta ahora.
       break;
     }
   }
@@ -394,7 +399,7 @@ async function fetchAllCommentPagesForContent(
   return pages;
 }
 
-function parseFollowerIdsFromPayload(payload: any): number[] {
+function parseFollowerIdsFromPayload(payload: unknown): number[] {
   const ids = new Set<number>();
 
   const pushFollower = (entry: unknown) => {
@@ -429,9 +434,9 @@ function parseFollowerIdsFromPayload(payload: any): number[] {
     }
   };
 
-  const root = payload ?? {};
-  const perfil = root?.perfil ?? {};
-  const seguimiento = root?.seguimiento ?? perfil?.seguimiento ?? {};
+  const root = (payload as Record<string, unknown>) ?? {};
+  const perfil = (root?.perfil as Record<string, unknown>) ?? {};
+  const seguimiento = (root?.seguimiento as Record<string, unknown>) ?? (perfil?.seguimiento as Record<string, unknown>) ?? {};
   const arrays = [
     root?.seguidores,
     root?.followers,
@@ -444,9 +449,9 @@ function parseFollowerIdsFromPayload(payload: any): number[] {
     perfil?.followers,
     perfil?.usuariosSeguidores,
     perfil?.seguidoresUsuarios,
-    perfil?.seguimiento?.seguidores,
-    perfil?.seguimiento?.followers,
-    perfil?.seguimiento?.usuariosSeguidores,
+    (perfil?.seguimiento as Record<string, unknown> | undefined)?.seguidores,
+    (perfil?.seguimiento as Record<string, unknown> | undefined)?.followers,
+    (perfil?.seguimiento as Record<string, unknown> | undefined)?.usuariosSeguidores,
   ];
 
   for (const candidate of arrays) {
@@ -563,7 +568,7 @@ async function loadCompletedCountsForProfile(
                 ? data.contenidos
                 : [];
               for (const contenido of contenidos) {
-                const contentId = Number(contenido?.id);
+                const contentId = Number((contenido as Record<string, unknown>)?.id);
                 if (Number.isFinite(contentId) && contentId > 0) {
                   contentIds.add(contentId);
                 }
@@ -632,7 +637,7 @@ async function loadProfileListsSummary(
         const contenidos = Array.isArray(data?.contenidos) ? data.contenidos : [];
         const ids: number[] = [];
         for (const contenido of contenidos) {
-          const contentId = Number(contenido?.id);
+          const contentId = Number((contenido as Record<string, unknown>)?.id);
           if (Number.isFinite(contentId) && contentId > 0) {
             ids.push(contentId);
           }
@@ -697,9 +702,7 @@ export default function ProfilePage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [profileUserId, setProfileUserId] = useState<number | null>(null);
   const [profileFollowerIds, setProfileFollowerIds] = useState<number[]>([]);
-  const [initialIsFollowing, setInitialIsFollowing] = useState<boolean | null>(
-    null
-  );
+  const [initialIsFollowing, setInitialIsFollowing] = useState<boolean | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -723,35 +726,26 @@ export default function ProfilePage() {
   const [statusProgressCounts, setStatusProgressCounts] =
     useState<StatusCounts>(EMPTY_STATUS_COUNTS);
   const [visibleProfileLists, setVisibleProfileLists] = useState<Lista[]>([]);
-  const [commentCandidateContentIds, setCommentCandidateContentIds] = useState<
-    number[]
-  >([]);
+  const [commentCandidateContentIds, setCommentCandidateContentIds] = useState<number[]>([]);
   const [timelineRecords, setTimelineRecords] = useState<TimelineRecord[]>([]);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-
   const [isCoverCropOpen, setIsCoverCropOpen] = useState(false);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
-  const [openSocialTarget, setOpenSocialTarget] =
-    useState<SocialListTarget | null>(null);
+  const [openSocialTarget, setOpenSocialTarget] = useState<SocialListTarget | null>(null);
   const [commentsPreviewOpen, setCommentsPreviewOpen] = useState(false);
   const [commentsActivityPreviewItems, setCommentsActivityPreviewItems] =
     useState<CommentPreviewItem[]>([]);
   const [commentsPreviewLoading, setCommentsPreviewLoading] = useState(false);
   const [commentsPreviewLoaded, setCommentsPreviewLoaded] = useState(false);
-  const [commentsPreviewError, setCommentsPreviewError] = useState<string | null>(
-    null
-  );
-  const [followersList, setFollowersList] =
-    useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
-  const [followingList, setFollowingList] =
-    useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
-  const [activeContentTab, setActiveContentTab] =
-    useState<ProfileContentTabId>("stats");
+  const [commentsPreviewError, setCommentsPreviewError] = useState<string | null>(null);
+  const [followersList, setFollowersList] = useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
+  const [followingList, setFollowingList] = useState<SocialListState>(EMPTY_SOCIAL_LIST_STATE);
+  const [activeContentTab, setActiveContentTab] = useState<ProfileContentTabId>("stats");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -806,8 +800,8 @@ export default function ProfilePage() {
             : await fetchUserProfile(requestedUserId ?? 0, controller.signal);
         if (controller.signal.aborted) return;
 
-        const perfil = data.perfil ?? {};
-        const stats = data.estadisticas ?? {};
+        const perfil = (data as Record<string, Record<string, unknown>>).perfil ?? {};
+        const stats = (data as Record<string, Record<string, unknown>>).estadisticas ?? {};
 
         if (requestedUserId === null) {
           setIsLoggedIn(true);
@@ -847,23 +841,23 @@ export default function ProfilePage() {
           setInitialIsFollowing(null);
         }
 
-        setUsername(perfil.username ?? "");
-        setRole((perfil.tipo ?? "Base").toString());
-        const resolvedBio = perfil.descripcion ?? "";
+        setUsername(String(perfil.username ?? ""));
+        setRole(String(perfil.tipo ?? "Base"));
+        const resolvedBio = String(perfil.descripcion ?? "");
         setBio(resolvedBio);
         setSavedBio(resolvedBio);
-        setProfileImage(perfil.avatarUrl ?? null);
-        setCoverImage(perfil.bannerUrl ?? null);
-        setRatingsCount(stats.valoraciones ?? 0);
-        setAverageRating(stats.media ?? 0);
-        setReviewsCount(stats.comentarios ?? 0);
-        setFollowingCount(stats.siguiendo ?? 0);
+        setProfileImage(String(perfil.avatarUrl ?? "") || null);
+        setCoverImage(String(perfil.bannerUrl ?? "") || null);
+        setRatingsCount(Number(stats.valoraciones ?? 0));
+        setAverageRating(Number(stats.media ?? 0));
+        setReviewsCount(Number(stats.comentarios ?? 0));
+        setFollowingCount(Number(stats.siguiendo ?? 0));
         setFollowersCount(
           Number.isFinite(resolvedFollowersCount) && resolvedFollowersCount >= 0
             ? resolvedFollowersCount
             : followerIds.length
         );
-        setCommentsCount(stats.comentarios ?? 0);
+        setCommentsCount(Number(stats.comentarios ?? 0));
 
         const canManageListsForTarget =
           requestedUserId === null ||
@@ -894,7 +888,7 @@ export default function ProfilePage() {
         const payloadDerivedContentIds = collectProfilePayloadContentIds(
           data,
           resolvedProfileUserId,
-          normalizeIdentity(perfil.username ?? username)
+          normalizeIdentity(String(perfil.username ?? ""))
         );
         setCommentCandidateContentIds([
           ...new Set([
@@ -903,8 +897,30 @@ export default function ProfilePage() {
           ]),
         ]);
 
-        const backendTimelineRecords = buildTimelineFromPayload(data);
-        setTimelineRecords(mergeTimelineRecords(backendTimelineRecords));
+        // ── Actividad real del usuario desde /actividad?userIds=<id> ──
+        if (resolvedProfileUserId != null) {
+          try {
+            const activityPayload = await getCommunityFeed({
+              page: 1,
+              pageSize: 50,
+              userIds: [resolvedProfileUserId],
+              signal: controller.signal,
+            });
+            if (!controller.signal.aborted) {
+              const activityRows = Array.isArray(activityPayload?.actividades)
+                ? activityPayload.actividades
+                : [];
+              const backendTimelineRecords = buildTimelineFromPayload({
+                actividades: activityRows,
+              });
+              setTimelineRecords(mergeTimelineRecords(backendTimelineRecords));
+            }
+          } catch {
+            setTimelineRecords([]);
+          }
+        } else {
+          setTimelineRecords([]);
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
         setProfileUserId(null);
@@ -1171,30 +1187,23 @@ export default function ProfilePage() {
 
         while (!reachedEnd && guard < MAX_ACTIVITY_PAGES) {
           if (commentsPreviewRequestIdRef.current !== requestId) return;
-          const payload = await getCommunityFeed({ page, pageSize: 50 });
+          const payload = await getCommunityFeed({
+            page,
+            pageSize: 50,
+            userIds: [targetUserId],
+          });
           const rows = Array.isArray(payload?.actividades) ? payload.actividades : [];
           if (rows.length === 0) break;
           for (const row of rows) {
-            const rowUserId = extractRowUserId(row);
-            const rowUsernameNormalized = normalizeIdentity(extractRowUsername(row));
-            const rowBelongsToTarget =
-              (rowUserId != null && rowUserId === targetUserId) ||
-              (targetUsernameNormalized.length > 0 &&
-                rowUsernameNormalized === targetUsernameNormalized);
-            if (!rowBelongsToTarget) continue;
-
-            const metadata = (row?.metadata ?? {}) as Record<string, any>;
+            const metadata = (row?.metadata ?? {}) as Record<string, unknown>;
             const contentId = extractRowContentId(row);
-            if (
-              contentId != null &&
-              !scannedContentIds.has(contentId)
-            ) {
+            if (contentId != null && !scannedContentIds.has(contentId)) {
               candidateFromActivity.add(contentId);
               const title = pickString(
                 row?.tituloContenido,
                 metadata?.tituloContenido,
-                metadata?.content?.title,
-                metadata?.content?.titulo
+                (metadata?.content as Record<string, unknown> | undefined)?.title,
+                (metadata?.content as Record<string, unknown> | undefined)?.titulo
               );
               if (title && !contentTitleById.has(contentId)) {
                 contentTitleById.set(contentId, title);
@@ -1215,15 +1224,9 @@ export default function ProfilePage() {
 
           const payloadPages = Number(payload?.pagination?.pages ?? 0);
           const hasValidPages = Number.isFinite(payloadPages) && payloadPages > 0;
-          if (hasValidPages && page >= payloadPages) {
-            reachedEnd = true;
-          }
-          if (!hasValidPages && rows.length < 50) {
-            reachedEnd = true;
-          }
-          if (candidateFromActivity.size >= 30) {
-            reachedEnd = true;
-          }
+          if (hasValidPages && page >= payloadPages) reachedEnd = true;
+          if (!hasValidPages && rows.length < 50) reachedEnd = true;
+          if (candidateFromActivity.size >= 30) reachedEnd = true;
           page += 1;
           guard += 1;
         }
@@ -1260,7 +1263,7 @@ export default function ProfilePage() {
       const sorted = [...deduped.values()]
         .sort((a, b) => b.__time - a.__time)
         .slice(0, maxPreviewItems)
-        .map(({ __time: _time, ...item }) => item);
+        .map(({ __time, ...item }) => { void __time; return item; });
 
       setCommentsActivityPreviewItems(sorted);
       setCommentsPreviewError(null);
@@ -1456,9 +1459,7 @@ export default function ProfilePage() {
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        setAvatarError(
-          "La subida ha tardado demasiado. Se guardó localmente."
-        );
+        setAvatarError("La subida ha tardado demasiado. Se guardó localmente.");
       } else {
         setAvatarError("No se pudo guardar la imagen.");
       }
@@ -1564,9 +1565,7 @@ export default function ProfilePage() {
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        setCoverError(
-          "La subida ha tardado demasiado. Se guardó localmente."
-        );
+        setCoverError("La subida ha tardado demasiado. Se guardó localmente.");
       } else {
         setCoverError("No se pudo guardar el banner.");
       }
