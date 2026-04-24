@@ -675,8 +675,8 @@ export function useDetailComments({
     ]
   );
 
-  const handleLikeComment = useCallback(
-    async (comment: DetailComment) => {
+  const handleReactComment = useCallback(
+    async (comment: DetailComment, reactionType: "like" | "dislike") => {
       if (!isLoggedIn) {
         throw new Error("Inicia sesión para reaccionar a comentarios.");
       }
@@ -690,15 +690,32 @@ export function useDetailComments({
       setReactingCommentId(comment.id);
       setCommentMessage(null);
       try {
-        await reactToContentComment(normalizedId, comment.id, "like");
+        await reactToContentComment(normalizedId, comment.id, reactionType);
         setComments((prev) =>
           prev.map((item) => {
             if (item.id !== comment.id) return item;
             const alreadyLiked = Boolean(item.isLikedByCurrentUser);
+            const alreadyDisliked = Boolean(item.isDislikedByCurrentUser);
+            const currentLikes = Math.max(0, item.likeCount ?? 0);
+            const currentDislikes = Math.max(0, item.dislikeCount ?? 0);
+            if (reactionType === "like") {
+              return {
+                ...item,
+                isLikedByCurrentUser: true,
+                isDislikedByCurrentUser: false,
+                likeCount: currentLikes + (alreadyLiked ? 0 : 1),
+                dislikeCount: Math.max(
+                  0,
+                  currentDislikes - (alreadyDisliked ? 1 : 0)
+                ),
+              };
+            }
             return {
               ...item,
-              isLikedByCurrentUser: true,
-              likeCount: (item.likeCount ?? 0) + (alreadyLiked ? 0 : 1),
+              isLikedByCurrentUser: false,
+              isDislikedByCurrentUser: true,
+              likeCount: Math.max(0, currentLikes - (alreadyLiked ? 1 : 0)),
+              dislikeCount: currentDislikes + (alreadyDisliked ? 0 : 1),
             };
           })
         );
@@ -715,11 +732,15 @@ export function useDetailComments({
           setComments(hydrated);
           setCommentsError(null);
         } catch {
-          // Si falla el refresco, mantenemos el like optimista local.
+          // Si falla el refresco, mantenemos la reacción optimista local.
         }
       } catch (err) {
         throw new Error(
-          err instanceof Error ? err.message : "No se pudo registrar el like."
+          err instanceof Error
+            ? err.message
+            : reactionType === "like"
+              ? "No se pudo registrar el like."
+              : "No se pudo registrar el dislike."
         );
       } finally {
         setReactingCommentId(null);
@@ -737,6 +758,20 @@ export function useDetailComments({
     ]
   );
 
+  const handleLikeComment = useCallback(
+    async (comment: DetailComment) => {
+      await handleReactComment(comment, "like");
+    },
+    [handleReactComment]
+  );
+
+  const handleDislikeComment = useCallback(
+    async (comment: DetailComment) => {
+      await handleReactComment(comment, "dislike");
+    },
+    [handleReactComment]
+  );
+
   return {
     comments,
     commentsError,
@@ -748,6 +783,7 @@ export function useDetailComments({
     handleCreateComment,
     handleEditComment,
     handleLikeComment,
+    handleDislikeComment,
     handleDeleteComment,
   };
 }

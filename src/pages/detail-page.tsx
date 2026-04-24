@@ -546,6 +546,7 @@ export function DetailPage() {
     commentMessage,
     handleCreateComment,
     handleLikeComment,
+    handleDislikeComment,
     handleEditComment,
     handleDeleteComment,
   } = useDetailComments({
@@ -741,6 +742,7 @@ export function DetailPage() {
                 focusCommentUser={focusCommentUserFromState}
                 onCreateComment={handleCreateComment}
                 onLikeComment={handleLikeComment}
+                onDislikeComment={handleDislikeComment}
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
                 canDeleteAnyComment={currentUserIsAdmin}
@@ -748,7 +750,6 @@ export function DetailPage() {
                 editingCommentId={editingCommentId}
                 reactingCommentId={reactingCommentId}
                 deletingCommentId={deletingCommentId}
-                userRating={userRating}
                 createCommentMessage={commentMessage}
                 listErrorMessage={commentsError}
               />

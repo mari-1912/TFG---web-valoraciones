@@ -4,22 +4,19 @@ import {
   ChevronUp,
   Ellipsis,
   ImagePlus,
-  MessageCircleReply,
-  Pencil,
-  Star,
-  ThumbsUp,
-  Trash2,
   X,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CommentAuthor } from "@/components/comments/comment-author";
+import { CommentMessage } from "@/components/comments/comment-message";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
+import { CommentReactionBar } from "@/components/comments/comment-reaction-bar";
+import { CommentSecondaryActions } from "@/components/comments/comment-secondary-actions";
 import { createCroppedImage, type CropAreaPixels } from "@/lib/image-crop";
-import { formatRatingOutOfTen } from "@/pages/detail-page.helpers";
 
 const MAX_COMMENT_IMAGE_MB = 5;
 const COMMENT_IMAGE_OUTPUT_SIZE = 1080;
@@ -38,7 +35,9 @@ export type DetailComment = {
   rating: number | null;
   ratingLabel?: string | null;
   likeCount?: number;
+  dislikeCount?: number;
   isLikedByCurrentUser?: boolean;
+  isDislikedByCurrentUser?: boolean;
   imageUrl?: string | null;
   comment: string;
 };
@@ -60,6 +59,7 @@ type DetailCommentsProps = {
       }
   >;
   onLikeComment?: (comment: DetailComment) => Promise<void>;
+  onDislikeComment?: (comment: DetailComment) => Promise<void>;
   onEditComment?: (comment: DetailComment, message: string) => Promise<void>;
   onDeleteComment?: (comment: DetailComment) => Promise<void>;
   canDeleteAnyComment?: boolean;
@@ -67,7 +67,6 @@ type DetailCommentsProps = {
   editingCommentId?: string | null;
   reactingCommentId?: string | null;
   deletingCommentId?: string | null;
-  userRating?: number | null;
   createCommentMessage?: string | null;
   listErrorMessage?: string | null;
 };
@@ -79,6 +78,7 @@ export function DetailComments({
   focusCommentUser,
   onCreateComment,
   onLikeComment,
+  onDislikeComment,
   onEditComment,
   onDeleteComment,
   canDeleteAnyComment = false,
@@ -86,7 +86,6 @@ export function DetailComments({
   editingCommentId,
   reactingCommentId,
   deletingCommentId,
-  userRating,
   createCommentMessage,
   listErrorMessage,
 }: DetailCommentsProps) {
@@ -96,7 +95,6 @@ export function DetailComments({
   const [editingDraft, setEditingDraft] = useState("");
   const [draftError, setDraftError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [failedAvatarIds, setFailedAvatarIds] = useState<Set<string>>(new Set());
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
   const [commentCropSourceUrl, setCommentCropSourceUrl] = useState<string | null>(
@@ -136,7 +134,6 @@ export function DetailComments({
     setActionError(null);
     setReplyTarget(null);
     setExpandedReplyParents(new Set());
-    setFailedAvatarIds(new Set());
     setFailedCommentImageIds(new Set());
   }, [comments]);
 
@@ -631,22 +628,9 @@ export function DetailComments({
   };
 
   const renderCommentCard = (comment: DetailComment, isReply = false) => {
-    const ownRatingValue =
-      comment.isOwn && userRating != null && Number.isFinite(userRating)
-        ? userRating
-        : null;
     const isEditingCurrent = editingId === comment.id;
     const isSavingCurrent = editingCommentId === comment.id;
     const isReactingCurrent = reactingCommentId === comment.id;
-    const likeCount = Math.max(0, comment.likeCount ?? 0);
-    const normalizedCommentRatingLabel =
-      typeof comment.ratingLabel === "string" && comment.ratingLabel.trim()
-        ? comment.ratingLabel.trim()
-        : null;
-    const effectiveRatingLabel =
-      ownRatingValue != null
-        ? `${ownRatingValue}/10`
-        : normalizedCommentRatingLabel ?? formatRatingOutOfTen(comment.rating);
     const articleClassName = isReply
       ? "rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm"
       : "rounded-xl border border-gray-200 bg-white p-4 shadow-sm";
@@ -660,43 +644,22 @@ export function DetailComments({
           className={`${articleClassName} ${isHighlighted ? "ring-2 ring-violet-300" : ""}`}
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700">
-              {comment.avatarUrl && !failedAvatarIds.has(comment.id) ? (
-                <img
-                  src={comment.avatarUrl}
-                  alt={comment.user}
-                  className="h-10 w-10 rounded-full object-cover"
-                  onError={() => {
-                    setFailedAvatarIds((prev) => {
-                      const next = new Set(prev);
-                      next.add(comment.id);
-                      return next;
-                    });
-                  }}
-                />
-              ) : (
-                (comment.user?.[0] ?? "U").toUpperCase()
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900">{comment.user}</p>
-              <p className="text-xs text-gray-500">{comment.date}</p>
-            </div>
-            <div className="ml-auto text-xs font-semibold text-yellow-500">
-              {effectiveRatingLabel ? (
-                <span className="inline-flex items-center gap-1">
-                  <span>{effectiveRatingLabel}</span>
-                  <Star className="h-3.5 w-3.5 fill-current" />
-                </span>
-              ) : (
-                "Sin rating"
-              )}
-            </div>
+            <CommentAuthor
+              user={comment.user}
+              avatarUrl={comment.avatarUrl}
+              dateLabel={comment.date}
+              containerClassName="flex items-center gap-3"
+              avatarSizeClassName="h-10 w-10"
+              avatarFallbackClassName="bg-violet-100 text-violet-700 text-sm"
+              nameClassName="text-sm font-semibold text-gray-900"
+              dateClassName="text-xs text-gray-500"
+              textClassName=""
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                  className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
                   aria-label="Opciones del comentario"
                 >
                   <Ellipsis className="h-4 w-4" />
@@ -706,8 +669,9 @@ export function DetailComments({
                 align="end"
                 className="w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg"
               >
-                <DropdownMenuItem
-                  onSelect={() => {
+                <CommentSecondaryActions
+                  mode="menu"
+                  onReply={() => {
                     const parentFromComment = Number(comment.parentId ?? 0);
                     const targetParentId =
                       Number.isFinite(parentFromComment) && parentFromComment > 0
@@ -728,32 +692,10 @@ export function DetailComments({
                     );
                     setActionError(null);
                   }}
-                  className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
-                >
-                  <MessageCircleReply className="h-4 w-4 text-gray-500" />
-                  Responder
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={
-                    !comment.isOwn ||
-                    !onEditComment ||
-                    deletingCommentId === comment.id ||
-                    isSavingCurrent
-                  }
-                  onSelect={() => {
+                  onEdit={() => {
                     startEditingComment(comment);
                   }}
-                  className="rounded-lg px-2.5 py-2 text-sm text-gray-700"
-                >
-                  <Pencil className="h-4 w-4 text-gray-500" />
-                  Editar
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={
-                    (!(comment.isOwn || canDeleteAnyComment)) ||
-                    deletingCommentId === comment.id
-                  }
-                  onSelect={() => {
+                  onDelete={() => {
                     if (!onDeleteComment) return;
                     void (async () => {
                       try {
@@ -768,11 +710,18 @@ export function DetailComments({
                       }
                     })();
                   }}
-                  className="rounded-lg px-2.5 py-2 text-sm text-rose-600"
-                >
-                  <Trash2 className="h-4 w-4 text-rose-500" />
-                  {deletingCommentId === comment.id ? "Borrando..." : "Eliminar"}
-                </DropdownMenuItem>
+                  editDisabled={
+                    !comment.isOwn ||
+                    !onEditComment ||
+                    deletingCommentId === comment.id ||
+                    isSavingCurrent
+                  }
+                  deleteDisabled={
+                    (!(comment.isOwn || canDeleteAnyComment)) ||
+                    deletingCommentId === comment.id
+                  }
+                  deleting={deletingCommentId === comment.id}
+                />
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -808,9 +757,15 @@ export function DetailComments({
               </div>
             </div>
           ) : comment.comment ? (
-            <p className="mt-3 text-sm text-gray-600 line-clamp-4">{comment.comment}</p>
+            <CommentMessage
+              message={comment.comment}
+              paragraphClassName="mt-3 text-sm text-gray-600 line-clamp-4"
+            />
           ) : !comment.imageUrl ? (
-            <p className="mt-3 text-sm text-gray-600">Sin comentario.</p>
+            <CommentMessage
+              emptyLabel="Sin comentario."
+              emptyClassName="mt-3 text-sm text-gray-600"
+            />
           ) : null}
           {comment.imageUrl && !failedCommentImageIds.has(comment.id) ? (
             <div className="mt-3">
@@ -828,40 +783,51 @@ export function DetailComments({
               />
             </div>
           ) : null}
-          <div className="mt-3 flex items-center justify-end">
-            {likeCount > 0 ? (
-              <span className="mr-2 text-xs font-semibold text-gray-600">{likeCount}</span>
-            ) : null}
-            <button
-              type="button"
-              disabled={!onLikeComment || isReactingCurrent}
-              onClick={() => {
-                if (!onLikeComment) return;
-                void (async () => {
-                  try {
-                    await onLikeComment(comment);
-                    setActionError(null);
-                  } catch (err) {
-                    setActionError(
-                      err instanceof Error
-                        ? err.message
-                        : "No se pudo registrar el like."
-                    );
+          <CommentReactionBar
+            variant="icon"
+            className="mt-3 flex items-center justify-end gap-2"
+            likeCount={comment.likeCount}
+            dislikeCount={comment.dislikeCount}
+            isLiked={comment.isLikedByCurrentUser}
+            isDisliked={comment.isDislikedByCurrentUser}
+            disabled={isReactingCurrent}
+            onLike={
+              onLikeComment
+                ? () => {
+                    void (async () => {
+                      try {
+                        await onLikeComment(comment);
+                        setActionError(null);
+                      } catch (err) {
+                        setActionError(
+                          err instanceof Error
+                            ? err.message
+                            : "No se pudo registrar el like."
+                        );
+                      }
+                    })();
                   }
-                })();
-              }}
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                comment.isLikedByCurrentUser
-                  ? "border-indigo-200 bg-indigo-100 text-indigo-700"
-                  : "border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              aria-label="Dar like al comentario"
-            >
-              <ThumbsUp
-                className={`h-3.5 w-3.5 ${isReactingCurrent ? "animate-pulse" : ""}`}
-              />
-            </button>
-          </div>
+                : undefined
+            }
+            onDislike={
+              onDislikeComment
+                ? () => {
+                    void (async () => {
+                      try {
+                        await onDislikeComment(comment);
+                        setActionError(null);
+                      } catch (err) {
+                        setActionError(
+                          err instanceof Error
+                            ? err.message
+                            : "No se pudo registrar el dislike."
+                        );
+                      }
+                    })();
+                  }
+                : undefined
+            }
+          />
         </article>
         {isReplyComposerTarget ? (
           <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
