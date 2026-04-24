@@ -30,33 +30,9 @@ export function ProfileTimeline({
   return (
     <section>
       {centerTitle ? (
-        <>
-          <h2 className={headingClassName}>Actividad reciente</h2>
-          {showAction ? (
-            <div className="mt-2 flex justify-center">
-              <button
-                type="button"
-                onClick={onAction}
-                className="text-sm font-medium text-violet-700 hover:text-violet-800"
-              >
-                {actionLabel}
-              </button>
-            </div>
-          ) : null}
-        </>
+        <h2 className={headingClassName}>Actividad reciente</h2>
       ) : (
-        <div className="flex items-center justify-between">
-          <h2 className={headingClassName}>Actividad reciente</h2>
-          {showAction ? (
-            <button
-              type="button"
-              onClick={onAction}
-              className="text-sm font-medium text-violet-700 hover:text-violet-800"
-            >
-              {actionLabel}
-            </button>
-          ) : null}
-        </div>
+        <h2 className={headingClassName}>Actividad reciente</h2>
       )}
 
       <div className="relative mt-4 pl-8">
@@ -105,6 +81,18 @@ export function ProfileTimeline({
           )}
         </div>
       </div>
+
+      {showAction ? (
+        <div className={`mt-4 flex ${centerTitle ? "justify-center" : "justify-end"}`}>
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-sm font-medium text-violet-700 hover:text-violet-800"
+          >
+            {actionLabel}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
