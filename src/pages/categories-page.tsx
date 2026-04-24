@@ -8,8 +8,9 @@ import { fetchMovieById, fetchMovies } from "@/services/fetchMovies";
 import { fetchSeries } from "@/services/fetchSeries";
 import { fetchVideoGameById, fetchVideoGames } from "@/services/fetchVideogames";
 import type { ServiceList } from "@/services/services-list";
+import { buildDetailPath } from "@/lib/detail-route";
 import ServiceSection from "../components/sections/services-section";
-import { Popcorn, Tv, BookOpen, Gamepad2 } from "lucide-react";
+import { Popcorn, Tv, BookOpen, Gamepad2, Star } from "lucide-react";
 import {
   ServicesFilters,
   type ServiceCategory,
@@ -19,6 +20,7 @@ import {
   type BookSeriesKey,
   type PlatformKey,
 } from "../components/service-filters";
+import { CategoryApiSearchBar } from "@/components/categories/category-api-search-bar";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type ServiceListItem = ServiceList & {
@@ -37,6 +39,57 @@ type ServiceListItem = ServiceList & {
   createDate?: number;
   viewsTotal?: number;
   viewsWeek?: number;
+};
+
+type ExternalType = "pelicula" | "serie" | "libro" | "videojuego";
+
+type ExternalSearchItem = {
+  externalId?: string | number;
+  id?: string | number;
+  tmdbId?: string | number;
+  rawgId?: string | number;
+  googleId?: string | number;
+  titulo?: string;
+  title?: string;
+  aliases?: string[];
+  portada?: string;
+  poster?: string;
+  image?: string;
+};
+
+type ApiSearchSuggestion = {
+  id: string;
+  title: string;
+  image?: string | null;
+  provider: string;
+  externalId: string | number;
+  type: ExternalType;
+};
+
+const API_URL = (
+  import.meta.env.VITE_API_URL ??
+  "https://tfg-web-valoraciones-back-i9b5.onrender.com"
+).replace(/\/+$/, "");
+
+const EXTERNAL_SEARCH_ENDPOINTS: Record<ExternalType, string> = {
+  pelicula: "peliculas/tmdb/search",
+  serie: "series/tmdb/search",
+  libro: "libros/google/search",
+  videojuego: "videojuegos/rawg/search",
+};
+
+const EXTERNAL_IMPORT_ENDPOINTS: Record<ExternalType, string> = {
+  pelicula: "peliculas/import/tmdb",
+  serie: "series/import/tmdb",
+  libro: "libros/import/google",
+  videojuego: "videojuegos/import/rawg",
+};
+
+const EXTERNAL_PROVIDER_LABEL: Record<ExternalType, string> = {
+  pelicula: "TMDB",
+  serie: "TMDB",
+  libro: "Google Books",
+  videojuego: "RAWG",
 };
 
 const normalizeGenres = (value: unknown): string[] => {
@@ -93,6 +146,63 @@ const normalizePlatforms = (value: unknown): string[] => {
     .split(/[,/;|&]/)
     .map((item) => item.trim())
     .filter(Boolean);
+};
+
+const normalizeSearchText = (value: unknown) =>
+  String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const buildApiUrl = (path: string) =>
+  `${API_URL}/${path.replace(/^\/+/, "")}`;
+
+const pickExternalTitle = (item: ExternalSearchItem) =>
+  (typeof item.titulo === "string" && item.titulo.trim()) ||
+  (typeof item.title === "string" && item.title.trim())
+    ? (item.titulo ?? item.title ?? "").trim()
+    : "";
+
+const getAliases = (item: ExternalSearchItem) =>
+  Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [];
+
+const resolveExternalType = (category: ServiceCategory): ExternalType =>
+  category === "peliculas"
+    ? "pelicula"
+    : category === "series"
+      ? "serie"
+      : category === "libros"
+        ? "libro"
+        : "videojuego";
+
+const scoreExternalMatch = (item: ExternalSearchItem, q: string) => {
+  const normalizedQuery = normalizeSearchText(q).trim();
+  if (!normalizedQuery) return 0;
+
+  const title = pickExternalTitle(item);
+  if (!title) return 0;
+  const normalizedTitle = normalizeSearchText(title);
+
+  if (normalizedTitle === normalizedQuery) return 1_000;
+  if (normalizedTitle.startsWith(normalizedQuery)) return 700;
+  if (normalizedTitle.includes(normalizedQuery)) return 500;
+
+  const aliases = getAliases(item).map((alias) => normalizeSearchText(alias));
+  if (aliases.some((alias) => alias === normalizedQuery)) return 450;
+  if (aliases.some((alias) => alias.startsWith(normalizedQuery))) return 300;
+  if (aliases.some((alias) => alias.includes(normalizedQuery))) return 200;
+
+  return 0;
+};
+
+const extractExternalRows = (payload: unknown): ExternalSearchItem[] => {
+  if (Array.isArray(payload)) return payload as ExternalSearchItem[];
+  const maybeObject = payload as { items?: unknown; results?: unknown; data?: { items?: unknown; results?: unknown } };
+  if (Array.isArray(maybeObject?.items)) return maybeObject.items as ExternalSearchItem[];
+  if (Array.isArray(maybeObject?.results)) return maybeObject.results as ExternalSearchItem[];
+  if (Array.isArray(maybeObject?.data?.items)) return maybeObject.data.items as ExternalSearchItem[];
+  if (Array.isArray(maybeObject?.data?.results)) return maybeObject.data.results as ExternalSearchItem[];
+  return [];
 };
 
 const toTimestamp = (value: unknown) => {
@@ -227,9 +337,7 @@ const normalizeServiceItems = (
       const duration = toNumber(
         item?.duracion_min ?? item?.duracionMin ?? item?.duration ?? item?.duracion,
       );
-      const rating = toNumber(
-        item?.rating ?? item?.avgRating ?? item?.valoracion ?? item?.puntuacion,
-      );
+      const rating = toNumber(item?.puntuacion);
       const tmdbRating = toNumber(
         item?.metadataApi?.tmdb?.content?.rating?.vote_average,
       );
@@ -399,6 +507,17 @@ const getPlatformBuckets = (platforms?: string[]) => {
   return Array.from(buckets);
 };
 
+/*
+ * TODO: Reactivar cuando el backend exponga un endpoint específico para
+ * títulos familiares/Disney Plus.
+ *
+ * const hasDisneyPlusPlatform = (item: ServiceListItem) =>
+ *   item.platforms?.some((platform) => {
+ *     const compact = normalizeText(platform).replace(/[^a-z0-9]+/g, "");
+ *     return compact.includes("disneyplus") || compact.includes("disney");
+ *   }) ?? false;
+ */
+
 const getBookSeriesType = (item: ServiceListItem): BookSeriesKey => {
   const size = item.collectionSize;
   if (size === 2) return "bilogia";
@@ -415,13 +534,6 @@ const getBookSeriesType = (item: ServiceListItem): BookSeriesKey => {
   return "autoconclusivo";
 };
 
-const hasAnyGenre = (itemGenre: string, wanted: string[]) => {
-  if (!itemGenre) return false;
-  const tokens = normalizeGenres(itemGenre).map(normalizeGenreKey);
-  const wantedKeys = wanted.map(normalizeGenreKey);
-  return wantedKeys.some((key) => tokens.includes(key));
-};
-
 const normalizeRatingScore = (value?: number) => {
   if (value == null || !Number.isFinite(value)) return null;
   return value <= 5 ? value * 2 : value;
@@ -435,58 +547,6 @@ const getBestApiScore = (item: ServiceListItem) => {
     api?.googleBooks ??
     null
   );
-};
-
-const MARATHON_KEYWORDS = [
-  "saga",
-  "trilog",
-  "trilogy",
-  "parte",
-  "vol",
-  "volumen",
-  "season",
-  "temporada",
-  "coleccion",
-  "collection",
-];
-
-const FAMILY_GENRES = [
-  "familia",
-  "family",
-  "infantil",
-  "kids",
-  "animacion",
-  "animación",
-  "aventura",
-  "comedia",
-  "fantasia",
-  "fantasía",
-];
-
-const FAMILY_NEGATIVE = [
-  "terror",
-  "horror",
-  "gore",
-  "crimen",
-  "crime",
-  "thriller",
-  "violencia",
-  "violento",
-  "adult",
-  "erotico",
-  "erótico",
-  "sexo",
-];
-
-const isMarathonItem = (item: ServiceListItem) => {
-  if (item.category === "series") return true;
-  if (item.collection) return true;
-  const title = normalizeText(item.title ?? "");
-  if (!title) return false;
-  if (MARATHON_KEYWORDS.some((key) => title.includes(key))) return true;
-  if (/\b(ii|iii|iv|v|vi|vii|viii|ix|x)\b/i.test(title)) return true;
-  if (/\b(2|3|4|5|6|7|8|9|10)\b/.test(title)) return true;
-  return false;
 };
 
 const extractPagination = (data: any) =>
@@ -600,6 +660,12 @@ export default function CategoriesPage() {
   const [seasons, setSeasons] = useState<SeasonKey>("all");
   const [bookSeries, setBookSeries] = useState<BookSeriesKey>("all");
   const [platform, setPlatform] = useState<PlatformKey>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [apiSearchSuggestions, setApiSearchSuggestions] = useState<
+    ApiSearchSuggestion[]
+  >([]);
+  const [apiSearchLoading, setApiSearchLoading] = useState(false);
+  const [apiSearchError, setApiSearchError] = useState<string | null>(null);
   const { pathname } = useLocation();
   const { categoria } = useParams<{ categoria?: string }>();
   const navigate = useNavigate();
@@ -616,6 +682,7 @@ export default function CategoriesPage() {
     pages: number;
   } | null>(null);
   const PAGE_SIZE = 20;
+  const CAROUSEL_PAGE_SIZE = 100;
 
   // -------------------------
   // Géneros por categoría (fijos)
@@ -643,9 +710,137 @@ export default function CategoriesPage() {
       setSeasons("all");
       setBookSeries("all");
       setPlatform("all");
+      setSearchQuery("");
+      setApiSearchSuggestions([]);
+      setApiSearchError(null);
       setPage(1);
     }
   }, [category]);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (category == null || q.length < 2) {
+      setApiSearchSuggestions([]);
+      setApiSearchError(null);
+      setApiSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const externalType = resolveExternalType(category);
+    const endpoint = EXTERNAL_SEARCH_ENDPOINTS[externalType];
+
+    const timer = window.setTimeout(async () => {
+      setApiSearchLoading(true);
+      setApiSearchError(null);
+      try {
+        const url = new URL(buildApiUrl(endpoint));
+        url.searchParams.set("q", q);
+        url.searchParams.set("pageSize", "12");
+        const res = await fetch(url.toString(), { signal: controller.signal });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`${res.status} ${text}`.trim());
+        }
+
+        const payload = await res.json();
+        if (controller.signal.aborted) return;
+
+        const scoredSuggestions: Array<ApiSearchSuggestion & { __score: number }> = [];
+        extractExternalRows(payload).forEach((item, index) => {
+          const title = pickExternalTitle(item);
+          const externalId =
+            item.externalId ??
+            item.id ??
+            item.tmdbId ??
+            item.rawgId ??
+            item.googleId;
+          if (!title || externalId == null) return;
+
+          const image =
+            typeof item.portada === "string"
+              ? item.portada
+              : typeof item.poster === "string"
+                ? item.poster
+                : typeof item.image === "string"
+                  ? item.image
+                  : null;
+
+          scoredSuggestions.push({
+            id: `${externalType}-${String(externalId)}-${index}`,
+            title,
+            image,
+            provider: EXTERNAL_PROVIDER_LABEL[externalType],
+            externalId,
+            type: externalType,
+            __score: scoreExternalMatch(item, q),
+          });
+        });
+
+        const suggestions = scoredSuggestions
+          .filter((item) => item.__score > 0)
+          .sort((a, b) => b.__score - a.__score)
+          .slice(0, 8)
+          .map(({ __score, ...item }) => item);
+
+        setApiSearchSuggestions(suggestions);
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
+        console.error("Error buscando en API externa:", err);
+        setApiSearchSuggestions([]);
+        setApiSearchError("No se pudo buscar en API externa.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setApiSearchLoading(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [category, searchQuery]);
+
+  const handleApiSuggestionSelect = async (id: string) => {
+    const suggestion = apiSearchSuggestions.find((item) => item.id === id);
+    if (!suggestion) return;
+
+    try {
+      setApiSearchError(null);
+      const endpoint = EXTERNAL_IMPORT_ENDPOINTS[suggestion.type];
+      const url = buildApiUrl(
+        `${endpoint}/${encodeURIComponent(String(suggestion.externalId))}`
+      );
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`${res.status} ${text}`.trim());
+      }
+      const text = await res.text();
+      const payload = text ? JSON.parse(text) : null;
+      const importedItem = payload?.item ?? payload;
+      const importedId = importedItem?.id ?? importedItem?._id;
+
+      if (!importedId) {
+        throw new Error("No se pudo obtener el ID del contenido importado.");
+      }
+
+      const resolvedTitle =
+        importedItem?.titulo ?? importedItem?.title ?? suggestion.title;
+
+      setSearchQuery("");
+      setApiSearchSuggestions([]);
+      navigate(buildDetailPath(suggestion.type, importedId, resolvedTitle), {
+        state: {
+          item: { ...importedItem, tipo: suggestion.type },
+        },
+      });
+    } catch (err) {
+      console.error("Error importando contenido externo:", err);
+      setApiSearchError("No se pudo importar el contenido seleccionado.");
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -663,10 +858,10 @@ export default function CategoriesPage() {
         setPagination(null);
         try {
           const results = await Promise.allSettled([
-            fetchMovies({ page: 1, pageSize: PAGE_SIZE, signal: controller.signal }),
-            fetchSeries({ page: 1, pageSize: PAGE_SIZE, signal: controller.signal }),
-            fetchBooks({ page: 1, pageSize: PAGE_SIZE, signal: controller.signal }),
-            fetchVideoGames({ page: 1, pageSize: PAGE_SIZE, signal: controller.signal }),
+            fetchMovies({ page: 1, pageSize: CAROUSEL_PAGE_SIZE, signal: controller.signal }),
+            fetchSeries({ page: 1, pageSize: CAROUSEL_PAGE_SIZE, signal: controller.signal }),
+            fetchBooks({ page: 1, pageSize: CAROUSEL_PAGE_SIZE, signal: controller.signal }),
+            fetchVideoGames({ page: 1, pageSize: CAROUSEL_PAGE_SIZE, signal: controller.signal }),
           ]);
 
           if (controller.signal.aborted) return;
@@ -685,7 +880,6 @@ export default function CategoriesPage() {
               ? normalizeServiceItems(results[3].value, "videojuegos")
               : []),
           ];
-
           setServices(combined);
 
           const anySuccess = results.some((res) => res.status === "fulfilled");
@@ -785,12 +979,28 @@ export default function CategoriesPage() {
   // Filtrado y orden
   // -------------------------
   const filteredServices = useMemo(() => {
+    const normalizedSearch = normalizeSearchText(searchQuery).trim();
     const hasGenreData = services.some((s) => Boolean(s.genre));
     const hasDurationData = services.some((s) => s.duration != null);
     const hasSeasonsData = services.some((s) => s.seasonsCount != null);
     const hasPlatformsData = services.some((s) => (s.platforms?.length ?? 0) > 0);
     const base = services
       .filter((s) => (category ? s.category === category : true))
+      .filter((s) => {
+        if (!normalizedSearch) return true;
+        const haystack = normalizeSearchText(
+          [
+            s.title,
+            s.description,
+            s.creator,
+            s.genre,
+            s.collection,
+          ]
+            .filter(Boolean)
+            .join(" ")
+        );
+        return haystack.includes(normalizedSearch);
+      })
       .filter((s) =>
         genre && hasGenreData ? matchesGenre(s.genre, genre) : true,
       )
@@ -850,11 +1060,11 @@ export default function CategoriesPage() {
       if (sort === "oldest") return getSortDate(a) - getSortDate(b);
       return 0;
     });
-  }, [services, category, genre, duration, seasons, bookSeries, platform, sort]);
+  }, [services, category, genre, duration, seasons, bookSeries, platform, sort, searchQuery]);
 
   const marathonItems = useMemo(() => {
     const items = filteredServices.filter(
-      (item) => item.category !== "videojuegos" && isMarathonItem(item),
+      (item) => item.category === "series",
     );
     return [...items].sort((a, b) => {
       const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
@@ -864,13 +1074,17 @@ export default function CategoriesPage() {
   }, [filteredServices]);
 
   const familyItems = useMemo(() => {
-    const items = filteredServices.filter((item) => {
-      const positive =
-        hasAnyGenre(item.genre, FAMILY_GENRES);
-      if (!positive) return false;
-      const negative = hasAnyGenre(item.genre, FAMILY_NEGATIVE);
-      return !negative;
-    });
+    /*
+     * TODO: Reactivar cuando el backend exponga un endpoint específico para
+     * títulos familiares/Disney Plus.
+     *
+     * const items = filteredServices.filter(
+     *   (item) =>
+     *     (item.category === "peliculas" || item.category === "series") &&
+     *     hasDisneyPlusPlatform(item),
+     * );
+     */
+    const items = filteredServices.filter((item) => item.category === "peliculas");
 
     const sorted = [...items].sort((a, b) => {
       const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
@@ -884,19 +1098,29 @@ export default function CategoriesPage() {
   }, [filteredServices]);
 
   const mustSeeItems = useMemo(() => {
+    const rankByScore = (items: ServiceListItem[]) =>
+      [...items].sort((a, b) => {
+        const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
+        const scoreB = getBestApiScore(b) ?? normalizeRatingScore(b.rating) ?? 0;
+        return scoreB - scoreA;
+      });
+
+    const books = filteredServices.filter((item) => item.category === "libros");
+    const topBooks = books.filter((item) => {
+      const score = getBestApiScore(item) ?? normalizeRatingScore(item.rating);
+      return score != null && score >= 7.5;
+    });
+
+    const ranked = rankByScore(topBooks.length > 0 ? topBooks : books).slice(0, 20);
+    if (ranked.length > 0) return ranked;
+
     const items = filteredServices.filter((item) => {
       if (item.category === "videojuegos") return false;
       const score = getBestApiScore(item) ?? normalizeRatingScore(item.rating);
       return score != null && score >= 7.5;
     });
-    const ranked = [...items]
-      .sort((a, b) => {
-        const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
-        const scoreB = getBestApiScore(b) ?? normalizeRatingScore(b.rating) ?? 0;
-        return scoreB - scoreA;
-      })
-      .slice(0, 20);
-    if (ranked.length > 0) return ranked;
+    const fallbackRanked = rankByScore(items).slice(0, 20);
+    if (fallbackRanked.length > 0) return fallbackRanked;
 
     const withViews = filteredServices
       .filter((item) => item.category !== "videojuegos")
@@ -917,26 +1141,55 @@ export default function CategoriesPage() {
       .slice(0, 20);
   }, [filteredServices]);
 
-  const topTmdbItems = useMemo(() => {
-    const items = filteredServices.filter(
-      (item) => item.category === "peliculas" || item.category === "series",
+  const standardOpinifyItems = useMemo(() => {
+    /*
+     * TODO: Reactivar cuando el backend incluya `puntuacion` en los listados.
+     *
+     * return filteredServices
+     *   .filter((item) => normalizeRatingScore(item.rating) != null)
+     *   .sort((a, b) => {
+     *     const scoreA = normalizeRatingScore(a.rating) ?? 0;
+     *     const scoreB = normalizeRatingScore(b.rating) ?? 0;
+     *     return scoreB - scoreA;
+     *   })
+     *   .slice(0, 20);
+     */
+    const grouped = {
+      peliculas: filteredServices.filter((item) => item.category === "peliculas"),
+      series: filteredServices.filter((item) => item.category === "series"),
+      libros: filteredServices.filter((item) => item.category === "libros"),
+      videojuegos: filteredServices.filter((item) => item.category === "videojuegos"),
+    };
+    const mixed: ServiceListItem[] = [];
+    const maxLength = Math.max(
+      grouped.peliculas.length,
+      grouped.series.length,
+      grouped.libros.length,
+      grouped.videojuegos.length,
     );
-    const withTmdb = items.filter((item) => item.apiRatings?.tmdb != null);
-    const base = withTmdb.length > 0 ? withTmdb : items;
-    return [...base]
+
+    for (let index = 0; index < maxLength && mixed.length < 20; index += 1) {
+      const row = [
+        grouped.peliculas[index],
+        grouped.series[index],
+        grouped.libros[index],
+        grouped.videojuegos[index],
+      ].filter((item): item is ServiceListItem => Boolean(item));
+      mixed.push(...row.slice(0, 20 - mixed.length));
+    }
+
+    return mixed;
+  }, [filteredServices]);
+
+  const iconicGameItems = useMemo(() => {
+    const items = filteredServices.filter((item) => item.category === "videojuegos");
+    return [...items]
       .sort((a, b) => {
-        const scoreA =
-          a.apiRatings?.tmdb ?? normalizeRatingScore(a.rating) ?? 0;
-        const scoreB =
-          b.apiRatings?.tmdb ?? normalizeRatingScore(b.rating) ?? 0;
+        const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
+        const scoreB = getBestApiScore(b) ?? normalizeRatingScore(b.rating) ?? 0;
         return scoreB - scoreA;
       })
-      .slice(0, 20)
-      .map((item) => {
-        const tmdbRating = item.apiRatings?.tmdb;
-        if (tmdbRating == null) return item;
-        return { ...item, rating: tmdbRating / 2 };
-      });
+      .slice(0, 20);
   }, [filteredServices]);
 
   const showServicesSkeleton =
@@ -1002,8 +1255,8 @@ export default function CategoriesPage() {
   // -------------------------
   return (
     <>
-      <main className="bg-white min-h-screen pt-4">
-        <section className="flex flex-col gap-2">
+      <main className="min-h-screen w-full bg-white pt-2">
+        <section className="flex flex-col gap-1">
           <ServicesFilters
             category={category}
             onCategoryChange={(next) => {
@@ -1049,15 +1302,30 @@ export default function CategoriesPage() {
               setPlatform(next);
               setPage(1);
             }}
+            searchBar={
+              category != null ? (
+                <CategoryApiSearchBar
+                  query={searchQuery}
+                  onQueryChange={(next) => {
+                    setSearchQuery(next);
+                    setPage(1);
+                  }}
+                  suggestions={apiSearchSuggestions}
+                  loading={apiSearchLoading}
+                  error={apiSearchError}
+                  onSelectSuggestion={handleApiSuggestionSelect}
+                />
+              ) : null
+            }
             genres={genres}
             showFullFilters={category != null} // filtros completos solo si hay categoría
           />
 
 
           {/* Contenido según categoría */}
-          <div className="mx-auto w-full max-w-7xl px-6">
+          <div className="mx-auto w-full max-w-7xl px-0 sm:px-6">
             {showServicesSkeleton && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <Skeleton className="h-8 w-52" />
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                   {Array.from({ length: 8 }).map((_, index) => (
@@ -1102,11 +1370,18 @@ export default function CategoriesPage() {
                         items={mustSeeItems}
                       />
                     )}
-                    {topTmdbItems.length > 0 && (
+                    {iconicGameItems.length > 0 && (
                       <ServiceSection
-                        title="Lo mejor valorado en TMDB"
+                        title="Juegos míticos"
                         icon={<Gamepad2 />}
-                        items={topTmdbItems}
+                        items={iconicGameItems}
+                      />
+                    )}
+                    {standardOpinifyItems.length > 0 && (
+                      <ServiceSection
+                        title="Lo mejor valorado de Opinify"
+                        icon={<Star />}
+                        items={standardOpinifyItems}
                       />
                     )}
                   </>
@@ -1123,7 +1398,7 @@ export default function CategoriesPage() {
                       fullWidth
                     />
                     {pagination && pagination.pages > page && (
-                      <div className="mt-8 flex justify-center">
+                      <div className="mt-6 flex justify-center">
                         <button
                           type="button"
                           onClick={() => setPage((prev) => prev + 1)}
@@ -1135,7 +1410,7 @@ export default function CategoriesPage() {
                       </div>
                     )}
                     {pagination && (
-                      <p className="mt-3 text-center text-xs text-gray-500">
+                      <p className="mt-2 text-center text-xs text-gray-500">
                         Página {page} de {pagination.pages} · {services.length} de{" "}
                         {pagination.total}
                       </p>

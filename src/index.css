@@ -98,7 +98,16 @@
   }
 
   /* Estilos base del body, usando directamente las custom properties */
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 100%;
+    min-height: 100%;
+  }
+
   body {
+    margin: 0;
     background-color: hsl(var(--color-bg));
     color: hsl(var(--color-text));
     -webkit-font-smoothing: antialiased;
@@ -127,6 +136,7 @@
 }
 
 .app-main-offset {
+  width: 100%;
   padding-top: var(--app-header-offset);
 }
 

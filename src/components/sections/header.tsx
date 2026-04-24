@@ -829,7 +829,7 @@ export function Header() {
       ref={headerRef}
       className="fixed left-0 top-0 z-50 w-full [background-image:var(--gradient-primary)]"
     >
-      <div className="flex w-full items-center justify-between px-6 py-4 text-white lg:grid lg:min-w-0 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 text-white lg:grid lg:min-w-0 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
         {/* LOGO */}
         <div
           className="flex cursor-pointer items-center text-2xl font-extrabold lg:justify-self-start"
@@ -944,7 +944,7 @@ export function Header() {
         </div>
       </div>
       {isMobileMenuOpen && (
-        <div className="lg:hidden px-6 pb-4">
+        <div className="mx-auto max-w-7xl px-6 pb-4 lg:hidden">
           <div className="mb-3">
             <div className="relative">
               <input
