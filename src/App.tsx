@@ -12,7 +12,9 @@ function App() {
   return (
     <Router>
       <Header />
-      <RoutesComponent />
+      <div className="app-main-offset">
+        <RoutesComponent />
+      </div>
     </Router>
   );
 }

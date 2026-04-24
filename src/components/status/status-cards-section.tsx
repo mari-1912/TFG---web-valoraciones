@@ -85,22 +85,55 @@ function StatusGroupCard({
 type StatusCardsSectionProps = {
   groups: StatusCardGroup[];
   buildStatusHref?: (status: StatusKey) => string | null;
+  title?: string;
+  helperText?: string;
+  stackHeader?: boolean;
+  titleClassName?: string;
+  helperTextClassName?: string;
 };
 
 export function StatusCardsSection({
   groups,
   buildStatusHref = (status) => `/listas/mis-listas/estado/${status}`,
+  title = "Estados",
+  helperText = "Aquí aparecen las listas de progreso y las listas creadas por el usuario",
+  stackHeader = false,
+  titleClassName,
+  helperTextClassName,
 }: StatusCardsSectionProps) {
+  const hasHelperText =
+    typeof helperText === "string" ? helperText.trim().length > 0 : Boolean(helperText);
+  const resolvedTitleClassName =
+    titleClassName ?? "text-xl font-black tracking-tight";
+  const resolvedHelperClassName =
+    helperTextClassName ??
+    (stackHeader
+      ? "mt-1 text-sm text-gray-600"
+      : "text-xs");
+
   return (
     <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-black tracking-tight" style={{ color: "hsl(258 24% 16%)" }}>
-          Estados
-        </h2>
-        <span className="text-xs" style={{ color: "hsl(258 16% 45%)" }}>
-          Dentro verás Películas, Series, Libros y Videojuegos
-        </span>
-      </div>
+      {stackHeader ? (
+        <div className="mb-4 text-center">
+          <h2 className={resolvedTitleClassName} style={{ color: "hsl(258 24% 16%)" }}>
+            {title}
+          </h2>
+          {hasHelperText ? (
+            <p className={resolvedHelperClassName}>{helperText}</p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className={resolvedTitleClassName} style={{ color: "hsl(258 24% 16%)" }}>
+            {title}
+          </h2>
+          {hasHelperText ? (
+            <span className={resolvedHelperClassName} style={{ color: "hsl(258 16% 45%)" }}>
+              {helperText}
+            </span>
+          ) : null}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {groups.map((group, i) => (
           <div key={group.status} style={{ animation: `fadeUp 0.4s ease ${i * 0.05}s both` }}>

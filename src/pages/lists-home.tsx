@@ -292,49 +292,48 @@ export default function ListsHome() {
         }
       `}</style>
 
-      <main
-        className="min-h-screen flex flex-col items-center justify-center px-6 py-16"
-        style={{ background: "hsl(264 100% 99%)" }}
-      >
-        {/* Cabecera */}
-        <div
-          className="text-center mb-12"
-          style={{ animation: "fadeUp 0.6s ease both" }}
-        >
-          <h1
-            className="text-4xl font-black tracking-tight"
-            style={{ color: "hsl(268 84% 62%)" }}
+      <section className="px-6 pb-16 pt-4" style={{ background: "hsl(264 100% 99%)" }}>
+        <div className="mx-auto max-w-7xl">
+          {/* Cabecera */}
+          <div
+            className="text-center mb-10"
+            style={{ animation: "fadeUp 0.6s ease both" }}
           >
-            Listas
-          </h1>
-        </div>
+            <h1
+              className="text-4xl font-black tracking-tight"
+              style={{ color: "hsl(268 84% 62%)" }}
+            >
+              Listas
+            </h1>
+          </div>
 
-        {/* Cards */}
-        <div
-          className="flex flex-wrap justify-center gap-8"
-          style={{ animation: "fadeUp 0.7s ease 0.1s both" }}
-        >
-          <SectionCard
-            to="/listas/listas-opinify"
-            label="Listas Opinify"
-            subtitle="Descubre las colecciones de Opinify"
-            images={movieImages}
-            loadingImages={loadingMovies}
-            accentColor="hsl(268 84% 62%)"
-            intervalMs={2000}
-          />
+          {/* Cards */}
+          <div
+            className="flex flex-wrap justify-center gap-8"
+            style={{ animation: "fadeUp 0.7s ease 0.1s both" }}
+          >
+            <SectionCard
+              to="/listas/listas-opinify"
+              label="Listas Opinify"
+              subtitle="Descubre las colecciones de Opinify"
+              images={movieImages}
+              loadingImages={loadingMovies}
+              accentColor="hsl(268 84% 62%)"
+              intervalMs={2000}
+            />
 
-          <SectionCard
-            to="/listas/mis-listas"
-            label="Mis listas"
-            subtitle="Gestiona tus colecciones personales"
-            images={seriesImages}
-            loadingImages={loadingSeries}
-            accentColor="hsl(295 86% 65%)"
-            intervalMs={2400}
-          />
+            <SectionCard
+              to="/listas/mis-listas"
+              label="Mis listas"
+              subtitle="Gestiona tus colecciones personales"
+              images={seriesImages}
+              loadingImages={loadingSeries}
+              accentColor="hsl(295 86% 65%)"
+              intervalMs={2400}
+            />
+          </div>
         </div>
-      </main>
+      </section>
     </PageLayout>
   );
 }

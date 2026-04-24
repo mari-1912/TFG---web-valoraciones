@@ -322,6 +322,13 @@ export function mapApiComment(
         comment?.reacciones?.count ??
         comment?.reacciones?.totalLikes
     ) ?? 0;
+  const dislikeCount =
+    parseCount(
+      comment?.reacciones?.dislike ??
+        comment?.dislikes ??
+        comment?.dislikesCount ??
+        comment?.reacciones?.totalDislikes
+    ) ?? 0;
   const repliesCount =
     (Array.isArray(comment?.respuestas) ? comment.respuestas.length : null) ??
     parseCount(
@@ -339,7 +346,8 @@ export function mapApiComment(
     comment?.userReaction
   )
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
   const parsedRating = parseRating(
     comment?.rating ??
       comment?.ratingValue ??
@@ -417,10 +425,15 @@ export function mapApiComment(
     rating: toFiveStars(parsedRating) ?? null,
     ratingLabel,
     likeCount,
+    dislikeCount,
     isLikedByCurrentUser:
       userReaction === "like" ||
       userReaction === "liked" ||
       userReaction === "me_gusta",
+    isDislikedByCurrentUser:
+      userReaction === "dislike" ||
+      userReaction === "disliked" ||
+      userReaction === "no_me_gusta",
     imageUrl: context.localCommentImages[commentId] ?? fallbackCommentImage,
     comment: normalizeCommentBody(
       pickString(

@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Popcorn, Tv, Gamepad2, BookOpen } from "lucide-react";
 
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 
 import moviesData from "../data/movies.json";
@@ -82,9 +81,7 @@ export default function ListasPorCategoria() {
 
   return (
     <>
-      <Header />
-
-      <main className="pt-36 bg-white min-h-screen">
+      <main className="bg-white min-h-screen">
       <div className="max-w-7xl mx-auto px-6">
           {/* Izquierda + Hero derecha */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">

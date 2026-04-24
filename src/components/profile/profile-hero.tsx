@@ -2,17 +2,20 @@ import type { ChangeEvent, RefObject } from "react";
 import {
   Loader2,
   MessageSquareText,
+  Pencil,
   ShieldCheck,
   Star,
   StarHalf,
   UserCircle,
   UserCheck2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -90,7 +93,9 @@ type ProfileHeroProps = {
   onCoverClick: () => void;
   onRemoveAvatar: () => void;
   onRemoveCover: () => void;
-  onToggleEdit: () => void;
+  onStartEdit: () => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
   onBioChange: (value: string) => void;
   showFollowAction?: boolean;
   isFollowing?: boolean;
@@ -126,7 +131,9 @@ export function ProfileHero({
   onCoverClick,
   onRemoveAvatar,
   onRemoveCover,
-  onToggleEdit,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
   onBioChange,
   showFollowAction = false,
   isFollowing = false,
@@ -141,7 +148,7 @@ export function ProfileHero({
   onCoverChange,
 }: ProfileHeroProps) {
   const baseQuickStatClassName =
-    "flex flex-col items-center justify-center rounded-xl border border-white/10 bg-black/30 px-4 py-5 text-center";
+    "flex min-w-0 flex-col items-center justify-center rounded-md border border-white/35 bg-black/35 px-1.5 py-1 text-center backdrop-blur-sm sm:py-1.5";
   const dropdownPanelClassName =
     "w-[min(92vw,24rem)] overflow-hidden rounded-2xl border border-violet-200/80 bg-[#f7f3ff] p-0 text-gray-900 shadow-[0_18px_40px_rgba(124,58,237,0.22)] backdrop-blur";
   const dropdownHeaderClassName =
@@ -172,8 +179,8 @@ export function ProfileHero({
             className={`${baseQuickStatClassName} cursor-pointer transition hover:border-violet-200/70 hover:bg-black/40`}
             aria-label={`Mostrar ${label.toLowerCase()} de ${displayName}`}
           >
-            <p className="text-2xl font-semibold">{stat.value}</p>
-            <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+            <p className="text-xl font-semibold leading-none sm:text-2xl">{stat.value}</p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/70 sm:text-xs sm:tracking-widest">
               {stat.label}
             </p>
           </button>
@@ -281,8 +288,8 @@ export function ProfileHero({
             className={`${baseQuickStatClassName} cursor-pointer transition hover:border-violet-200/70 hover:bg-black/40`}
             aria-label={`Mostrar comentarios de ${displayName}`}
           >
-            <p className="text-2xl font-semibold">{stat.value}</p>
-            <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
+            <p className="text-xl font-semibold leading-none sm:text-2xl">{stat.value}</p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/70 sm:text-xs sm:tracking-widest">
               {stat.label}
             </p>
           </button>
@@ -366,150 +373,277 @@ export function ProfileHero({
   };
 
   return (
-    <section className="relative overflow-hidden bg-[#0f0b14] text-white">
+    <section className="relative overflow-hidden text-white [background-image:var(--gradient-primary)]">
+      <div className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(135deg,#3f2ed8,#5b21ff,#7c3aed)] sm:h-48 md:h-56" />
       {coverImage && (
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="absolute inset-x-0 top-0 h-40 bg-cover bg-center sm:h-48 md:h-56"
           style={{ backgroundImage: `url(${coverImage})` }}
         />
       )}
-      <div className="absolute inset-0 bg-black/55" />
-      <div className="absolute inset-0 bg-[radial-gradient(900px_520px_at_15%_0%,rgba(124,58,237,0.35),transparent_70%),radial-gradient(900px_520px_at_85%_0%,rgba(236,72,153,0.22),transparent_70%)]" />
-      <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.06)_45%,transparent_60%)]" />
+      <div className="absolute inset-x-0 top-0 h-40 bg-black/45 sm:h-48 md:h-56" />
+      <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(900px_420px_at_15%_0%,rgba(124,58,237,0.35),transparent_70%),radial-gradient(900px_420px_at_85%_0%,rgba(236,72,153,0.22),transparent_70%)] sm:h-48 md:h-56" />
+      <div className="absolute inset-x-0 top-0 h-40 opacity-30 [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.06)_45%,transparent_60%)] sm:h-48 md:h-56" />
+      <div className="absolute inset-x-0 bottom-0 top-40 bg-black/35 sm:top-48 md:top-56" />
 
-      <div className="relative mx-auto max-w-6xl px-4 py-10">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="flex items-start gap-3 sm:gap-4">
+      <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-24 sm:pt-28 md:pt-32">
+        {canEdit && !isEditing ? (
+          <div className="group absolute right-4 top-4 z-10">
             <button
               type="button"
-              onClick={onAvatarClick}
-              className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 transition sm:h-20 sm:w-20 ${
-                canEdit && isEditing
-                  ? "cursor-pointer hover:bg-white/15"
-                  : "cursor-default"
-              }`}
-              aria-label="Cambiar foto de perfil"
-              title={canEdit && isEditing ? "Cambiar foto" : "Perfil"}
+              onClick={onStartEdit}
+              disabled={!canEdit}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/10 text-white transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Editar perfil"
             >
-              {profileImage ? (
-                <img
-                  src={profileImage}
-                  alt="Avatar"
-                  className="h-full w-full rounded-full object-cover"
-                />
-              ) : (
-                <UserCircle className="h-8 w-8 text-violet-200 sm:h-10 sm:w-10" />
-              )}
+              <Pencil className="h-4 w-4" />
             </button>
+            <span className="pointer-events-none absolute -bottom-9 right-0 rounded-md border border-white/15 bg-black/80 px-2 py-1 text-xs font-medium text-white opacity-0 translate-y-1 transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+              Editar perfil
+            </span>
+          </div>
+        ) : null}
+        {canEdit && isEditing ? (
+          <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/10 text-white transition hover:bg-white hover:text-indigo-700"
+                    aria-label="Opciones de banner"
+                    title="Opciones de banner"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="border-white/20 bg-[#161a27] text-white"
+                >
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      onCoverClick();
+                    }}
+                    className="text-white focus:bg-white/15 focus:text-white"
+                  >
+                    Editar banner
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!coverImage || coverUploading}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      onRemoveCover();
+                    }}
+                    className="text-white focus:bg-white/15 focus:text-white"
+                  >
+                    {coverUploading ? "Procesando..." : "Eliminar banner"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/10 text-white transition hover:bg-white hover:text-rose-600"
+                aria-label="Cerrar edición sin guardar"
+                title="Cerrar edición sin guardar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={onSaveEdit}
+              className="rounded-full border border-white/40 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white hover:text-indigo-700"
+            >
+              Guardar cambios
+            </button>
+          </div>
+        ) : null}
 
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              onChange={onAvatarChange}
-              className="hidden"
-            />
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/*"
-              onChange={onCoverChange}
-              className="hidden"
-            />
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/*"
+          onChange={onAvatarChange}
+          className="hidden"
+        />
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          onChange={onCoverChange}
+          className="hidden"
+        />
 
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-violet-200 sm:text-sm sm:tracking-[0.28em]">
-                Perfil
-              </p>
-              <h1 className="mt-1 break-words text-2xl font-semibold leading-tight sm:text-3xl">
-                {displayName}
-              </h1>
-              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-violet-100">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                {displayRole}
+        <div className="flex flex-col gap-4 sm:gap-5">
+          <div className="flex flex-col gap-4 sm:gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+              <div className="relative mt-4 shrink-0 sm:mt-6 md:mt-10">
+                <button
+                  type="button"
+                  className="flex h-24 w-24 cursor-default items-center justify-center overflow-hidden rounded-full border-4 border-[#090b11] bg-white/10 transition sm:h-28 sm:w-28"
+                  aria-label="Cambiar foto de perfil"
+                  title="Perfil"
+                >
+                  {profileImage ? (
+                    <img
+                      src={profileImage}
+                      alt="Avatar"
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <UserCircle className="h-10 w-10 text-violet-200 sm:h-12 sm:w-12" />
+                  )}
+                </button>
+                {canEdit && isEditing ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="absolute bottom-1 right-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/50 bg-black/75 text-white shadow-[0_6px_14px_rgba(0,0,0,0.35)] transition hover:bg-white hover:text-indigo-700 sm:h-8 sm:w-8"
+                        aria-label="Opciones de foto de perfil"
+                        title="Opciones de foto"
+                      >
+                        <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="border-white/20 bg-[#161a27] text-white"
+                    >
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          onAvatarClick();
+                        }}
+                        className="text-white focus:bg-white/15 focus:text-white"
+                      >
+                        Editar foto
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={!profileImage || avatarUploading}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          onRemoveAvatar();
+                        }}
+                        className="text-white focus:bg-white/15 focus:text-white"
+                      >
+                        {avatarUploading ? "Procesando..." : "Eliminar foto"}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
               </div>
 
-              <div className="mt-3 w-full max-w-md">
-              {canEdit && isEditing ? (
-                  <textarea
-                    value={bio}
-                    onChange={(event) =>
-                      onBioChange(event.target.value.slice(0, 140))
-                    }
-                    rows={2}
-                    placeholder="Añade una breve descripción..."
-                    className="w-full resize-none rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-white placeholder-white/60 outline-none focus:border-white/60"
-                  />
-                ) : (
-                  <p className="text-xs text-white/70">
-                    {bio || "Añade una breve descripción sobre ti."}
-                  </p>
-                )}
-                {canEdit && isEditing && (
-                  <p className="mt-1 text-[11px] text-white/50">
-                    {bio.length}/140 caracteres
-                  </p>
-                )}
-              </div>
+              <div className="mt-5 min-w-0 flex-1 sm:mt-8 md:mt-10">
+                <div className="flex min-w-0 items-center gap-2 sm:flex-wrap">
+                  <h1
+                    className="min-w-0 text-2xl font-semibold leading-tight sm:text-4xl"
+                    title={displayName}
+                  >
+                    {displayName}
+                  </h1>
+                  <div className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-violet-100">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {displayRole}
+                  </div>
+                </div>
 
-              <div className="mt-3 grid w-full max-w-md grid-cols-3 gap-2 text-[11px] text-white/70 sm:gap-3 sm:text-xs">
-                <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center sm:flex-row sm:justify-start sm:gap-2 sm:px-3">
-                  <Star className="hidden h-4 w-4 text-violet-200 sm:block" />
-                  <div>
-                    <p className="text-base font-semibold leading-none text-white sm:text-sm">
-                      {ratingsCount}
-                    </p>
-                    <p className="mt-1 text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
-                      Valoraciones
-                    </p>
-                  </div>
-                </div>
-                <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center sm:flex-row sm:justify-start sm:gap-2 sm:px-3">
-                  <StarHalf className="hidden h-4 w-4 text-violet-200 sm:block" />
-                  <div>
-                    <p className="text-base font-semibold leading-none text-white sm:text-sm">
-                      {averageRating.toFixed(1)}
-                    </p>
-                    <p className="mt-1 text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
-                      Media
-                    </p>
-                  </div>
-                </div>
-                <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-center sm:flex-row sm:justify-start sm:gap-2 sm:px-3">
-                  <MessageSquareText className="hidden h-4 w-4 text-violet-200 sm:block" />
-                  <div>
-                    <p className="text-base font-semibold leading-none text-white sm:text-sm">
-                      {reviewsCount}
-                    </p>
-                    <p className="mt-1 text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
-                      Reseñas
-                    </p>
+                <div className="mt-5 flex justify-start">
+                  <div
+                    className={`grid w-full max-w-full grid-cols-3 gap-1.5 sm:max-w-[330px] ${
+                      quickStats.length >= 3 ? "" : "sm:grid-cols-2"
+                    }`}
+                  >
+                    {quickStats.map((stat) => {
+                      if (stat.id === "followers") {
+                        return (
+                          renderConnectionsDropdown("followers", stat) ?? (
+                            <div key={stat.label} className={baseQuickStatClassName}>
+                              <p className="text-sm font-semibold leading-none">{stat.value}</p>
+                              <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
+                                {stat.label}
+                              </p>
+                            </div>
+                          )
+                        );
+                      }
+
+                      if (stat.id === "following") {
+                        return (
+                          renderConnectionsDropdown("following", stat) ?? (
+                            <div key={stat.label} className={baseQuickStatClassName}>
+                              <p className="text-sm font-semibold leading-none">{stat.value}</p>
+                              <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
+                                {stat.label}
+                              </p>
+                            </div>
+                          )
+                        );
+                      }
+
+                      if (stat.id === "comments") {
+                        return (
+                          renderCommentsDropdown(stat) ?? (
+                            <div key={stat.label} className={baseQuickStatClassName}>
+                              <p className="text-sm font-semibold leading-none">{stat.value}</p>
+                              <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
+                                {stat.label}
+                              </p>
+                            </div>
+                          )
+                        );
+                      }
+
+                      return (
+                        <div key={stat.label} className={baseQuickStatClassName}>
+                          <p className="text-sm font-semibold leading-none">{stat.value}</p>
+                          <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
+                            {stat.label}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
+            </div>
 
-              {canEdit && isEditing && (
-                <p className="mt-2 text-xs text-white/60">
-                  Pulsa la foto para cambiarla
+            <div className="mt-3 grid w-full grid-cols-3 gap-2 text-[11px] text-white/70 sm:mt-8 md:mt-6 md:w-[340px] sm:text-xs">
+              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-white/35 bg-black/35 px-2 py-2 text-center backdrop-blur-sm">
+                <Star className="h-4 w-4 text-violet-200" />
+                <p className="text-base font-semibold leading-none text-white sm:text-sm">
+                  {ratingsCount}
                 </p>
-              )}
-              {avatarError && (
-                <p className="mt-3 text-xs text-rose-200">{avatarError}</p>
-              )}
+                <p className="text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
+                  Valoraciones
+                </p>
+              </div>
+              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-white/35 bg-black/35 px-2 py-2 text-center backdrop-blur-sm">
+                <StarHalf className="h-4 w-4 text-violet-200" />
+                <p className="text-base font-semibold leading-none text-white sm:text-sm">
+                  {averageRating.toFixed(1)}
+                </p>
+                <p className="text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
+                  Media
+                </p>
+              </div>
+              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-white/35 bg-black/35 px-2 py-2 text-center backdrop-blur-sm">
+                <MessageSquareText className="h-4 w-4 text-violet-200" />
+                <p className="text-base font-semibold leading-none text-white sm:text-sm">
+                  {reviewsCount}
+                </p>
+                <p className="text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
+                  COMENTARIOS
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {canEdit ? (
-              <button
-                type="button"
-                onClick={onToggleEdit}
-                disabled={!canEdit}
-                className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isEditing ? "Cerrar edición" : "Editar"}
-              </button>
-            ) : showFollowAction ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {!canEdit && showFollowAction ? (
               <div className="flex flex-col items-stretch gap-2">
                 {isFollowing ? (
                   <button
@@ -551,104 +685,46 @@ export function ProfileHero({
                 </button>
               </div>
             ) : null}
-            {isEditing && (
-              <>
-                <button
-                  type="button"
-                  onClick={onCoverClick}
-                  className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700"
-                >
-                  Cambiar portada
-                </button>
-                <button
-                  type="button"
-                  onClick={onRemoveCover}
-                  disabled={!coverImage || coverUploading}
-                  className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {coverUploading ? "Procesando..." : "Eliminar portada"}
-                </button>
-                <button
-                  type="button"
-                  onClick={onRemoveAvatar}
-                  disabled={!profileImage || avatarUploading}
-                  className="inline-flex items-center justify-center rounded-full border border-white/30 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {avatarUploading ? "Procesando..." : "Eliminar foto"}
-                </button>
-              </>
+          </div>
+
+          <div className="-mt-3 rounded-md border border-white/35 bg-black/30 px-3 py-2 backdrop-blur-sm">
+            {canEdit && isEditing ? (
+              <textarea
+                value={bio}
+                onChange={(event) =>
+                  onBioChange(event.target.value.slice(0, 140))
+                }
+                rows={2}
+                placeholder="Añade una breve descripción..."
+                className="w-full resize-none rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white placeholder-white/60 outline-none focus:border-white/60"
+              />
+            ) : (
+              <p className="text-sm leading-snug text-white/75">
+                {bio || "Añade una breve descripción sobre ti."}
+              </p>
+            )}
+            {canEdit && isEditing && (
+              <p className="mt-1 text-[11px] text-white/50">
+                {bio.length}/140 caracteres
+              </p>
             )}
           </div>
-        </div>
 
-        {!canEdit && followMessage ? (
-          <p className="mt-3 text-xs text-violet-100">{followMessage}</p>
-        ) : null}
+          {avatarError && (
+            <p className="text-xs text-rose-200">{avatarError}</p>
+          )}
+          {!canEdit && followMessage ? (
+            <p className="text-xs text-violet-100">{followMessage}</p>
+          ) : null}
+          {saveError && (
+            <p className="text-xs text-rose-200">{saveError}</p>
+          )}
+          {coverError && (
+            <p className="text-xs text-rose-200 md:text-right">
+              {coverError}
+            </p>
+          )}
 
-        {saveError && (
-          <p className="mt-3 text-xs text-rose-200">{saveError}</p>
-        )}
-
-        {coverError && (
-          <p className="mt-4 text-xs text-rose-200 md:text-right">
-            {coverError}
-          </p>
-        )}
-
-        <div
-          className={`mt-8 grid grid-cols-1 gap-3 border-t border-white/10 pt-6 ${
-            quickStats.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
-          }`}
-        >
-          {quickStats.map((stat) => {
-            if (stat.id === "followers") {
-              return (
-                renderConnectionsDropdown("followers", stat) ?? (
-                  <div key={stat.label} className={baseQuickStatClassName}>
-                    <p className="text-2xl font-semibold">{stat.value}</p>
-                    <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
-                      {stat.label}
-                    </p>
-                  </div>
-                )
-              );
-            }
-
-            if (stat.id === "following") {
-              return (
-                renderConnectionsDropdown("following", stat) ?? (
-                  <div key={stat.label} className={baseQuickStatClassName}>
-                    <p className="text-2xl font-semibold">{stat.value}</p>
-                    <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
-                      {stat.label}
-                    </p>
-                  </div>
-                )
-              );
-            }
-
-            if (stat.id === "comments") {
-              return (
-                renderCommentsDropdown(stat) ?? (
-                  <div key={stat.label} className={baseQuickStatClassName}>
-                    <p className="text-2xl font-semibold">{stat.value}</p>
-                    <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
-                      {stat.label}
-                    </p>
-                  </div>
-                )
-              );
-            }
-
-            return (
-              <div key={stat.label} className={baseQuickStatClassName}>
-                <p className="text-2xl font-semibold">{stat.value}</p>
-                <p className="mt-1 text-xs uppercase tracking-widest text-white/70">
-                  {stat.label}
-                </p>
-              </div>
-            );
-          })}
         </div>
       </div>
     </section>

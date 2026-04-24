@@ -546,6 +546,7 @@ export function DetailPage() {
     commentMessage,
     handleCreateComment,
     handleLikeComment,
+    handleDislikeComment,
     handleEditComment,
     handleDeleteComment,
   } = useDetailComments({
@@ -560,7 +561,7 @@ export function DetailPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-gray-50 px-6 pb-12 pt-32">
+      <main className="min-h-screen bg-gray-50 px-6 pb-12">
         <div className="mx-auto w-full max-w-none">
           {!item ? (
             <div className="space-y-6">
@@ -741,6 +742,7 @@ export function DetailPage() {
                 focusCommentUser={focusCommentUserFromState}
                 onCreateComment={handleCreateComment}
                 onLikeComment={handleLikeComment}
+                onDislikeComment={handleDislikeComment}
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
                 canDeleteAnyComment={currentUserIsAdmin}
@@ -748,7 +750,6 @@ export function DetailPage() {
                 editingCommentId={editingCommentId}
                 reactingCommentId={reactingCommentId}
                 deletingCommentId={deletingCommentId}
-                userRating={userRating}
                 createCommentMessage={commentMessage}
                 listErrorMessage={commentsError}
               />

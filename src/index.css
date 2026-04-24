@@ -50,6 +50,7 @@
       radial-gradient(circle at 0% 0%, rgba(120, 70, 255, 0.35) 0%, transparent 55%),
       radial-gradient(circle at 100% 0%, rgba(255, 80, 200, 0.30) 0%, transparent 55%),
       linear-gradient(135deg, #2b1248, #5b21ff, #e000ff);
+    --app-header-offset: 112px;
   }
 
   .dark {
@@ -125,6 +126,10 @@
   }
 }
 
+.app-main-offset {
+  padding-top: var(--app-header-offset);
+}
+
 /* 🎨 Shadcn UI tokens — versioneados a tema neon morado */
 :root {
   /* Fondo general del menú */
@@ -176,4 +181,3 @@
    --card-foreground: var(--color-text);
  
 }
-

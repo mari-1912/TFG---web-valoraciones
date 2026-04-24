@@ -1,6 +1,5 @@
 import LoginForm from "../components/login-form";
 import RegisterForm from "../components/register-form";
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import BackgroundImg from "@/img/bg-img.avif"
 import { useEffect, useState } from "react";
@@ -77,16 +76,6 @@ useEffect(() => {
 
   return (
     <main className="min-h-screen bg-white">
-      {/* HEADER fijo para que no “empuje” el layout y no lo tape */}
-      <header className="fixed top-0 left-0 w-full z-50 bg-violet-700 text-white">
-        <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-          <Header />
-        </div>
-      </header>
-
-      {/* Spacer: evita que el contenido se meta debajo del header fijo */}
-      <div className="h-[64px] md:h-[72px]" />
-
       {activeForm === "login" && (
         <LoginForm onClose={() => setActiveForm(null)} />
       )}

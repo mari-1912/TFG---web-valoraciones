@@ -1,5 +1,4 @@
 import { useParams } from "react-router-dom";
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 
 const listasMock = {
@@ -52,10 +51,6 @@ export default function ListTypePage() {
 
   return (
     <>
-      <header className="mb-8 w-full max-w-7xl mx-auto flex justify-between items-center border-b border-gray-300 py-4 px-6">
-        <Header />
-        {/* Para móviles, puedes agregar un botón hamburguesa (icono) para el menú */}
-      </header>{" "}
       <main className="min-h-screen bg-gray-50 px-6 py-12 max-w-5xl mx-auto">
         <h2 className="text-2xl font-bold text-indigo-700 mb-8 text-center">
           Listas de {categoria?.replace(/-/g, " ")}

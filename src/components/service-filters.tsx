@@ -29,6 +29,8 @@ export type PlatformKey =
 type Props = {
   category: ServiceCategory | null;
   onCategoryChange: (v: ServiceCategory | null) => void;
+  showCategoryHeading?: boolean;
+  categoryHeading?: string;
 
 
   sort?: SortKey;
@@ -69,6 +71,8 @@ const tabIdle = "bg-white hover:bg-gray-50";
 export function ServicesFilters({
   category,
   onCategoryChange,
+  showCategoryHeading = false,
+  categoryHeading = "Categorías",
   sort,
   onSortChange,
   genre,
@@ -87,9 +91,18 @@ export function ServicesFilters({
   return (
     <section className="mx-auto max-w-7xl px-6">
       {/* ----------------- Categorías siempre visibles ----------------- */}
-      <div className="mb-3 flex items-center gap-3">
-        <span className="text-lg font-semibold text-gray-900">Categoría</span>
-        <div className="flex flex-wrap gap-3">
+      <div className="mb-3">
+        {showCategoryHeading ? (
+          <h1
+            className="text-3xl font-black tracking-tight text-center"
+            style={{ color: "hsl(268 84% 62%)" }}
+          >
+            {categoryHeading}
+          </h1>
+        ) : (
+          <span className="text-lg font-semibold text-gray-900">Categoría</span>
+        )}
+        <div className={`flex flex-wrap gap-3 ${showCategoryHeading ? "mt-4" : "mt-3"}`}>
           {(
             [
               "peliculas",
@@ -211,4 +224,3 @@ export function ServicesFilters({
     </section>
   );
 }
-

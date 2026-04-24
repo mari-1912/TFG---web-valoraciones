@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import { fetchBookById, fetchBooks } from "@/services/fetchBooks";
 import { fetchMovieById, fetchMovies } from "@/services/fetchMovies";
@@ -1003,9 +1002,8 @@ export default function CategoriesPage() {
   // -------------------------
   return (
     <>
-      <Header />
-      <main className="bg-white min-h-screen pt-38">
-        <section className="flex flex-col gap-8">
+      <main className="bg-white min-h-screen pt-4">
+        <section className="flex flex-col gap-2">
           <ServicesFilters
             category={category}
             onCategoryChange={(next) => {
@@ -1019,6 +1017,8 @@ export default function CategoriesPage() {
               setCategory(next);
               navigate(`/categorías/${next}`);
             }}
+            showCategoryHeading
+            categoryHeading="Categorías"
             sort={sort}
             onSortChange={(next) => {
               setSort(next);

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircleReply, Pencil, Star, ThumbsUp, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Header } from "../components/sections/header";
 import Footer from "../components/sections/footer";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CommunityCommentSection,
+  type CommunityAction,
+  type CommunityPost,
+} from "@/components/comments/community-comment-section";
 import {
   getCommunityFeed,
   resolveAssetUrl,
@@ -28,41 +31,6 @@ import moviesData from "../data/movies.json";
 import seriesData from "../data/series.json";
 import videoGamesData from "../data/video-games.json";
 import booksData from "../data/books.json";
-
-type CommunityAction =
-  | "comment"
-  | "left_comment"
-  | "favorite"
-  | "pending"
-  | "list_add"
-  | "rating";
-
-interface CommunityPost {
-  id: string;
-  userId?: number | null;
-  user: string;
-  avatar?: string;
-  timestampLabel?: string;
-  activityDate?: string;
-
-  action?: CommunityAction;
-  listName?: string;
-
-  // Para posters reales:
-  contentType?: "película" | "serie" | "videojuego" | "libro";
-  detailType?: "pelicula" | "serie" | "videojuego" | "libro" | null;
-  contentId?: number | null;
-  commentId?: number | null;
-  likeCount?: number;
-  isLikedByCurrentUser?: boolean;
-  title?: string;
-
-  // Opcional: fuerza un poster desde community.json
-  poster?: string;
-
-  rating?: number; // 0..10
-  comment?: string;
-}
 
 function pickString(...values: unknown[]) {
   for (const value of values) {
@@ -140,14 +108,11 @@ function parseCount(value: unknown) {
   return parsed < 0 ? null : parsed;
 }
 
-function formatRatingLabel(value?: number) {
-  if (!Number.isFinite(value)) return null;
-  const normalized = normalizeRating(value);
-  if (normalized == null) return null;
-  const asText = Number.isInteger(normalized)
-    ? String(normalized)
-    : normalized.toFixed(1).replace(".", ",");
-  return `${asText}/10`;
+function normalizeReactionType(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 }
 
 function formatActivityDate(value?: string) {
@@ -271,14 +236,38 @@ function mapActivityToPost(activity: CommunityActivity, index: number): Communit
           metadataRecord.likes ??
           metadataRecord.likeCount
       ) ?? 0,
+    dislikeCount:
+      parseCount(
+        reactions?.dislike ??
+          reactions?.dislikes ??
+          metadataRecord.dislikes ??
+          metadataRecord.dislikeCount ??
+          reactions?.totalDislikes
+      ) ?? 0,
     isLikedByCurrentUser:
-      String(
+      [
+        "like",
+        "liked",
+        "me_gusta",
+      ].includes(
+        normalizeReactionType(
+          reactions?.userReaction ??
+            metadataRecord.userReaction ??
+            metadataRecord.reaccionUsuario
+        )
+      ),
+    isDislikedByCurrentUser:
+      [
+        "dislike",
+        "disliked",
+        "no_me_gusta",
+      ].includes(
+        normalizeReactionType(
         reactions?.userReaction ??
           metadataRecord.userReaction ??
           metadataRecord.reaccionUsuario
-      )
-        .trim()
-        .toLowerCase() === "like",
+        )
+      ),
     contentType: normalizeContentType(
       metadataRecord.tipoContenido ??
         metadataRecord.tipo
@@ -418,65 +407,6 @@ function inferDetailTypeFromPost(post: CommunityPost): CommunityPost["detailType
   }
 
   return "pelicula";
-}
-
-function RatingBadge({ rating }: { rating?: number }) {
-  const label = formatRatingLabel(rating);
-  if (!label) return null;
-  return (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-yellow-500">
-      <span>{label}</span>
-      <Star className="h-3.5 w-3.5 fill-current" />
-    </span>
-  );
-}
-
-function buildMessage(post: CommunityPost) {
-  const user = post.user || "Customer";
-  const action = post.action ?? (post.rating ? "rating" : "comment");
-
-  switch (action) {
-    case "comment":
-      return `${user} ha comentado`;
-    case "left_comment":
-      return `${user} ha dejado un comentario`;
-    case "favorite":
-      return `${user} ha añadido a favoritos:`;
-    case "pending":
-      return `${user} ha añadido a pendientes:`;
-    case "list_add":
-      return `${user} ha añadido a la lista de ${post.listName ?? "terror"}:`;
-    case "rating":
-    default:
-      return `${user} ha añadido una nueva valoración:`;
-  }
-}
-
-function Avatar({ user, src }: { user: string; src?: string }) {
-  const [ok, setOk] = useState(true);
-  const letter = (user?.trim()?.[0] ?? "C").toUpperCase();
-
-  useEffect(() => {
-    setOk(true);
-  }, [src]);
-
-  if (src && ok) {
-    return (
-      <img
-        src={src}
-        alt={user}
-        className="h-12 w-12 rounded-full object-cover bg-gray-200"
-        loading="lazy"
-        onError={() => setOk(false)}
-      />
-    );
-  }
-
-  return (
-    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 font-semibold text-gray-700">
-      {letter}
-    </div>
-  );
 }
 
 export default function CommunityPage() {
@@ -834,6 +764,30 @@ export default function CommunityPage() {
     [refreshFeedSilently, resolveCommentIdForPost]
   );
 
+  const handleDislikeCommentFromFeed = useCallback(
+    async (post: CommunityPost) => {
+      if (post.contentId == null) return;
+      setProcessingPostId(post.id);
+      setActionError(null);
+      setActionMessage(null);
+      try {
+        const resolvedCommentId = await resolveCommentIdForPost(post);
+        if (resolvedCommentId == null) {
+          throw new Error("No se pudo localizar el comentario para dar dislike.");
+        }
+        await reactToContentComment(post.contentId, resolvedCommentId, "dislike");
+        await refreshFeedSilently();
+      } catch (err) {
+        setActionError(
+          err instanceof Error ? err.message : "No se pudo registrar el dislike."
+        );
+      } finally {
+        setProcessingPostId(null);
+      }
+    },
+    [refreshFeedSilently, resolveCommentIdForPost]
+  );
+
   const handleReplyFromFeed = useCallback(
     async (post: CommunityPost) => {
       const message = replyDraft.trim();
@@ -936,9 +890,19 @@ export default function CommunityPage() {
   if (loading) {
     return (
       <>
-        <Header />
-        <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)] pt-28 md:pt-32">
+        <main className="min-h-screen pt-4 bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
           <div className="mx-auto max-w-6xl space-y-4 px-6 pb-10">
+            <div className="mb-6 text-center">
+              <h1
+                className="text-3xl font-black tracking-tight"
+                style={{ color: "hsl(268 84% 62%)" }}
+              >
+                Actividad reciente
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Estás visualizando las últimas valoraciones y comentarios de los usuarios que sigues
+              </p>
+            </div>
             {Array.from({ length: 3 }).map((_, index) => (
               <div
                 key={`community-skeleton-${index}`}
@@ -968,14 +932,23 @@ export default function CommunityPage() {
   }
 
   return (
-    <>
-      <Header />
-
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)] pt-28 md:pt-32">
-        <div className="mx-auto max-w-6xl px-6 pb-10">
-          {error ? (
-            <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
-              {error}
+      <>
+      <main className="min-h-screen pt-4 bg-[radial-gradient(circle_at_top,_rgba(167,139,250,0.18),_transparent_55%),linear-gradient(180deg,#faf7ff_0%,#ffffff_35%,#ffffff_100%)]">
+          <div className="mx-auto max-w-6xl px-6 pb-10">
+            <div className="mb-6 text-center">
+              <h1
+                className="text-3xl font-black tracking-tight"
+                style={{ color: "hsl(268 84% 62%)" }}
+              >
+                Actividad reciente
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Estás visualizando las últimas valoraciones y comentarios de los usuarios que sigues
+              </p>
+            </div>
+            {error ? (
+              <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+                {error}
             </p>
           ) : null}
           {actionMessage ? (
@@ -989,305 +962,37 @@ export default function CommunityPage() {
             </p>
           ) : null}
 
-          <section className="space-y-4">
-            {!rows.length ? (
-              <div className="rounded-[26px] border border-violet-200/80 bg-white/90 px-5 py-6 text-sm text-gray-600 shadow-[0_12px_28px_rgba(124,58,237,0.16)]">
-                Aún no hay actividad reciente de usuarios que sigues.
-              </div>
-            ) : null}
-            {rows.map((post) => {
-              const msg = buildMessage(post);
-              const action = post.action ?? (post.rating ? "rating" : "comment");
-              const canNavigateToDetail =
-                post.contentId != null &&
-                Number.isFinite(post.contentId);
-              const canNavigateToUserProfile =
-                typeof post.userId === "number" &&
-                Number.isFinite(post.userId) &&
-                post.userId > 0;
-              const isCommentPost = action === "comment" || action === "left_comment";
-              const canModerateThisPost =
-                isCommentPost &&
-                post.contentId != null &&
-                (isOwnCommentPost(post) || currentUserIsAdmin);
-              const canEditThisPost =
-                isCommentPost &&
-                post.contentId != null &&
-                isOwnCommentPost(post);
-              const canReplyThisPost =
-                isCommentPost &&
-                post.contentId != null;
-              const canLikeThisPost =
-                isCommentPost &&
-                post.contentId != null;
-              const isReplying = replyingPostId === post.id;
-              const isEditing = editingPostId === post.id;
-              const isProcessing = processingPostId === post.id;
-
-              const showRating = action === "rating";
-              const showQuotedComment =
-                action === "rating" && (post.comment?.trim()?.length ?? 0) > 0;
-
-              const posterSrc =
-                post.poster ??
-                findPosterByType(post.contentType, post.title) ??
-                findPosterAnywhere(post.title);
-
-              return (
-                <article
-                  key={post.id}
-                  className="rounded-[26px] border border-violet-200/80 bg-white/95 p-4 shadow-[0_12px_30px_rgba(124,58,237,0.16)] transition hover:shadow-[0_18px_36px_rgba(124,58,237,0.2)]"
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                    <div className="flex items-center gap-3 md:w-52 md:shrink-0">
-                      {canNavigateToUserProfile ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOpenUserProfile(post);
-                          }}
-                          className="rounded-full outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-violet-400"
-                          aria-label={`Ir al perfil de ${post.user}`}
-                        >
-                          <Avatar user={post.user} src={post.avatar} />
-                        </button>
-                      ) : (
-                        <Avatar user={post.user} src={post.avatar} />
-                      )}
-                      <span className="max-w-[160px] truncate text-sm font-semibold text-gray-900">
-                        {post.user}
-                      </span>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium text-gray-800">{msg}</p>
-                        <span className="shrink-0 text-xs text-gray-500">
-                          {post.timestampLabel ?? "hace poco"}
-                        </span>
-                      </div>
-
-                      {showRating ? (
-                        <div className="mt-2">
-                          <RatingBadge rating={post.rating} />
-                        </div>
-                      ) : null}
-
-                      {showQuotedComment ? (
-                        <button
-                          type="button"
-                          onClick={() => void openPostDetail(post)}
-                          className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-left text-sm text-gray-700 transition hover:border-gray-300 hover:bg-gray-200/80"
-                        >
-                          “{post.comment}”
-                        </button>
-                      ) : null}
-
-                      {isCommentPost && post.comment?.trim() ? (
-                        <button
-                          type="button"
-                          onClick={() => void openPostDetail(post)}
-                          className="mt-2 w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-left text-sm text-gray-700 transition hover:border-gray-300 hover:bg-gray-200/80"
-                        >
-                          {post.comment}
-                        </button>
-                      ) : null}
-
-                      {(canLikeThisPost ||
-                        canReplyThisPost ||
-                        canEditThisPost ||
-                        canModerateThisPost) && (
-                        <div
-                          className="mt-3 flex flex-wrap items-center gap-2"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {canLikeThisPost ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleLikeCommentFromFeed(post)}
-                              disabled={isProcessing}
-                              className={`inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                                post.isLikedByCurrentUser
-                                  ? "border-indigo-200 bg-indigo-100 text-indigo-700"
-                                  : "border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200"
-                              }`}
-                            >
-                              {typeof post.likeCount === "number" && post.likeCount > 0 ? (
-                                <span>{post.likeCount}</span>
-                              ) : null}
-                              <ThumbsUp className="h-3.5 w-3.5" />
-                            </button>
-                          ) : null}
-                          {canReplyThisPost ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReplyingPostId(post.id);
-                                setEditingPostId(null);
-                                setReplyDraft(`@${post.user} `);
-                                setActionError(null);
-                              }}
-                              className="inline-flex h-8 items-center gap-1 rounded-full border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-                            >
-                              <MessageCircleReply className="h-3.5 w-3.5" />
-                              Responder
-                            </button>
-                          ) : null}
-                          {canEditThisPost ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingPostId(post.id);
-                                setReplyingPostId(null);
-                                setEditingDraft(post.comment ?? "");
-                                setActionError(null);
-                              }}
-                              className="inline-flex h-8 items-center gap-1 rounded-full border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              Editar
-                            </button>
-                          ) : null}
-                          {canModerateThisPost ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteFromFeed(post)}
-                              disabled={isProcessing}
-                              className="inline-flex h-8 items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              {isProcessing ? "Borrando..." : "Eliminar"}
-                            </button>
-                          ) : null}
-                        </div>
-                      )}
-
-                      {isReplying && canReplyThisPost ? (
-                        <div
-                          className="mt-3 space-y-2"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <textarea
-                            value={replyDraft}
-                            onChange={(event) => setReplyDraft(event.target.value)}
-                            className="min-h-[90px] w-full resize-y rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                            placeholder="Escribe tu respuesta..."
-                          />
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReplyingPostId(null);
-                                setReplyDraft("");
-                              }}
-                              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-                            >
-                              Cancelar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleReplyFromFeed(post)}
-                              disabled={isProcessing}
-                              className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {isProcessing ? "Enviando..." : "Responder"}
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {isEditing && canEditThisPost ? (
-                        <div
-                          className="mt-3 space-y-2"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <textarea
-                            value={editingDraft}
-                            onChange={(event) => setEditingDraft(event.target.value)}
-                            className="min-h-[90px] w-full resize-y rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                            placeholder="Edita tu comentario..."
-                          />
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingPostId(null);
-                                setEditingDraft("");
-                              }}
-                              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-                            >
-                              Cancelar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleEditFromFeed(post)}
-                              disabled={isProcessing}
-                              className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {isProcessing ? "Guardando..." : "Guardar"}
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3 md:w-[220px] md:justify-end">
-                      <span
-                        className={`text-sm ${post.title ? "font-semibold text-gray-900" : "text-gray-400"}`}
-                      >
-                        {post.title ?? "Título"}
-                      </span>
-                      {canNavigateToDetail ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void openPostDetail(post);
-                          }}
-                          className="group rounded-lg outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400"
-                          aria-label={`Ir al detalle de ${post.title ?? "este título"}`}
-                        >
-                          {posterSrc ? (
-                            <img
-                              src={posterSrc}
-                              alt={`Poster ${post.title ?? ""}`}
-                              className="h-16 w-12 rounded-lg border border-violet-100 object-cover bg-gray-200 shadow-sm transition group-hover:border-violet-300 group-hover:shadow-md"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="h-16 w-12 rounded-lg border border-violet-100 bg-gray-200 transition group-hover:border-violet-300 group-hover:shadow-md" />
-                          )}
-                        </button>
-                      ) : posterSrc ? (
-                        <img
-                          src={posterSrc}
-                          alt={`Poster ${post.title ?? ""}`}
-                          className="h-16 w-12 rounded-lg border border-violet-100 object-cover bg-gray-200 shadow-sm"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="h-16 w-12 rounded-lg border border-violet-100 bg-gray-200" />
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </section>
-
-          {currentPage < totalPages && rows.length > 0 ? (
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={() => void loadMoreFeed()}
-                disabled={loadingMore}
-                className="rounded-full border border-violet-300 bg-white px-6 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loadingMore ? "Cargando..." : "Cargar más"}
-              </button>
-            </div>
-          ) : null}
+          <CommunityCommentSection
+            rows={rows}
+            currentUserIsAdmin={currentUserIsAdmin}
+            isOwnCommentPost={isOwnCommentPost}
+            processingPostId={processingPostId}
+            replyingPostId={replyingPostId}
+            replyDraft={replyDraft}
+            setReplyingPostId={setReplyingPostId}
+            setReplyDraft={setReplyDraft}
+            editingPostId={editingPostId}
+            editingDraft={editingDraft}
+            setEditingPostId={setEditingPostId}
+            setEditingDraft={setEditingDraft}
+            clearActionError={() => setActionError(null)}
+            onOpenPostDetail={openPostDetail}
+            onOpenUserProfile={handleOpenUserProfile}
+            onLikeComment={handleLikeCommentFromFeed}
+            onDislikeComment={handleDislikeCommentFromFeed}
+            onReplyComment={handleReplyFromFeed}
+            onEditComment={handleEditFromFeed}
+            onDeleteComment={handleDeleteFromFeed}
+            getPosterSrc={(post) =>
+              post.poster ??
+              findPosterByType(post.contentType, post.title) ??
+              findPosterAnywhere(post.title)
+            }
+            currentPage={currentPage}
+            totalPages={totalPages}
+            loadingMore={loadingMore}
+            onLoadMore={loadMoreFeed}
+          />
         </div>
       </main>
 
