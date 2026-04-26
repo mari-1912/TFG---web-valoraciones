@@ -5,7 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { fetchBookById, fetchBooks } from "@/services/fetchBooks";
 import { fetchMovieById, fetchMovies } from "@/services/fetchMovies";
-import { fetchSeries } from "@/services/fetchSeries";
+import { fetchSeries, fetchSeriesById } from "@/services/fetchSeries";
 import { fetchVideoGameById, fetchVideoGames } from "@/services/fetchVideogames";
 import type { ServiceList } from "@/services/services-list";
 import { buildDetailPath } from "@/lib/detail-route";
@@ -334,9 +334,19 @@ const normalizeServiceItems = (
         item?.developer ??
         item?.estudio ??
         item?.studio;
-      const duration = toNumber(
-        item?.duracion_min ?? item?.duracionMin ?? item?.duration ?? item?.duracion,
+      const rawDuration = toNumber(
+        category === "series"
+          ? item?.runtime_min
+          : category === "videojuegos"
+            ? item?.duracion
+          : (item?.duracionMin ?? item?.duracion_min),
       );
+      const duration =
+        category === "videojuegos"
+          ? rawDuration
+          : rawDuration != null && rawDuration > 0
+            ? rawDuration
+            : undefined;
       const rating = toNumber(item?.puntuacion);
       const tmdbRating = toNumber(
         item?.metadataApi?.tmdb?.content?.rating?.vote_average,
@@ -507,6 +517,20 @@ const getPlatformBuckets = (platforms?: string[]) => {
   return Array.from(buckets);
 };
 
+const hasAnyPlatform = (platforms: string[] | undefined, targets: string[]) => {
+  if (!platforms || platforms.length === 0) return false;
+  const normalizedTargets = targets.map(normalizeText);
+  return platforms.some((platform) => {
+    const normalizedPlatform = normalizeText(platform);
+    return normalizedTargets.some(
+      (target) =>
+        normalizedPlatform === target ||
+        normalizedPlatform.includes(target) ||
+        target.includes(normalizedPlatform)
+    );
+  });
+};
+
 /*
  * TODO: Reactivar cuando el backend exponga un endpoint específico para
  * títulos familiares/Disney Plus.
@@ -547,6 +571,16 @@ const getBestApiScore = (item: ServiceListItem) => {
     api?.googleBooks ??
     null
   );
+};
+
+const getBackendSortParams = (sort: SortKey) => {
+  if (sort === "az") return { order: "title", desc: false };
+  if (sort === "za") return { order: "title", desc: true };
+  if (sort === "rating_high") return { order: "rating", desc: true };
+  if (sort === "rating_low") return { order: "rating", desc: false };
+  if (sort === "newest") return { order: "year", desc: true };
+  if (sort === "oldest") return { order: "year", desc: false };
+  return null;
 };
 
 const extractPagination = (data: any) =>
@@ -652,6 +686,34 @@ const enrichMovieDates = async (
   });
 };
 
+const enrichSeriesRuntime = async (
+  items: ServiceListItem[],
+  signal?: AbortSignal
+) => {
+  const missing = items.filter((item) => item.duration == null);
+  if (missing.length === 0) return items;
+
+  const results = await Promise.allSettled(
+    missing.map((item) => fetchSeriesById(item.id, signal))
+  );
+
+  const runtimeMap = new Map<string, number>();
+  results.forEach((result, index) => {
+    if (result.status !== "fulfilled") return;
+    const rawItem = result.value?.contenido ?? result.value?.item ?? result.value;
+    const runtime = Number(rawItem?.runtime_min);
+    if (!Number.isFinite(runtime) || runtime <= 0) return;
+    runtimeMap.set(String(missing[index].id), runtime);
+  });
+
+  if (runtimeMap.size === 0) return items;
+
+  return items.map((item) => {
+    const runtime = runtimeMap.get(String(item.id));
+    return runtime == null ? item : { ...item, duration: runtime };
+  });
+};
+
 export default function CategoriesPage() {
   const [category, setCategory] = useState<ServiceCategory | null>(null);
   const [sort, setSort] = useState<SortKey>("none");
@@ -681,7 +743,7 @@ export default function CategoriesPage() {
     total: number;
     pages: number;
   } | null>(null);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 16;
   const CAROUSEL_PAGE_SIZE = 100;
 
   // -------------------------
@@ -690,13 +752,102 @@ export default function CategoriesPage() {
   const genres = useMemo(() => {
     switch (category) {
       case "peliculas":
-        return ["Acción", "Drama", "Comedia", "Ciencia ficción"];
+        return [
+          "Acción",
+          "Animación",
+          "Aventura",
+          "Bélica",
+          "Ciencia ficción",
+          "Comedia",
+          "Crimen",
+          "Drama",
+          { label: "Familiar", value: "Familia" },
+          "Fantasía",
+          "Misterio",
+          "Romance",
+          "Suspense",
+          "Terror",
+        ];
       case "series":
-        return ["Drama", "Thriller", "Comedia"];
+        return [
+          { label: "Acción y aventura", value: "Action & Adventure" },
+          "Animación",
+          "Comedia",
+          "Crimen",
+          "Drama",
+          { label: "Ciencia ficción y Fantasía", value: "Sci-Fi & Fantasy" },
+          { label: "Guerra y Política", value: "War & Politics" },
+          "Misterio",
+          "Thriller",
+        ];
       case "videojuegos":
-        return ["Aventura", "RPG", "Estrategia"];
+        return [
+          "Acción",
+          "Aventura",
+          "Arcade",
+          "Carreras",
+          "Deportes",
+          "Estrategia",
+          "Indie",
+          "Plataformas",
+          "Puzzle",
+          "RPG",
+          "Shooter",
+          "Simulación",
+        ];
       case "libros":
-        return ["Fantasía", "Romance", "Historia"];
+        return [
+          {
+            label: "Aventura",
+            value: [
+              "Fiction / Science Fiction / Action & Adventure",
+              "Young Adult Fiction / Action & Adventure / General",
+              "Juvenile Fiction / Action & Adventure / General",
+            ],
+          },
+          {
+            label: "Ciencia ficción",
+            value: [
+              "Fiction / Science Fiction / Action & Adventure",
+              "Fiction / Science Fiction / Hard Science Fiction",
+            ],
+          },
+          {
+            label: "Clásicos",
+            value: "Fiction / Classics",
+          },
+          {
+            label: "Distopía",
+            value: "Young Adult Fiction / Dystopian",
+          },
+          {
+            label: "Fantasía",
+            value: [
+              "Juvenile Fiction / Fantasy / General",
+              "Young Adult Fiction / Fantasy / General",
+              "Young Adult Fiction / Fantasy / Epic",
+            ],
+          },
+          {
+            label: "Misterio",
+            value: "Juvenile Fiction / Paranormal, Occult & Supernatural",
+          },
+          {
+            label: "Suspense",
+            value: "Fiction / Thrillers / Suspense",
+          },
+          {
+            label: "Romance",
+            value: [
+              "Young Adult Fiction / Romance / General",
+              "Juvenile Fiction / Love & Romance",
+            ],
+          },
+          {
+            label: "Terror",
+            value: "Juvenile Fiction / Paranormal, Occult & Supernatural",
+          },
+        ];
       default:
         return [];
     }
@@ -866,19 +1017,31 @@ export default function CategoriesPage() {
 
           if (controller.signal.aborted) return;
 
-          const combined = [
-            ...(results[0].status === "fulfilled"
+          const movieItems =
+            results[0].status === "fulfilled"
               ? normalizeServiceItems(results[0].value, "peliculas")
-              : []),
-            ...(results[1].status === "fulfilled"
+              : [];
+          const seriesItems =
+            results[1].status === "fulfilled"
               ? normalizeServiceItems(results[1].value, "series")
-              : []),
-            ...(results[2].status === "fulfilled"
+              : [];
+          const bookItems =
+            results[2].status === "fulfilled"
               ? normalizeServiceItems(results[2].value, "libros")
-              : []),
-            ...(results[3].status === "fulfilled"
-              ? normalizeServiceItems(results[3].value, "videojuegos")
-              : []),
+              : [];
+          const videoGameItems =
+            results[3].status === "fulfilled"
+              ? await enrichVideoGamePlatforms(
+                  normalizeServiceItems(results[3].value, "videojuegos"),
+                  controller.signal
+                )
+              : [];
+
+          const combined = [
+            ...movieItems,
+            ...seriesItems,
+            ...bookItems,
+            ...videoGameItems,
           ];
           setServices(combined);
 
@@ -917,23 +1080,44 @@ export default function CategoriesPage() {
         const params: Record<string, unknown> = {
           page,
           pageSize: PAGE_SIZE,
+          recommend: false,
           signal: controller.signal,
         };
 
         if (genre) params.generos = genre;
 
-        if (category === "peliculas") {
+        const sortParams = getBackendSortParams(sort);
+        if (sortParams) {
+          params.order = sortParams.order;
+          params.desc = sortParams.desc;
+        }
+
+        if (
+          category === "peliculas" ||
+          category === "libros"
+        ) {
           if (duration === "short") {
             params.duracionMax = 60;
           } else if (duration === "medium") {
             params.duracionMin = 61;
-            params.duracionMax = 120;
+            params.duracionMax = 90;
           } else if (duration === "long") {
-            params.duracionMin = 121;
+            params.duracionMin = 91;
+          }
+        } else if (category === "videojuegos") {
+          if (duration === "short") {
+            params.duracionMin = 1;
+            params.duracionMax = 5;
+          } else if (duration === "medium") {
+            params.duracionMin = 6;
+            params.duracionMax = 20;
+          } else if (duration === "long") {
+            params.duracionMin = 21;
+          } else if (duration === "unlimited") {
+            params.duracionMin = 0;
+            params.duracionMax = 0;
           }
         }
-
-        // Ordenamos en frontend para evitar errores con "order" del backend.
 
         const data =
           category === "peliculas"
@@ -947,9 +1131,13 @@ export default function CategoriesPage() {
         const items = normalizeServiceItems(data, category);
         const needsDateEnrichment =
           sort === "newest" || sort === "oldest";
+        const needsSeriesRuntimeEnrichment =
+          category === "series" && duration !== "all";
         const enrichedItems =
           category === "videojuegos"
             ? await enrichVideoGamePlatforms(items, controller.signal)
+            : needsSeriesRuntimeEnrichment
+              ? await enrichSeriesRuntime(items, controller.signal)
             : category === "libros" && needsDateEnrichment
               ? await enrichBookDates(items, controller.signal)
               : category === "peliculas" && needsDateEnrichment
@@ -1005,12 +1193,25 @@ export default function CategoriesPage() {
         genre && hasGenreData ? matchesGenre(s.genre, genre) : true,
       )
       .filter((s) => {
-        if (category !== "peliculas") return true;
         if (!hasDurationData) return true;
-        if (!s.duration || duration === "all") return true;
+        if (duration === "all") return true;
+        if (s.duration == null) return false;
+        if (category === "series") {
+          if (duration === "short") return s.duration <= 20;
+          if (duration === "medium") return s.duration <= 45;
+          if (duration === "long") return s.duration <= 60;
+          return true;
+        }
+        if (category === "videojuegos") {
+          if (duration === "short") return s.duration > 0 && s.duration <= 5;
+          if (duration === "medium") return s.duration >= 6 && s.duration <= 20;
+          if (duration === "long") return s.duration > 20;
+          if (duration === "unlimited") return s.duration === 0;
+          return true;
+        }
         if (duration === "short") return s.duration <= 60;
-        if (duration === "medium") return s.duration > 60 && s.duration <= 120;
-        if (duration === "long") return s.duration > 120;
+        if (duration === "medium") return s.duration > 60 && s.duration <= 90;
+        if (duration === "long") return s.duration > 90;
         return true;
       })
       .filter((s) => {
@@ -1074,17 +1275,9 @@ export default function CategoriesPage() {
   }, [filteredServices]);
 
   const familyItems = useMemo(() => {
-    /*
-     * TODO: Reactivar cuando el backend exponga un endpoint específico para
-     * títulos familiares/Disney Plus.
-     *
-     * const items = filteredServices.filter(
-     *   (item) =>
-     *     (item.category === "peliculas" || item.category === "series") &&
-     *     hasDisneyPlusPlatform(item),
-     * );
-     */
-    const items = filteredServices.filter((item) => item.category === "peliculas");
+    const items = filteredServices.filter(
+      (item) => item.category === "peliculas" && matchesGenre(item.genre, "Familia")
+    );
 
     const sorted = [...items].sort((a, b) => {
       const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
@@ -1182,7 +1375,15 @@ export default function CategoriesPage() {
   }, [filteredServices]);
 
   const iconicGameItems = useMemo(() => {
-    const items = filteredServices.filter((item) => item.category === "videojuegos");
+    const items = filteredServices.filter(
+      (item) =>
+        item.category === "videojuegos" &&
+        hasAnyPlatform(item.platforms, [
+          "PlayStation 3",
+          "PlayStation 2",
+          "Nintendo DS",
+        ])
+    );
     return [...items]
       .sort((a, b) => {
         const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
@@ -1403,7 +1604,7 @@ export default function CategoriesPage() {
                           type="button"
                           onClick={() => setPage((prev) => prev + 1)}
                           disabled={loadingMore}
-                          className="rounded-md border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-full border border-violet-300 bg-[linear-gradient(135deg,rgba(76,29,149,0.92),rgba(124,58,237,0.9),rgba(224,0,255,0.84))] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(88,28,135,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(88,28,135,0.34)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-[0_8px_22px_rgba(88,28,135,0.28)]"
                         >
                           {loadingMore ? "Cargando..." : "Cargar más"}
                         </button>

@@ -172,9 +172,13 @@ export function DetailPage() {
     tmdbPoster,
     tmdbBackdrop
   );
-  const tmdbTrailerKey = tmdbContent?.trailer?.key;
-  const tmdbTrailerProvider = tmdbContent?.trailer?.provider;
-  const trailerUrlCandidate = pickString(tmdbContent?.trailer?.url);
+  const tmdbTrailerKey = tmdbContent?.trailer?.key ?? item?.trailer?.key;
+  const tmdbTrailerProvider =
+    tmdbContent?.trailer?.provider ?? item?.trailer?.provider;
+  const trailerUrlCandidate = pickString(
+    tmdbContent?.trailer?.url,
+    item?.trailer?.url
+  );
   const trailerUrlIsHttp = /^https?:\/\//i.test(trailerUrlCandidate);
   const tmdbTrailerUrl =
     tmdbTrailerProvider === "youtube"
@@ -190,9 +194,10 @@ export function DetailPage() {
     item?.video,
     item?.video_url,
     item?.videoUrl,
-    item?.trailer,
+    typeof item?.trailer === "string" ? item.trailer : null,
     item?.trailer_url,
     item?.trailerUrl,
+    item?.trailer?.url,
     tmdbTrailerUrl
   );
   const isYouTube = /youtu\.be|youtube\.com/i.test(videoUrl);
@@ -223,12 +228,12 @@ export function DetailPage() {
       googleBooksRating
   );
   const ourRating = parseRating(
-    item?.valoracion ??
+    item?.puntuacion ??
+      item?.valoracionMedia ??
+      item?.rating_media ??
       item?.avgRating ??
       item?.rating ??
-      item?.puntuacion ??
-      item?.valoracionMedia ??
-      item?.rating_media
+      (typeof item?.valoracion === "number" ? item.valoracion : null)
   );
   const hasOurRating = Number.isFinite(ourRating);
 
@@ -307,8 +312,11 @@ export function DetailPage() {
   const duracionMin =
     item?.duracion_min ?? item?.duracionMin ?? tmdbContent?.runtime_min;
 
-  const cast = Array.isArray(tmdbContent?.cast) ? tmdbContent?.cast
-    : [];
+  const cast = Array.isArray(item?.cast)
+    ? item.cast
+    : Array.isArray(tmdbContent?.cast)
+      ? tmdbContent.cast
+      : [];
   const watchProviders =
     item?.watchProviders ?? item?.metadataApi?.tmdb?.watch_providers ?? null;
 
@@ -755,7 +763,12 @@ export function DetailPage() {
                 listErrorMessage={commentsError}
               />
 
-              <DetailRelated type={type} />
+              <DetailRelated
+                type={type}
+                currentId={normalizedId}
+                genres={genresText}
+                year={year}
+              />
               </div>
             </div>
           )}
