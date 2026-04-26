@@ -8,6 +8,7 @@ import {
 } from "../service-filters";
 import type { ServiceList } from "@/services/services-list";
 import { buildDetailPath } from "@/lib/detail-route";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 
 
 interface Props {
@@ -85,6 +86,7 @@ export default function ServiceSection({
   const [genre, setGenre] = React.useState<string>("");
   const [sort, setSort] = React.useState<SortKey>("none");
   const [duration, setDuration] = React.useState<DurationKey>("all");
+  const dragScroll = useDragScroll<HTMLDivElement>();
 
   const availableGenres = React.useMemo(() => {
     const set = new Set<string>();
@@ -210,7 +212,10 @@ export default function ServiceSection({
         </h2>
       )}
 
-      <div className="home-marquee overflow-hidden py-1">
+      <div
+        {...dragScroll}
+        className="home-marquee home-marquee-scroll overflow-x-auto py-1"
+      >
         <div
           className={[
             "home-marquee-track flex w-max gap-4",

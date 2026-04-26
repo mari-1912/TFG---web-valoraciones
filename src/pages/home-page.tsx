@@ -10,6 +10,7 @@ import { fetchMostViewedWeek, type MostViewedWeekResponse } from "../services/fe
 import MostViewedCard from "@/components/most-viewed-card";
 import LogoPng from "@/assets/LOGO.png";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 
 type HomeCarouselDirection = "left" | "right";
 
@@ -27,9 +28,13 @@ function MovingHomeCarousel({
 }) {
   const baseItems = [...items, ...items, ...items];
   const loopItems = [...baseItems, ...baseItems];
+  const dragScroll = useDragScroll<HTMLDivElement>();
 
   return (
-    <div className="home-marquee overflow-hidden py-2">
+    <div
+      {...dragScroll}
+      className="home-marquee home-marquee-scroll overflow-x-auto py-2"
+    >
       <div
         className={[
           "home-marquee-track flex w-max gap-4",
@@ -59,8 +64,14 @@ function MovingHomeCarouselSkeleton({
   direction: HomeCarouselDirection;
   label: string;
 }) {
+  const dragScroll = useDragScroll<HTMLDivElement>();
+
   return (
-    <div className="home-marquee overflow-hidden py-2" aria-label={label}>
+    <div
+      {...dragScroll}
+      className="home-marquee home-marquee-scroll overflow-x-auto py-2"
+      aria-label={label}
+    >
       <div
         className={[
           "home-marquee-track flex w-max gap-4",
