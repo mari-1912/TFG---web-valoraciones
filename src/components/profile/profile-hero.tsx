@@ -560,7 +560,7 @@ export function ProfileHero({
     className={`grid w-full max-w-[260px] grid-cols-2 gap-1.5`}
   >
     {quickStats.map((stat) => {
-      return (
+      const fallbackCard = (
         <div key={stat.label} className={baseQuickStatClassName}>
           <p className="text-sm font-semibold leading-none text-violet-800">
             {stat.value}
@@ -569,6 +569,22 @@ export function ProfileHero({
             {stat.label}
           </p>
         </div>
+      );
+
+      if (stat.id === "followers") {
+        return renderConnectionsDropdown("followers", stat) ?? fallbackCard;
+      }
+
+      if (stat.id === "following") {
+        return renderConnectionsDropdown("following", stat) ?? fallbackCard;
+      }
+
+      if (stat.id === "comments") {
+        return renderCommentsDropdown(stat) ?? fallbackCard;
+      }
+
+      return (
+        fallbackCard
       );
     })}
   </div>
