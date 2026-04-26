@@ -213,7 +213,7 @@ function mapActivityRecord(record: unknown, index: number): TimelineRecord | nul
     if (type === "comment" && rawMessage) {
       detail = `"${truncate(rawMessage)}"`;
     } else if (type === "rating" && rawRating != null) {
-      detail = `${rawRating}/5`;
+      detail = `${rawRating}/10`;
     } else if (type === "service" && rawStatus) {
       detail = rawStatus;
     }

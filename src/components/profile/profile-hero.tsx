@@ -148,8 +148,7 @@ export function ProfileHero({
   onCoverChange,
 }: ProfileHeroProps) {
   const baseQuickStatClassName =
-    "flex min-w-0 flex-col items-center justify-center rounded-md border border-white/35 bg-black/35 px-1.5 py-1 text-center backdrop-blur-sm sm:py-1.5";
-  const dropdownPanelClassName =
+  "flex min-w-0 flex-col items-center justify-center rounded-2xl border border-violet-200/80 bg-white/85 px-3 py-2 text-center text-violet-700 shadow-[0_10px_30px_rgba(124,58,237,0.14)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white";  const dropdownPanelClassName =
     "w-[min(92vw,24rem)] overflow-hidden rounded-2xl border border-violet-200/80 bg-[#f7f3ff] p-0 text-gray-900 shadow-[0_18px_40px_rgba(124,58,237,0.22)] backdrop-blur";
   const dropdownHeaderClassName =
     "border-b border-violet-200/70 bg-gradient-to-r from-violet-100 via-fuchsia-50 to-indigo-100 px-4 py-3";
@@ -179,10 +178,13 @@ export function ProfileHero({
             className={`${baseQuickStatClassName} cursor-pointer transition hover:border-violet-200/70 hover:bg-black/40`}
             aria-label={`Mostrar ${label.toLowerCase()} de ${displayName}`}
           >
-            <p className="text-xl font-semibold leading-none sm:text-2xl">{stat.value}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/70 sm:text-xs sm:tracking-widest">
-              {stat.label}
-            </p>
+          <p className="text-xl font-bold leading-none text-violet-700 sm:text-2xl">
+  {stat.value}
+</p>
+
+<p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-violet-800 sm:text-xs sm:tracking-widest">
+  {stat.label}
+</p>
           </button>
         </DropdownMenuTrigger>
 
@@ -288,8 +290,8 @@ export function ProfileHero({
             className={`${baseQuickStatClassName} cursor-pointer transition hover:border-violet-200/70 hover:bg-black/40`}
             aria-label={`Mostrar comentarios de ${displayName}`}
           >
-            <p className="text-xl font-semibold leading-none sm:text-2xl">{stat.value}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/70 sm:text-xs sm:tracking-widest">
+            <p className="text-xl font-semibold leading-none sm:text-xl">{stat.value}</p>
+            <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-violet-800 sm:text-xs sm:tracking-widest">
               {stat.label}
             </p>
           </button>
@@ -483,7 +485,7 @@ export function ProfileHero({
               <div className="relative mt-4 shrink-0 sm:mt-6 md:mt-10">
                 <button
                   type="button"
-                  className="flex h-24 w-24 cursor-default items-center justify-center overflow-hidden rounded-full border-4 border-[#090b11] bg-white/10 transition sm:h-28 sm:w-28"
+                  className="flex h-24 w-24 cursor-default items-center justify-center overflow-hidden rounded-full border-4 border-violet-100 bg-white/10 transition sm:h-28 sm:w-28"
                   aria-label="Cambiar foto de perfil"
                   title="Perfil"
                 >
@@ -551,143 +553,101 @@ export function ProfileHero({
                   </div>
                 </div>
 
-                <div className="mt-5 flex justify-start">
-                  <div
-                    className={`grid w-full max-w-full grid-cols-3 gap-1.5 sm:max-w-[330px] ${
-                      quickStats.length >= 3 ? "" : "sm:grid-cols-2"
-                    }`}
-                  >
-                    {quickStats.map((stat) => {
-                      if (stat.id === "followers") {
-                        return (
-                          renderConnectionsDropdown("followers", stat) ?? (
-                            <div key={stat.label} className={baseQuickStatClassName}>
-                              <p className="text-sm font-semibold leading-none">{stat.value}</p>
-                              <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
-                                {stat.label}
-                              </p>
-                            </div>
-                          )
-                        );
-                      }
+                <div className="mt-5 flex items-start justify-between gap-3">
+  
+  {/* STATS */}
+  <div
+    className={`grid w-full max-w-[260px] grid-cols-2 gap-1.5`}
+  >
+    {quickStats.map((stat) => {
+      return (
+        <div key={stat.label} className={baseQuickStatClassName}>
+          <p className="text-sm font-semibold leading-none text-violet-800">
+            {stat.value}
+          </p>
+          <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-violet-900">
+            {stat.label}
+          </p>
+        </div>
+      );
+    })}
+  </div>
 
-                      if (stat.id === "following") {
-                        return (
-                          renderConnectionsDropdown("following", stat) ?? (
-                            <div key={stat.label} className={baseQuickStatClassName}>
-                              <p className="text-sm font-semibold leading-none">{stat.value}</p>
-                              <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
-                                {stat.label}
-                              </p>
-                            </div>
-                          )
-                        );
-                      }
+  {/* BOTONES EN COLUMNA */}
+  {!canEdit && showFollowAction ? (
+    <div className="flex flex-col gap-1.5">
+      
+      {/* Siguiendo */}
+      {isFollowing ? (
+        <button
+          type="button"
+          disabled
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-400/20 px-3 py-1 text-[11px] font-semibold text-emerald-100"
+        >
+          <UserCheck2 className="h-3 w-3" />
+          Siguiendo
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onToggleFollow}
+          disabled={followDisabled}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-violet-400 px-3 py-1 text-[11px] font-semibold text-white hover:bg-violet-600"
+        >
+          <UserPlus className="h-3 w-3" />
+          Seguir
+        </button>
+      )}
 
-                      if (stat.id === "comments") {
-                        return (
-                          renderCommentsDropdown(stat) ?? (
-                            <div key={stat.label} className={baseQuickStatClassName}>
-                              <p className="text-sm font-semibold leading-none">{stat.value}</p>
-                              <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
-                                {stat.label}
-                              </p>
-                            </div>
-                          )
-                        );
-                      }
+      {/* Dejar de seguir */}
+      <button
+        type="button"
+        onClick={onToggleFollow}
+        disabled={followDisabled || !isFollowing}
+        className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white hover:bg-white hover:text-indigo-700 disabled:opacity-50"
+      >
+        Dejar de seguir
+      </button>
 
-                      return (
-                        <div key={stat.label} className={baseQuickStatClassName}>
-                          <p className="text-sm font-semibold leading-none">{stat.value}</p>
-                          <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
-                            {stat.label}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+    </div>
+  ) : null}
+
+</div>
               </div>
             </div>
 
             <div className="mt-3 grid w-full grid-cols-3 gap-2 text-[11px] text-white/70 sm:mt-8 md:mt-6 md:w-[340px] sm:text-xs">
-              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-white/35 bg-black/35 px-2 py-2 text-center backdrop-blur-sm">
-                <Star className="h-4 w-4 text-violet-200" />
-                <p className="text-base font-semibold leading-none text-white sm:text-sm">
+            <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-violet bg-white/80 px-2 py-2 text-center backdrop-blur-sm">
+            <Star className="h-4 w-4 text-violet-800" />
+            <p className="text-base font-semibold leading-none text-violet-800 sm:text-sm">
                   {ratingsCount}
                 </p>
-                <p className="text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
+                <p className="text-[9px] uppercase text-violet-900 tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
                   Valoraciones
                 </p>
               </div>
-              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-white/35 bg-black/35 px-2 py-2 text-center backdrop-blur-sm">
-                <StarHalf className="h-4 w-4 text-violet-200" />
-                <p className="text-base font-semibold leading-none text-white sm:text-sm">
+              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-violet bg-white/80 px-2 py-2 text-center backdrop-blur-sm">
+                <StarHalf className="h-4 w-4 text-violet-800" />
+                <p className="text-base font-semibold leading-none text-violet-800 sm:text-sm">
                   {averageRating.toFixed(1)}
                 </p>
-                <p className="text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
+                <p className="text-[9px] uppercase text-violet-900 tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
                   Media
                 </p>
               </div>
-              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-white/35 bg-black/35 px-2 py-2 text-center backdrop-blur-sm">
-                <MessageSquareText className="h-4 w-4 text-violet-200" />
-                <p className="text-base font-semibold leading-none text-white sm:text-sm">
+              <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-violet bg-white/80 px-2 py-2 text-center backdrop-blur-sm">
+                <MessageSquareText className="h-4 w-4 text-violet-800" />
+                <p className="text-base font-semibold leading-none text-violet-800 sm:text-sm">
                   {reviewsCount}
                 </p>
-                <p className="text-[9px] uppercase tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
+                <p className="text-[9px] uppercase text-violet-900 tracking-[0.12em] leading-tight sm:text-[10px] sm:tracking-widest">
                   COMENTARIOS
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {!canEdit && showFollowAction ? (
-              <div className="flex flex-col items-stretch gap-2">
-                {isFollowing ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300/60 bg-emerald-400/20 px-5 py-2 text-sm font-semibold text-emerald-100 opacity-90"
-                  >
-                    <UserCheck2 className="h-4 w-4" />
-                    Siguiendo
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onToggleFollow}
-                    disabled={followDisabled}
-                    className={[
-                      "inline-flex items-center justify-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700",
-                      followDisabled
-                        ? "cursor-not-allowed opacity-60"
-                        : "cursor-pointer",
-                    ].join(" ")}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    +Seguir
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onToggleFollow}
-                  disabled={followDisabled || !isFollowing}
-                  className={[
-                    "inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-indigo-700",
-                    followDisabled || !isFollowing
-                      ? "cursor-not-allowed opacity-60"
-                      : "cursor-pointer",
-                  ].join(" ")}
-                >
-                  Dejar de seguir
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="-mt-3 rounded-md border border-white/35 bg-black/30 px-3 py-2 backdrop-blur-sm">
+          <div className="-mt-3 rounded-xl border border-violet/35 bg-white/80 px-3 py-2 backdrop-blur-sm">
             {canEdit && isEditing ? (
               <textarea
                 value={bio}
@@ -696,15 +656,15 @@ export function ProfileHero({
                 }
                 rows={2}
                 placeholder="Añade una breve descripción..."
-                className="w-full resize-none rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white placeholder-white/60 outline-none focus:border-white/60"
+                className="w-full resize-none rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-violet-800 placeholder-violet-800 outline-none focus:border-white/60"
               />
             ) : (
-              <p className="text-sm leading-snug text-white/75">
+              <p className="text-sm leading-snug text-violet-800 ">
                 {bio || "Añade una breve descripción sobre ti."}
               </p>
             )}
             {canEdit && isEditing && (
-              <p className="mt-1 text-[11px] text-white/50">
+              <p className="mt-1 text-[11px] text-violet-800">
                 {bio.length}/140 caracteres
               </p>
             )}
