@@ -8,37 +8,6 @@ export type TimelineItem = {
   date: string;
 };
 
-export const DEFAULT_TIMELINE: TimelineItem[] = [
-  {
-    id: "t-1",
-    type: "comment",
-    title: "Comentaste en Dune",
-    detail: "“Fotografía impecable y ritmo constante.”",
-    date: "Hace 2 días",
-  },
-  {
-    id: "t-2",
-    type: "rating",
-    title: "Valoraste Arcane",
-    detail: "4.5/5",
-    date: "Hace 4 días",
-  },
-  {
-    id: "t-3",
-    type: "service",
-    title: "Añadiste a favoritos: The Witcher 3",
-    detail: "Videojuegos",
-    date: "Hace 1 semana",
-  },
-  {
-    id: "t-4",
-    type: "list",
-    title: "Añadiste un servicio a tu lista",
-    detail: "Mis listas • Fantasía oscura",
-    date: "Hace 2 semanas",
-  },
-];
-
 type ProfileTimelineProps = {
   items: TimelineItem[];
   actionLabel?: string;
@@ -61,33 +30,9 @@ export function ProfileTimeline({
   return (
     <section>
       {centerTitle ? (
-        <>
-          <h2 className={headingClassName}>Actividad reciente</h2>
-          {showAction ? (
-            <div className="mt-2 flex justify-center">
-              <button
-                type="button"
-                onClick={onAction}
-                className="text-sm font-medium text-violet-700 hover:text-violet-800"
-              >
-                {actionLabel}
-              </button>
-            </div>
-          ) : null}
-        </>
+        <h2 className={headingClassName}>Actividad reciente</h2>
       ) : (
-        <div className="flex items-center justify-between">
-          <h2 className={headingClassName}>Actividad reciente</h2>
-          {showAction ? (
-            <button
-              type="button"
-              onClick={onAction}
-              className="text-sm font-medium text-violet-700 hover:text-violet-800"
-            >
-              {actionLabel}
-            </button>
-          ) : null}
-        </div>
+        <h2 className={headingClassName}>Actividad reciente</h2>
       )}
 
       <div className="relative mt-4 pl-8">
@@ -136,6 +81,18 @@ export function ProfileTimeline({
           )}
         </div>
       </div>
+
+      {showAction ? (
+        <div className={`mt-4 flex ${centerTitle ? "justify-center" : "justify-end"}`}>
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-sm font-medium text-violet-700 hover:text-violet-800"
+          >
+            {actionLabel}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

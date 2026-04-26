@@ -60,7 +60,7 @@ function normalizeTimelineType(value: unknown): TimelineItem["type"] {
     return "comment";
   }
   if (text.includes("rating") || text.includes("valor")) return "rating";
-  if (text.includes("list")) return "list";
+  if (text.includes("list") || text.includes("lista")) return "list";
   return "service";
 }
 
@@ -78,10 +78,10 @@ function truncate(value: string, max = 120) {
   return `${value.slice(0, max - 1).trimEnd()}…`;
 }
 
-function collectActivityArrays(payload: any) {
-  const root = payload ?? {};
-  const perfil = root?.perfil ?? {};
-  const result: any[] = [];
+function collectActivityArrays(payload: unknown) {
+  const root = (payload ?? {}) as Record<string, unknown>;
+  const perfil = (root?.perfil ?? {}) as Record<string, unknown>;
+  const result: unknown[] = [];
   const pushArray = (items: unknown, forcedType?: TimelineItem["type"]) => {
     if (!Array.isArray(items)) return;
     if (!forcedType) {
@@ -113,82 +113,84 @@ function collectActivityArrays(payload: any) {
   return result;
 }
 
-function mapActivityRecord(record: any, index: number): TimelineRecord | null {
+function mapActivityRecord(record: unknown, index: number): TimelineRecord | null {
   if (!record || typeof record !== "object") return null;
+  const r = record as Record<string, unknown>;
+  const meta = (r?.metadata ?? {}) as Record<string, unknown>;
 
-  const forcedType = record.__forcedType
-    ? normalizeTimelineType(record.__forcedType)
+  const forcedType = r.__forcedType
+    ? normalizeTimelineType(r.__forcedType)
     : null;
   const rawTypeValue =
-    record?.type ?? record?.tipo ?? record?.eventType ?? record?.accionTipo;
+    r?.type ?? r?.tipo ?? r?.eventType ?? r?.accionTipo;
   const normalizedTypeText =
     typeof rawTypeValue === "string" ? rawTypeValue.toLowerCase() : "";
   const isReplyLikeType =
     normalizedTypeText.includes("reply") ||
     normalizedTypeText.includes("respuest");
   const hasParentReference =
-    record?.parentId != null ||
-    record?.parent_id != null ||
-    record?.comentarioPadreId != null;
+    r?.parentId != null ||
+    r?.parent_id != null ||
+    r?.comentarioPadreId != null;
   const hasCommentPayload =
-    record?.mensaje != null ||
-    record?.comentario != null ||
-    record?.textoComentario != null ||
-    record?.texto != null ||
-    record?.comment != null ||
-    record?.body != null ||
-    record?.commentId != null ||
-    record?.comentarioId != null ||
+    r?.mensaje != null ||
+    r?.comentario != null ||
+    r?.textoComentario != null ||
+    r?.texto != null ||
+    r?.comment != null ||
+    r?.body != null ||
+    r?.commentId != null ||
+    r?.comentarioId != null ||
     hasParentReference;
   const inferredType =
     hasCommentPayload
       ? "comment"
-      : record?.puntuacion != null ||
-          record?.rating != null ||
-          record?.valoracion != null
+      : r?.puntuacion != null ||
+          r?.rating != null ||
+          r?.valoracion != null
         ? "rating"
-        : record?.estado != null
+        : r?.estado != null
           ? "service"
           : normalizeTimelineType(rawTypeValue);
   const type = forcedType ?? inferredType;
 
   const contentTitle = pickString(
-    record?.contenidoTitulo,
-    record?.tituloContenido,
-    record?.contenido?.titulo,
-    record?.contenido?.title,
-    record?.content?.titulo,
-    record?.content?.title
+    r?.contenidoTitulo,
+    r?.tituloContenido,
+    (r?.contenido as Record<string, unknown> | undefined)?.titulo,
+    (r?.contenido as Record<string, unknown> | undefined)?.title,
+    (r?.content as Record<string, unknown> | undefined)?.titulo,
+    (r?.content as Record<string, unknown> | undefined)?.title
   );
   const rawMessage = pickString(
-    record?.mensaje,
-    record?.comentario,
-    record?.textoComentario,
-    record?.texto,
-    record?.text,
-    record?.comment,
-    record?.body,
-    record?.metadata?.textoComentario,
-    record?.metadata?.comment?.mensaje,
-    record?.metadata?.comentario?.mensaje
+    r?.mensaje,
+    r?.comentario,
+    r?.textoComentario,
+    r?.texto,
+    r?.text,
+    r?.comment,
+    r?.body,
+    meta?.textoComentario,
+    (meta?.comment as Record<string, unknown> | undefined)?.mensaje,
+    (meta?.comentario as Record<string, unknown> | undefined)?.mensaje
   );
-  const rawStatus = statusLabel(record?.estado ?? record?.status);
+  const rawStatus = statusLabel(r?.estado ?? r?.status);
   const rawRating = parseNumber(
-    record?.puntuacion ?? record?.rating ?? record?.valoracion
+    r?.puntuacion ?? r?.rating ?? r?.valoracion
   );
 
   let title =
     pickString(
-      record?.title,
-      record?.titulo,
-      record?.accion,
-      record?.label,
-      record?.name
+      r?.title,
+      r?.titulo,
+      r?.accion,
+      r?.label,
+      r?.name
     ) ?? "";
   let detail = pickString(
-    record?.detail,
-    record?.detalle,
-    record?.descripcion
+    r?.detail,
+    r?.detalle,
+    r?.descripcion
   ) ?? "";
 
   if (!title) {
@@ -209,7 +211,7 @@ function mapActivityRecord(record: any, index: number): TimelineRecord | null {
 
   if (!detail) {
     if (type === "comment" && rawMessage) {
-      detail = `“${truncate(rawMessage)}”`;
+      detail = `"${truncate(rawMessage)}"`;
     } else if (type === "rating" && rawRating != null) {
       detail = `${rawRating}/5`;
     } else if (type === "service" && rawStatus) {
@@ -218,23 +220,23 @@ function mapActivityRecord(record: any, index: number): TimelineRecord | null {
   }
 
   const dateValue =
-    record?.date ??
-    record?.fecha ??
-    record?.timestamp ??
-    record?.createDate ??
-    record?.createdAt ??
-    record?.updateDate ??
-    record?.updatedAt;
+    r?.date ??
+    r?.fecha ??
+    r?.timestamp ??
+    r?.createDate ??
+    r?.createdAt ??
+    r?.updateDate ??
+    r?.updatedAt;
   const timestamp = parseDateMs(dateValue) ?? Date.now() - index;
 
   return {
     id: String(
-      record?.id ??
-        record?.actividadId ??
-        record?.commentId ??
-        record?.comentarioId ??
-        record?.estadoId ??
-        record?.valoracionId ??
+      r?.id ??
+        r?.actividadId ??
+        r?.commentId ??
+        r?.comentarioId ??
+        r?.estadoId ??
+        r?.valoracionId ??
         `timeline-${index}`
     ),
     type,
@@ -261,7 +263,7 @@ export function mergeTimelineRecords(records: TimelineRecord[]) {
     .slice(0, 120);
 }
 
-export function buildTimelineFromPayload(payload: any) {
+export function buildTimelineFromPayload(payload: unknown) {
   const activityRows = collectActivityArrays(payload);
   return activityRows
     .map((record, index) => mapActivityRecord(record, index))
