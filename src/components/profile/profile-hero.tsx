@@ -632,7 +632,7 @@ export function ProfileHero({
               </div>
             </div>
 
-            <div className="mt-3 grid w-full grid-cols-3 gap-2 text-[11px] text-white/70 sm:mt-8 md:mt-6 md:w-[340px] sm:text-xs">
+            <div className="mt-2 grid w-full grid-cols-3 gap-2 text-[11px] text-white/70 sm:mt-4 md:mt-3 md:w-[340px] sm:text-xs">
             <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-violet bg-white/80 px-2 py-2 text-center backdrop-blur-sm">
             <Star className="h-4 w-4 text-violet-800" />
             <p className="text-base font-semibold leading-none text-violet-800 sm:text-sm">

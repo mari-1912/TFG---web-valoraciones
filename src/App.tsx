@@ -3,6 +3,7 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { RoutesComponent } from "./routes/app-router";
 import { bootstrapAuth } from "./services/auth-service";
 import { Header } from "./components/sections/header";
+import { ScrollToTop } from "./components/scroll-to-top";
 
 function App() {
   useEffect(() => {
@@ -11,6 +12,7 @@ function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <Header />
       <div className="app-main-offset">
         <RoutesComponent />

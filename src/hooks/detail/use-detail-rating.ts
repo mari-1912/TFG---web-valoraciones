@@ -10,6 +10,7 @@ type UseDetailRatingArgs = {
   isLoggedIn: boolean;
   canRate: boolean;
   normalizedId: string;
+  onRatingChanged?: () => void | Promise<void>;
 };
 
 export function useDetailRating({
@@ -17,6 +18,7 @@ export function useDetailRating({
   isLoggedIn,
   canRate,
   normalizedId,
+  onRatingChanged,
 }: UseDetailRatingArgs) {
   const [userRating, setUserRating] = useState<number | null>(null);
   const [ratingUpdating, setRatingUpdating] = useState(false);
@@ -66,6 +68,12 @@ export function useDetailRating({
       try {
         await setContentRating(normalizedId, value);
         setUserRating(value);
+        try {
+          await onRatingChanged?.();
+        } catch (refreshError) {
+          console.error("No se pudo refrescar la media de Opinify:", refreshError);
+          setRatingMessage("Valoración guardada. No se pudo actualizar la media automáticamente.");
+        }
       } catch (err) {
         setRatingMessage(
           err instanceof Error ? err.message : "No se pudo guardar la valoración."
@@ -74,7 +82,7 @@ export function useDetailRating({
         setRatingUpdating(false);
       }
     },
-    [isLoggedIn, canRate, normalizedId]
+    [isLoggedIn, canRate, normalizedId, onRatingChanged]
   );
 
   const handleClearRating = useCallback(async () => {
@@ -95,6 +103,12 @@ export function useDetailRating({
     try {
       await deleteContentRating(normalizedId);
       setUserRating(null);
+      try {
+        await onRatingChanged?.();
+      } catch (refreshError) {
+        console.error("No se pudo refrescar la media de Opinify:", refreshError);
+        setRatingMessage("Valoración eliminada. No se pudo actualizar la media automáticamente.");
+      }
     } catch (err) {
       setRatingMessage(
         err instanceof Error ? err.message : "No se pudo eliminar la valoración."
@@ -102,7 +116,7 @@ export function useDetailRating({
     } finally {
       setRatingUpdating(false);
     }
-  }, [isLoggedIn, canRate, normalizedId]);
+  }, [isLoggedIn, canRate, normalizedId, onRatingChanged]);
 
   return {
     userRating,

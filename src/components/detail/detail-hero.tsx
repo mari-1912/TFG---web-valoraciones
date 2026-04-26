@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent,
+  type TouchEvent,
+} from "react";
 import { Check, ChevronDown, ListPlus, Plus, Star, X } from "lucide-react";
 import type { ContentStatus } from "@/services/content-status";
 import {
@@ -171,6 +178,8 @@ export function DetailHero({
   const [showVideo, setShowVideo] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [pendingRating, setPendingRating] = useState(0);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [listMenuOpen, setListMenuOpen] = useState(false);
   const [userLists, setUserLists] = useState<UserList[]>([]);
   const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
   const [isCreatingList, setIsCreatingList] = useState(false);
@@ -179,6 +188,12 @@ export function DetailHero({
   const [newListName, setNewListName] = useState("");
   const [newListError, setNewListError] = useState<string | null>(null);
   const videoRef = useRef<HTMLDivElement | null>(null);
+  const touchRef = useRef({
+    active: false,
+    moved: false,
+    x: 0,
+    y: 0,
+  });
   const currentCategory = resolveListContentType(listContentType) as CategoryKey;
   const numericContentId = Number(contentId);
   const hasValidNumericContentId = Number.isFinite(numericContentId);
@@ -288,6 +303,40 @@ export function DetailHero({
     onSetRating?.(pendingRating);
     setShowRatingModal(false);
   };
+
+  const getMobileDropdownTriggerProps = (
+    open: boolean,
+    setOpen: (value: boolean) => void,
+  ) => ({
+    onPointerDownCapture: (event: PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType !== "touch") return;
+      touchRef.current = {
+        active: true,
+        moved: false,
+        x: event.clientX,
+        y: event.clientY,
+      };
+      event.preventDefault();
+    },
+    onTouchMove: (event: TouchEvent<HTMLButtonElement>) => {
+      const touch = event.touches[0];
+      if (!touchRef.current.active || !touch) return;
+      const deltaX = Math.abs(touch.clientX - touchRef.current.x);
+      const deltaY = Math.abs(touch.clientY - touchRef.current.y);
+      if (deltaY > 10 || deltaX > 16) {
+        touchRef.current.moved = true;
+      }
+    },
+    onClick: (event: MouseEvent<HTMLButtonElement>) => {
+      if (!touchRef.current.active) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!touchRef.current.moved) {
+        setOpen(!open);
+      }
+      touchRef.current.active = false;
+    },
+  });
 
   const currentStatusLabel = statusOptions.find(
     (option) => option.value === currentStatus
@@ -415,6 +464,12 @@ export function DetailHero({
 
   const ratingBlockedMessage = "Disponible al marcar como completado.";
   const [expanded, setExpanded] = useState(false);
+  const actionTriggerClass =
+    "flex w-full items-center justify-between rounded-xl border border-purple-300/50 bg-white/[0.06] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-white-200 shadow-[0_10px_28px_rgba(88,28,135,0.22)] backdrop-blur transition hover:border-purple-200/70 hover:bg-purple-400/15 data-[state=open]:border-purple-200/80 data-[state=open]:bg-purple-400/20";
+  const dropdownContentClass =
+    "w-[min(280px,calc(100vw-2rem))] space-y-2 rounded-2xl border border-purple-300/30 bg-[linear-gradient(145deg,rgba(23,16,38,0.98),rgba(50,24,82,0.97),rgba(18,12,30,0.98))] p-3 text-white shadow-[0_18px_44px_rgba(28,10,54,0.48)] backdrop-blur-xl";
+  const dropdownItemClass =
+    "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition focus:bg-purple-400/15 focus:text-white";
 
   const hasText = description?.trim();
   return (
@@ -521,14 +576,14 @@ export function DetailHero({
         <div className="col-span-2 space-y-5 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
           <div className="space-y-3">
             {/* Estado */}
-            <DropdownMenu>
+            <DropdownMenu open={statusMenuOpen} onOpenChange={setStatusMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   disabled={statusUpdating}
+                  {...getMobileDropdownTriggerProps(statusMenuOpen, setStatusMenuOpen)}
                   className={[
-                    "flex w-full items-center justify-between rounded-xl border border-purple-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-white-200 transition",
-                    "hover:bg-purple-400/10",
+                    actionTriggerClass,
                     statusUpdating ? "cursor-not-allowed opacity-60" : "",
                   ].join(" ")}
                 >
@@ -538,7 +593,7 @@ export function DetailHero({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-[240px] space-y-2 rounded-2xl border border-white/10 bg-neutral-900/95 p-3 text-white shadow-2xl backdrop-blur"
+                className={dropdownContentClass}
               >
                 {statusOptions.map((option) => {
                   const isActive = option.value === currentStatus;
@@ -569,10 +624,13 @@ export function DetailHero({
                   return (
                     <DropdownMenuItem
                       key={option.value}
-                      onSelect={() => onSetStatus?.(option.value)}
+                      onSelect={() => {
+                        onSetStatus?.(option.value);
+                        setStatusMenuOpen(false);
+                      }}
                       disabled={statusUpdating}
                       className={[
-                        "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
+                        dropdownItemClass,
                         tone,
                         isActive ? activeBg : hoverBg,
                         statusUpdating ? "cursor-not-allowed opacity-60" : "",
@@ -587,11 +645,12 @@ export function DetailHero({
             </DropdownMenu>
 
             {/* Listas — filtradas por tipo de contenido */}
-            <DropdownMenu>
+            <DropdownMenu open={listMenuOpen} onOpenChange={setListMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-xl border border-purple-400/60 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-white-200 transition hover:bg-purple-400/10"
+                  {...getMobileDropdownTriggerProps(listMenuOpen, setListMenuOpen)}
+                  className={actionTriggerClass}
                 >
                   <span>{listTriggerLabel}</span>
                   <ChevronDown className="h-4 w-4" />
@@ -599,7 +658,7 @@ export function DetailHero({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-[260px] space-y-2 rounded-2xl border border-white/10 bg-neutral-900/95 p-3 text-white shadow-2xl backdrop-blur"
+                className={dropdownContentClass}
               >
                 <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white-300/90">
                   Mis listas
@@ -620,11 +679,11 @@ export function DetailHero({
                         }}
                         disabled={assigningListId === ul.id}
                         className={[
-                          "flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
+                          dropdownItemClass,
                           assigningListId === ul.id ? "cursor-not-allowed opacity-60" : "",
                           isSelected
-                            ? "border-purple-400/70 bg-purple-400/20 text-white-200"
-                            : "border-white/15 text-white/90 hover:bg-white/10",
+                            ? "border-purple-300/70 bg-purple-400/20 text-white-200 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                            : "border-white/10 bg-white/[0.04] text-white/90 hover:border-purple-300/40 hover:bg-purple-400/15",
                         ].join(" ")}
                       >
                         <span>{ul.name}</span>
@@ -641,13 +700,13 @@ export function DetailHero({
                       setIsCreatingList((prev) => !prev);
                       setNewListError(null);
                     }}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/90 transition hover:bg-white/10"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl border border-purple-300/25 bg-white/[0.04] px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/90 transition hover:border-purple-300/50 hover:bg-purple-400/15 focus:bg-purple-400/15 focus:text-white"
                   >
                     <Plus className="h-4 w-4" />
                     Crear nueva lista
                   </DropdownMenuItem>
                   {isCreatingList ? (
-                    <div className="mt-2 rounded-xl border border-white/15 bg-black/30 p-2.5">
+                    <div className="mt-2 rounded-xl border border-purple-300/25 bg-black/25 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                       <input
                         type="text"
                         value={newListName}
@@ -663,13 +722,13 @@ export function DetailHero({
                           }
                         }}
                         placeholder="Nombre de la lista"
-                        className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-purple-300/70 focus:outline-none"
+                        className="w-full rounded-lg border border-purple-300/30 bg-white/[0.06] px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-purple-200/80 focus:bg-white/[0.08] focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleCreateList}
                         disabled={isCreatingListLoading}
-                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-purple-400/70 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white-200 transition hover:bg-purple-400/10"
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-purple-300/60 bg-purple-400/15 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white-200 transition hover:bg-purple-400/25 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <ListPlus className="h-4 w-4" />
                         {isCreatingListLoading ? "Creando..." : "Crear y añadir"}

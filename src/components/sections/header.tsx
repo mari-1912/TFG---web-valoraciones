@@ -1,4 +1,4 @@
-import { Search, Menu, UserCircle } from "lucide-react";
+import { LogOut, Search, Menu, User, UserCircle } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LogoPng from "@/assets/LOGO.png";
@@ -27,6 +27,14 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
+import { FollowerNotificationsMenu } from "@/components/notifications/follower-notifications-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 //import { useIsMobile } from "@/hooks/use-mobile";
@@ -113,6 +121,7 @@ export function Header() {
     return ensureSessionValid();
   });
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const headerRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
@@ -395,6 +404,7 @@ export function Header() {
   useEffect(() => {
     if (!isLoggedIn) {
       setProfileImage(null);
+      setCurrentUserId(null);
       return;
     }
 
@@ -403,10 +413,13 @@ export function Header() {
       .then((data) => {
         if (controller.signal.aborted) return;
         setProfileImage(data.perfil?.avatarUrl ?? null);
+        const userId = Number(data.perfil?.userId ?? 0);
+        setCurrentUserId(Number.isFinite(userId) && userId > 0 ? userId : null);
       })
       .catch(() => {
         if (controller.signal.aborted) return;
         setProfileImage(null);
+        setCurrentUserId(null);
       });
 
     return () => controller.abort();
@@ -644,26 +657,21 @@ export function Header() {
         </NavigationMenuLink>
       </NavigationMenuItem>
 
-      {/* CATEGORÍAS — dropdown */}
-      {/* CATEGORÍAS — link a /categorías + botón para abrir dropdown */}
+      {/* CATEGORÍAS — texto clicable a /categorías + dropdown */}
       <NavigationMenuItem className="hover:bg-[hsl(var(--color-primary-soft))] rounded-lg">
-        <div className="flex items-center">
-          {/* Link clicable */}
-          <NavigationMenuLink
-            asChild
-            className={navigationMenuTriggerStyle()}
+        <NavigationMenuTrigger>
+          <span
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate("/categorías");
+              onNavigate?.();
+            }}
+            className="cursor-pointer"
           >
-            <Link to="/categorías" onClick={onNavigate}>
-              Categorías
-            </Link>
-          </NavigationMenuLink>
-
-          {/* Flecha/trigger solo para desplegar */}
-          <NavigationMenuTrigger
-            className="px-2"
-            aria-label="Abrir menú de categorías"
-          />
-        </div>
+            Categorías
+          </span>
+        </NavigationMenuTrigger>
 
         <NavigationMenuContent
           className="
@@ -898,29 +906,67 @@ export function Header() {
 
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleLogout}
-                className="cursor-pointer rounded border border-white px-4 py-2 text-sm font-medium transition hover:bg-white hover:text-indigo-600"
-              >
-                Logout
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/perfil")}
-                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/60 bg-white/15 text-white shadow-sm transition hover:bg-white/25"
-                aria-label="Perfil"
-                title="Perfil"
-              >
-                {profileImage ? (
-                  <img
-                    src={profileImage}
-                    alt="Perfil"
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <UserCircle className="h-6 w-6" />
-                )}
-              </button>
+              <FollowerNotificationsMenu userId={currentUserId} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/60 bg-white/15 text-white shadow-sm transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                    aria-label="Menú de perfil"
+                    title="Perfil"
+                  >
+                    {profileImage ? (
+                      <img
+                        src={profileImage}
+                        alt="Perfil"
+                        className="h-8 w-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <UserCircle className="h-6 w-6" />
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  sideOffset={10}
+                  className="w-56 overflow-hidden rounded-xl border border-white/25 bg-[hsl(var(--color-primary-strong))] p-0 text-white shadow-[0_18px_45px_rgba(80,15,120,0.35)]"
+                >
+                  <div className="flex items-center gap-3 border-b border-white/15 bg-white/10 px-3 py-3">
+                    {profileImage ? (
+                      <img
+                        src={profileImage}
+                        alt="Perfil"
+                        className="h-9 w-9 rounded-full object-cover ring-2 ring-white/45"
+                      />
+                    ) : (
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 ring-2 ring-white/35">
+                        <UserCircle className="h-5 w-5" />
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold leading-tight">Mi cuenta</p>
+                      <p className="text-xs text-white/70">Opciones de perfil</p>
+                    </div>
+                  </div>
+                  <div className="p-1.5">
+                  <DropdownMenuItem
+                    onClick={() => navigate("/perfil")}
+                    className="cursor-pointer rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:bg-white/15 focus:text-white"
+                  >
+                    <User className="h-4 w-4 text-white/80" />
+                    Ver perfil
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 bg-white/15" />
+                  <DropdownMenuItem
+                    onClick={() => void handleLogout()}
+                    className="cursor-pointer rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:bg-white/15 focus:text-white"
+                  >
+                    <LogOut className="h-4 w-4 text-white/80" />
+                    Logout
+                  </DropdownMenuItem>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ) : (
             <>

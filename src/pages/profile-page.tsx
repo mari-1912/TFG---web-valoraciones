@@ -35,10 +35,10 @@ import {
   uploadProfileImage,
   uploadProfileCover,
 } from "@/services/profile-service";
-import { getMe } from "@/services/auth-service";
+import { getMe, isSessionValid } from "@/services/auth-service";
 import { getCommunityFeed, type CommunityActivity } from "@/services/apiCommunity";
 import { listContentComments, type ListCommentsPayload } from "@/services/content-comments";
-import { getListContents } from "@/services/lists-service";
+import { getListContents, type BackendLista } from "@/services/lists-service";
 import { resolveBaseLists } from "@/services/listas/my-lists";
 import {
   buildTimelineFromPayload,
@@ -525,10 +525,9 @@ const EMPTY_SOCIAL_LIST_STATE: SocialListState = {
 };
 
 async function loadCompletedCountsForProfile(
-  targetUserId: number | null,
-  canManageLists: boolean
+  baseLists: BackendLista[],
+  readContentIdsFromList: (listId: number) => Promise<number[]>
 ): Promise<CompletedCounts> {
-  const baseLists = await resolveBaseLists({ targetUserId, canManageLists });
   const completedListIdsByCategory: Record<CategoryKey, number[]> = {
     pelicula: [],
     serie: [],
@@ -560,24 +559,12 @@ async function loadCompletedCountsForProfile(
         if (!uniqueListIds.length) return;
 
         const contentIds = new Set<number>();
-        await Promise.all(
-          uniqueListIds.map(async (listId) => {
-            try {
-              const data = await getListContents(listId);
-              const contenidos = Array.isArray(data?.contenidos)
-                ? data.contenidos
-                : [];
-              for (const contenido of contenidos) {
-                const contentId = Number((contenido as Record<string, unknown>)?.id);
-                if (Number.isFinite(contentId) && contentId > 0) {
-                  contentIds.add(contentId);
-                }
-              }
-            } catch {
-              // Ignoramos listas que fallen para no romper el perfil.
-            }
-          })
+        const contentsByList = await Promise.all(
+          uniqueListIds.map((listId) => readContentIdsFromList(listId))
         );
+        for (const listContentIds of contentsByList) {
+          for (const contentId of listContentIds) contentIds.add(contentId);
+        }
 
         completedCounts[category] = contentIds.size;
       }
@@ -588,11 +575,10 @@ async function loadCompletedCountsForProfile(
 }
 
 async function loadProfileListsSummary(
-  targetUserId: number | null,
-  canManageLists: boolean,
-  isOwnProfile: boolean
+  baseLists: BackendLista[],
+  isOwnProfile: boolean,
+  readContentIdsFromList: (listId: number) => Promise<number[]>
 ): Promise<ProfileListsSummary> {
-  const baseLists = await resolveBaseLists({ targetUserId, canManageLists });
   const listIdsByStatus: Record<StatusKey, number[]> = {
     watchlist: [],
     in_progress: [],
@@ -625,32 +611,6 @@ async function loadProfileListsSummary(
       visibleCustomLists.push(list as unknown as Lista);
     }
   }
-
-  const listContentCache = new Map<number, Promise<number[]>>();
-  const readContentIdsFromList = (listId: number) => {
-    const cached = listContentCache.get(listId);
-    if (cached) return cached;
-
-    const request = (async () => {
-      try {
-        const data = await getListContents(listId);
-        const contenidos = Array.isArray(data?.contenidos) ? data.contenidos : [];
-        const ids: number[] = [];
-        for (const contenido of contenidos) {
-          const contentId = Number((contenido as Record<string, unknown>)?.id);
-          if (Number.isFinite(contentId) && contentId > 0) {
-            ids.push(contentId);
-          }
-        }
-        return ids;
-      } catch {
-        return [];
-      }
-    })();
-
-    listContentCache.set(listId, request);
-    return request;
-  };
 
   const computeUniqueContentCount = async (ids: number[]) => {
     const uniqueListIds = [...new Set(ids)];
@@ -698,7 +658,7 @@ export default function ProfilePage() {
     return Number.isFinite(parsed) ? parsed : null;
   }, [userIdParam]);
 
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => isSessionValid());
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [profileUserId, setProfileUserId] = useState<number | null>(null);
   const [profileFollowerIds, setProfileFollowerIds] = useState<number[]>([]);
@@ -757,6 +717,17 @@ export default function ProfilePage() {
   }, [profileUserId]);
 
   useEffect(() => {
+    if (requestedUserId === null) {
+      setIsLoggedIn(isSessionValid());
+      setCurrentUserId(null);
+      return;
+    }
+    if (!isSessionValid()) {
+      setIsLoggedIn(false);
+      setCurrentUserId(null);
+      return;
+    }
+
     let cancelled = false;
     getMe()
       .then((result) => {
@@ -776,7 +747,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedUserId]);
 
   useEffect(() => {
     if (requestedUserId === null && !isLoggedIn) {
@@ -860,13 +831,45 @@ export default function ProfilePage() {
         setCommentsCount(Number(stats.comentarios ?? 0));
 
         const canManageListsForTarget =
-          requestedUserId === null ||
-          (currentUserId != null &&
-            resolvedProfileUserId != null &&
-            currentUserId === resolvedProfileUserId);
+          requestedUserId === null;
+        const isOwnProfileForLists = requestedUserId === null;
+        const baseLists = await resolveBaseLists({
+          targetUserId: resolvedProfileUserId,
+          canManageLists: canManageListsForTarget,
+        });
+        const listContentCache = new Map<number, Promise<number[]>>();
+        const readContentIdsFromList = (listId: number) => {
+          const cached = listContentCache.get(listId);
+          if (cached) return cached;
+
+          const request = (async () => {
+            try {
+              const data = await getListContents(listId);
+              const contenidos = Array.isArray(data?.contenidos)
+                ? data.contenidos
+                : [];
+              const ids: number[] = [];
+              for (const contenido of contenidos) {
+                const contentId = Number(
+                  (contenido as Record<string, unknown>)?.id
+                );
+                if (Number.isFinite(contentId) && contentId > 0) {
+                  ids.push(contentId);
+                }
+              }
+              return ids;
+            } catch {
+              return [];
+            }
+          })();
+
+          listContentCache.set(listId, request);
+          return request;
+        };
+
         const completedCounts = await loadCompletedCountsForProfile(
-          resolvedProfileUserId,
-          canManageListsForTarget
+          baseLists,
+          readContentIdsFromList
         ).catch(() => EMPTY_COMPLETED_COUNTS);
         if (controller.signal.aborted) return;
         setSeriesCount(completedCounts.serie);
@@ -875,12 +878,9 @@ export default function ProfilePage() {
         setGamesCount(completedCounts.videojuego);
 
         const listsSummary = await loadProfileListsSummary(
-          resolvedProfileUserId,
-          canManageListsForTarget,
-          requestedUserId === null ||
-            (currentUserId != null &&
-              resolvedProfileUserId != null &&
-              currentUserId === resolvedProfileUserId)
+          baseLists,
+          isOwnProfileForLists,
+          readContentIdsFromList
         ).catch(() => EMPTY_PROFILE_LISTS_SUMMARY);
         if (controller.signal.aborted) return;
         setStatusProgressCounts(listsSummary.statusCounts);
@@ -944,7 +944,7 @@ export default function ProfilePage() {
     loadProfile();
 
     return () => controller.abort();
-  }, [requestedUserId, isLoggedIn, currentUserId]);
+  }, [requestedUserId, isLoggedIn]);
 
   useEffect(() => {
     if (currentUserId == null) return;
@@ -1103,9 +1103,6 @@ export default function ProfilePage() {
   const quickStats: QuickStat[] = [
     { id: "following", label: "Seguidos", value: followingCount },
     { id: "followers", label: "Seguidores", value: followersCount },
-    ...(isOwnProfile
-      ? ([{ id: "comments", label: "Comentarios", value: commentsCount }] as const)
-      : []),
   ];
 
   const timelineCommentPreviewItems = useMemo<CommentPreviewItem[]>(
@@ -1670,7 +1667,7 @@ export default function ProfilePage() {
 
       <section className="mx-auto max-w-6xl px-4 py-10">
         <div className="border-b border-gray-200">
-          <div className="flex min-w-0 items-center gap-6 overflow-x-auto">
+          <div className="flex min-w-0 items-center gap-6 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {PROFILE_CONTENT_TABS.map((tab) => {
               const isActive = activeContentTab === tab.id;
               return (
