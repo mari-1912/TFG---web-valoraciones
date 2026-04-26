@@ -175,14 +175,33 @@
 }
 
 .home-marquee-track--left {
-  animation: home-marquee-left 56s linear infinite;
+  animation: home-marquee-left 104s linear infinite;
 }
 
 .home-marquee-track--right {
-  animation: home-marquee-right 56s linear infinite;
+  animation: home-marquee-right 104s linear infinite;
 }
 
 .home-marquee:hover .home-marquee-track {
+  animation-play-state: paused;
+}
+
+.home-marquee-scroll {
+  cursor: grab;
+  scrollbar-width: none;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.home-marquee-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.home-marquee-scroll.is-dragging {
+  cursor: grabbing;
+}
+
+.home-marquee-scroll.is-dragging .home-marquee-track {
   animation-play-state: paused;
 }
 

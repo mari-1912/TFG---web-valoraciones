@@ -68,7 +68,7 @@ type Props = {
 
 
 const tabBase =
-  "w-full rounded-full border px-2 py-2 text-[11px] font-semibold leading-tight tracking-wide transition-all duration-200 sm:w-auto sm:px-4 sm:py-2.5 sm:text-sm";
+  "w-auto min-w-[4.6rem] whitespace-nowrap rounded-full border px-2 py-1.5 text-[9px] font-semibold leading-tight tracking-wide transition-all duration-200 sm:min-w-[5rem] sm:px-2.5 sm:py-2 sm:text-[10px]";
 const tabActive =
   "border-violet-300 bg-[linear-gradient(135deg,rgba(76,29,149,0.92),rgba(124,58,237,0.9),rgba(224,0,255,0.84))] text-white shadow-[0_8px_22px_rgba(88,28,135,0.32)]";
 const tabIdle =
@@ -116,7 +116,7 @@ export function ServicesFilters({
           <span className="text-lg font-semibold text-gray-900">Categoría</span>
         )}
         <div
-          className={`mt-2 grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:gap-2.5 ${showCategoryHeading ? "sm:mt-3 sm:justify-center" : "sm:justify-start"}`}
+          className={`mt-2 flex flex-wrap gap-1.5 ${showCategoryHeading ? "sm:mt-3 justify-center" : "justify-start"}`}
         >
           {CATEGORY_OPTIONS.map(({ key, label }) => (
             <button
