@@ -15,6 +15,7 @@ type FetchListOptions = {
   duracionMax?: number;
   order?: string;
   desc?: boolean;
+  recommend?: boolean;
   signal?: AbortSignal;
 };
 
@@ -36,10 +37,11 @@ const buildParams = (options: FetchListOptions) => {
   }
   if (options.anioFrom) params.set("anioFrom", String(options.anioFrom));
   if (options.anioTo) params.set("anioTo", String(options.anioTo));
-  if (options.duracionMin) params.set("duracionMin", String(options.duracionMin));
-  if (options.duracionMax) params.set("duracionMax", String(options.duracionMax));
+  if (options.duracionMin != null) params.set("duracionMin", String(options.duracionMin));
+  if (options.duracionMax != null) params.set("duracionMax", String(options.duracionMax));
   if (options.order) params.set("order", options.order);
   if (options.desc != null) params.set("desc", String(options.desc));
+  if (options.recommend != null) params.set("recommend", String(options.recommend));
   return params;
 };
 
@@ -58,12 +60,29 @@ export async function fetchSeries(
   const base = `${API_URL}/series/`.replace(/\/+$/, "/");
   const url = `${base}${query ? `?${query}` : ""}`;
 
-  const res = await fetch(url, { signal: options.signal ?? signal });
+  const res = await fetch(url, { signal: options.signal ?? signal, credentials: "include" });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     console.error("fetchSeries ERROR:", res.status, text);
     throw new Error(`fetchSeries failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchSeriesById(
+  serieId: string | number,
+  signal?: AbortSignal
+) {
+  const base = `${API_URL}/series/`.replace(/\/+$/, "/");
+  const url = `${base}${serieId}`;
+  const res = await fetch(url, { signal });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error("fetchSeriesById ERROR:", res.status, text);
+    throw new Error(`fetchSeriesById failed: ${res.status}`);
   }
 
   return res.json();

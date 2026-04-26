@@ -9,7 +9,7 @@ export type SortKey =
   | "rating_low"
   | "newest"
   | "oldest";
-export type DurationKey = "all" | "short" | "medium" | "long";
+export type DurationKey = "all" | "short" | "medium" | "long" | "unlimited";
 export type SeasonKey = "all" | "1" | "2-3" | "4-6" | "7+";
 export type BookSeriesKey =
   | "all"
@@ -26,6 +26,7 @@ export type PlatformKey =
   | "nintendo"
   | "mobile"
   | "other";
+export type GenreOption = string | { label: string; value: string | string[] };
 
 
 type Props = {
@@ -57,7 +58,7 @@ type Props = {
 
 
   // Si quieres poblar géneros dinámicos según categoría
-  genres?: string[];
+  genres?: GenreOption[];
 
 
   // Nuevo: mostrar filtros completos solo si hay categoría
@@ -94,6 +95,8 @@ export function ServicesFilters({
   onGenreChange,
   platform,
   onPlatformChange,
+  duration,
+  onDurationChange,
   genres = [],
   showFullFilters = false,
   searchBar,
@@ -160,10 +163,65 @@ export function ServicesFilters({
             >
               <option value="">Géneros</option>
               {genres.map((g) => (
-                <option key={g} value={g}>
-                  {g}
+                <option
+                  key={
+                    typeof g === "string"
+                      ? g
+                      : Array.isArray(g.value)
+                        ? `${g.label}:${g.value.join("|")}`
+                        : `${g.label}:${g.value}`
+                  }
+                  value={
+                    typeof g === "string"
+                      ? g
+                      : Array.isArray(g.value)
+                        ? g.value.join(",")
+                        : g.value
+                  }
+                >
+                  {typeof g === "string" ? g : g.label}
                 </option>
               ))}
+            </select>
+          )}
+
+
+          {category && duration && onDurationChange && (
+            <select
+              value={duration}
+              onChange={(e) => onDurationChange(e.target.value as DurationKey)}
+              className={selectBaseClass}
+            >
+              {category === "series" ? (
+                <>
+                  <option value="all">Duración por capítulo</option>
+                  <option value="short">Hasta 20min</option>
+                  <option value="medium">Hasta 45min</option>
+                  <option value="long">Hasta 1h</option>
+                </>
+              ) : category === "videojuegos" ? (
+                <>
+                  <option value="all">Duración</option>
+                  <option value="short">Cortos (hasta 5h)</option>
+                  <option value="medium">Medios (6-20h)</option>
+                  <option value="long">Largos (más de 20h)</option>
+                  <option value="unlimited">Sin duración</option>
+                </>
+              ) : category === "libros" ? (
+                <>
+                  <option value="all">Extensión</option>
+                  <option value="short">Cortos</option>
+                  <option value="medium">Medios</option>
+                  <option value="long">Largos</option>
+                </>
+              ) : (
+                <>
+                  <option value="all">Duración</option>
+                  <option value="short">Cortas (menos de 1h)</option>
+                  <option value="medium">Media (de hasta 1h 30min)</option>
+                  <option value="long">Largas (más de 1h 30min)</option>
+                </>
+              )}
             </select>
           )}
 

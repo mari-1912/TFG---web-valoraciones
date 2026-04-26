@@ -14,6 +14,7 @@ type FetchListOptions = {
   duracionMax?: number;
   order?: string;
   desc?: boolean;
+  recommend?: boolean;
   signal?: AbortSignal;
 };
 
@@ -35,10 +36,11 @@ const buildParams = (options: FetchListOptions) => {
   }
   if (options.anioFrom) params.set("anioFrom", String(options.anioFrom));
   if (options.anioTo) params.set("anioTo", String(options.anioTo));
-  if (options.duracionMin) params.set("duracionMin", String(options.duracionMin));
-  if (options.duracionMax) params.set("duracionMax", String(options.duracionMax));
+  if (options.duracionMin != null) params.set("duracionMin", String(options.duracionMin));
+  if (options.duracionMax != null) params.set("duracionMax", String(options.duracionMax));
   if (options.order) params.set("order", options.order);
   if (options.desc != null) params.set("desc", String(options.desc));
+  if (options.recommend != null) params.set("recommend", String(options.recommend));
   return params;
 };
 
@@ -57,7 +59,7 @@ export async function fetchVideoGames(
   const base = `${API_URL}/videojuegos/`.replace(/\/+$/, "/");
   const url = `${base}${query ? `?${query}` : ""}`;
 
-  const res = await fetch(url, { signal: options.signal ?? signal });
+  const res = await fetch(url, { signal: options.signal ?? signal, credentials: "include" });
 
   if (!res.ok) {
     const text = await res.text();
