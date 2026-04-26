@@ -572,11 +572,11 @@ export function DetailComments({
         </div>
         {selectedImagePreview ? (
           <div className="mx-auto mt-3 w-full max-w-4xl">
-            <div className="relative inline-block">
+            <div className="relative inline-block max-w-full">
               <img
                 src={selectedImagePreview}
                 alt="Previsualización"
-                className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
+                className="max-h-52 max-w-full rounded-lg border border-gray-200 object-contain"
               />
               <button
                 type="button"
@@ -772,7 +772,7 @@ export function DetailComments({
               <img
                 src={comment.imageUrl}
                 alt="Imagen del comentario"
-                className="h-36 w-full rounded-lg border border-gray-200 object-cover"
+                className="max-h-64 max-w-full rounded-lg border border-gray-200 object-contain sm:max-w-[340px]"
                 onError={() => {
                   setFailedCommentImageIds((prev) => {
                     const next = new Set(prev);

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { DetailComments } from "../components/detail/detail-comments";
@@ -11,6 +11,7 @@ import {
   extractYear,
   formatList,
   getSessionUsername,
+  normalizeDetailItem,
   parseCount,
   parseRating,
   pickString,
@@ -25,6 +26,7 @@ import {
   isNumericDetailSegment,
   slugifyDetailTitle,
 } from "@/lib/detail-route";
+import { getContentRatingSnapshot } from "@/services/content-rating";
 import movies from "../data/movies.json";
 import books from "../data/books.json";
 import videoGames from "../data/video-games.json";
@@ -59,6 +61,21 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TMDB_IMG_BASE = "https://image.tmdb.org/t/p/";
+
+function extractOpinifyRating(source: any) {
+  const item = normalizeDetailItem(source);
+  return parseRating(
+    item?.puntuacion ??
+      item?.valoracionMedia ??
+      item?.rating_media ??
+      item?.avgRating ??
+      item?.mediaPuntuacion ??
+      item?.media_puntuacion ??
+      item?.media ??
+      item?.rating ??
+      (typeof item?.valoracion === "number" ? item.valoracion : null)
+  );
+}
 
 export function DetailPage() {
   const { id: detailSegment, type } = useParams();
@@ -227,14 +244,22 @@ export function DetailPage() {
       rawgRating ??
       googleBooksRating
   );
-  const ourRating = parseRating(
-    item?.puntuacion ??
-      item?.valoracionMedia ??
-      item?.rating_media ??
-      item?.avgRating ??
-      item?.rating ??
-      (typeof item?.valoracion === "number" ? item.valoracion : null)
+  const itemOpinifyRating = extractOpinifyRating(item);
+  const [asyncOpinifyRating, setAsyncOpinifyRating] = useState<number | null>(
+    itemOpinifyRating
   );
+
+  useEffect(() => {
+    setAsyncOpinifyRating(itemOpinifyRating);
+  }, [normalizedId, itemOpinifyRating]);
+
+  const refreshOpinifyRating = useCallback(async () => {
+    if (!normalizedId) return;
+    const snapshot = await getContentRatingSnapshot(normalizedId);
+    setAsyncOpinifyRating(extractOpinifyRating(snapshot));
+  }, [normalizedId]);
+
+  const ourRating = asyncOpinifyRating;
   const hasOurRating = Number.isFinite(ourRating);
 
   const tmdbVotes = parseCount(tmdbContent?.rating?.vote_count);
@@ -543,6 +568,7 @@ export function DetailPage() {
     isLoggedIn,
     canRate: isCompletedForRating,
     normalizedId,
+    onRatingChanged: refreshOpinifyRating,
   });
   const {
     comments,

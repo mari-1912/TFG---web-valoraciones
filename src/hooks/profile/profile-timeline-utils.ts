@@ -73,6 +73,50 @@ function statusLabel(value: unknown) {
   return pickString(value) ?? "";
 }
 
+function formatListName(value: string) {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized.startsWith("pendientes") ||
+    normalized.startsWith("watchlist")
+  ) {
+    return "Pendientes";
+  }
+  if (
+    normalized.startsWith("en_progreso") ||
+    normalized.startsWith("en progreso") ||
+    normalized.startsWith("in_progress")
+  ) {
+    return "En progreso";
+  }
+  if (
+    normalized.startsWith("completado") ||
+    normalized.startsWith("completados") ||
+    normalized.startsWith("finalizado") ||
+    normalized.startsWith("finalizados") ||
+    normalized.startsWith("completed")
+  ) {
+    return "Finalizado";
+  }
+  if (
+    normalized.startsWith("abandonado") ||
+    normalized.startsWith("abandonados") ||
+    normalized.startsWith("dropped")
+  ) {
+    return "Abandonado";
+  }
+
+  return value
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase("es-ES"));
+}
+
 function truncate(value: string, max = 120) {
   if (value.length <= max) return value;
   return `${value.slice(0, max - 1).trimEnd()}…`;
@@ -162,6 +206,25 @@ function mapActivityRecord(record: unknown, index: number): TimelineRecord | nul
     (r?.content as Record<string, unknown> | undefined)?.titulo,
     (r?.content as Record<string, unknown> | undefined)?.title
   );
+  const listName = pickString(
+    r?.listaNombre,
+    r?.nombreLista,
+    r?.listName,
+    r?.lista_name,
+    r?.nombre_lista,
+    (r?.lista as Record<string, unknown> | undefined)?.nombre,
+    (r?.lista as Record<string, unknown> | undefined)?.name,
+    (r?.list as Record<string, unknown> | undefined)?.nombre,
+    (r?.list as Record<string, unknown> | undefined)?.name,
+    meta?.listaNombre,
+    meta?.nombreLista,
+    meta?.listName,
+    (meta?.lista as Record<string, unknown> | undefined)?.nombre,
+    (meta?.lista as Record<string, unknown> | undefined)?.name,
+    (meta?.list as Record<string, unknown> | undefined)?.nombre,
+    (meta?.list as Record<string, unknown> | undefined)?.name
+  );
+  const displayListName = listName ? formatListName(listName) : null;
   const rawMessage = pickString(
     r?.mensaje,
     r?.comentario,
@@ -201,9 +264,15 @@ function mapActivityRecord(record: unknown, index: number): TimelineRecord | nul
     } else if (type === "rating") {
       title = `Valoraste${contentTitle ? ` ${contentTitle}` : " un título"}`;
     } else if (type === "list") {
-      title = contentTitle
-        ? `Actualizaste una lista con ${contentTitle}`
-        : "Actualizaste una lista";
+      if (contentTitle && displayListName) {
+        title = `Añadiste ${contentTitle} a la lista de ${displayListName}`;
+      } else if (contentTitle) {
+        title = `Añadiste ${contentTitle} a una lista`;
+      } else if (displayListName) {
+        title = `Actualizaste la lista de ${displayListName}`;
+      } else {
+        title = "Actualizaste una lista";
+      }
     } else {
       title = `Actualizaste estado${contentTitle ? ` en ${contentTitle}` : ""}`;
     }

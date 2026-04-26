@@ -2,13 +2,6 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../Card";
 import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import {
   ServicesFilters,
   type DurationKey,
   type SortKey,
@@ -23,6 +16,7 @@ interface Props {
   items: ServiceList[];
   fullWidth?: boolean; // si true: mostrar grid completo
   showFilters?: boolean; // si true: mostrar filtros
+  marqueeDirection?: "left" | "right";
 }
 
 const normalizeGenres = (value: unknown): string[] => {
@@ -85,6 +79,7 @@ export default function ServiceSection({
   items,
   fullWidth = false,
   showFilters = false,
+  marqueeDirection = "left",
 }: Props) {
   const navigate = useNavigate();
   const [genre, setGenre] = React.useState<string>("");
@@ -202,8 +197,11 @@ export default function ServiceSection({
 
 
   // -------------------------
-  // Render carrusel (estilo shadcn)
+  // Render carrusel en movimiento continuo
   // -------------------------
+  const baseItems = [...items, ...items, ...items];
+  const loopItems = [...baseItems, ...baseItems];
+
   return (
     <section className="my-7 mx-auto max-w-7xl px-4 sm:my-8">
       {icon && (
@@ -212,12 +210,20 @@ export default function ServiceSection({
         </h2>
       )}
 
-      <Carousel className="relative">
-        <CarouselContent className="py-1">
-          {items.map((item) => (
-            <CarouselItem
-              key={item.id}
-              className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
+      <div className="home-marquee overflow-hidden py-1">
+        <div
+          className={[
+            "home-marquee-track flex w-max gap-4",
+            marqueeDirection === "right"
+              ? "home-marquee-track--right"
+              : "home-marquee-track--left",
+          ].join(" ")}
+        >
+          {loopItems.map((item, index) => (
+            <div
+              key={`${item.id}-${index}`}
+              className="w-[min(68vw,240px)] shrink-0 sm:w-[220px] md:w-[240px]"
+              aria-hidden={index >= baseItems.length ? "true" : undefined}
             >
               <div
                 onClick={() => handleCardClick(item)}
@@ -225,12 +231,10 @@ export default function ServiceSection({
               >
                 <Card {...item} />
               </div>
-            </CarouselItem>
+            </div>
           ))}
-        </CarouselContent>
-        <CarouselPrevious className="-left-3 md:-left-5" />
-        <CarouselNext className="-right-3 md:-right-5" />
-      </Carousel>
+        </div>
+      </div>
     </section>
   );
 }

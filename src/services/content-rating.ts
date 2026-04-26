@@ -122,6 +122,27 @@ export async function setContentRating(
   return requestSetRating(contenidoId, puntuacion);
 }
 
+export async function getContentRatingSnapshot(
+  contenidoId: string | number,
+  signal?: AbortSignal
+) {
+  const res = await fetch(`${API_URL}/contenidos/${contenidoId}`, {
+    credentials: "include",
+    signal,
+  });
+  handleUnauthorizedResponse(res.status, `/contenidos/${contenidoId}`);
+
+  if (!res.ok) {
+    const message = await buildApiErrorMessage(
+      res,
+      "No se pudo actualizar la valoración media."
+    );
+    throw new Error(message);
+  }
+
+  return res.json().catch(() => ({}));
+}
+
 export async function deleteContentRating(contenidoId: string | number) {
   const res = await fetchWithSingleRetry(
     `${API_URL}/contenidos/${contenidoId}/valoracion`,

@@ -66,6 +66,67 @@ type ApiSearchSuggestion = {
   type: ExternalType;
 };
 
+const MAIN_CAROUSEL_SKELETONS = [
+  { title: "Para un maratón", direction: "left" },
+  { title: "Para toda la familia", direction: "right" },
+  { title: "Imperdibles", direction: "left" },
+  { title: "Juegos míticos", direction: "right" },
+  { title: "Lo mejor valorado de Opinify", direction: "left" },
+];
+
+function CategoryCarouselSkeleton({
+  title,
+  direction,
+}: {
+  title: string;
+  direction: string;
+}) {
+  return (
+    <section className="my-7 mx-auto max-w-7xl px-4 sm:my-8">
+      <div className="mb-3 flex items-center gap-2">
+        <Skeleton className="h-7 w-7 rounded-full" />
+        <Skeleton className="h-8 w-56 max-w-[70vw]" />
+        <span className="sr-only">{title}</span>
+      </div>
+      <div className="home-marquee overflow-hidden py-1">
+        <div
+          className={[
+            "home-marquee-track flex w-max gap-4",
+            direction === "right"
+              ? "home-marquee-track--right"
+              : "home-marquee-track--left",
+          ].join(" ")}
+        >
+          {Array.from({ length: 24 }).map((_, index) => (
+            <div
+              key={`${title}-carousel-skeleton-${index}`}
+              className="w-[min(68vw,240px)] shrink-0 space-y-3 rounded-xl border border-violet-100 bg-white p-3 sm:w-[220px] md:w-[240px]"
+            >
+              <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MainCarouselsSkeleton() {
+  return (
+    <>
+      {MAIN_CAROUSEL_SKELETONS.map((item) => (
+        <CategoryCarouselSkeleton
+          key={item.title}
+          title={item.title}
+          direction={item.direction}
+        />
+      ))}
+    </>
+  );
+}
+
 const API_URL = (
   import.meta.env.VITE_API_URL ??
   "https://tfg-web-valoraciones-back-i9b5.onrender.com"
@@ -347,7 +408,14 @@ const normalizeServiceItems = (
           : rawDuration != null && rawDuration > 0
             ? rawDuration
             : undefined;
-      const rating = toNumber(item?.puntuacion);
+      const rating = toNumber(
+        item?.puntuacion ??
+          item?.valoracionMedia ??
+          item?.rating_media ??
+          item?.avgRating ??
+          item?.mediaPuntuacion ??
+          item?.media_puntuacion,
+      );
       const tmdbRating = toNumber(
         item?.metadataApi?.tmdb?.content?.rating?.vote_average,
       );
@@ -745,6 +813,7 @@ export default function CategoriesPage() {
   } | null>(null);
   const PAGE_SIZE = 16;
   const CAROUSEL_PAGE_SIZE = 100;
+  const MAIN_CAROUSEL_ITEM_LIMIT = 12;
 
   // -------------------------
   // Géneros por categoría (fijos)
@@ -1062,8 +1131,10 @@ export default function CategoriesPage() {
           console.error("Error cargando servicios:", err);
           setError("No se pudieron cargar las categorías");
         } finally {
-          setLoading(false);
-          setHasLoadedOnce(true);
+          if (!controller.signal.aborted) {
+            setLoading(false);
+            setHasLoadedOnce(true);
+          }
         }
         return;
       }
@@ -1152,9 +1223,11 @@ export default function CategoriesPage() {
         console.error("Error cargando servicios:", err);
         setError("No se pudieron cargar las categorías");
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        setHasLoadedOnce(true);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+          setHasLoadedOnce(true);
+        }
       }
     };
 
@@ -1271,7 +1344,7 @@ export default function CategoriesPage() {
       const scoreA = getBestApiScore(a) ?? normalizeRatingScore(a.rating) ?? 0;
       const scoreB = getBestApiScore(b) ?? normalizeRatingScore(b.rating) ?? 0;
       return scoreB - scoreA;
-    }).slice(0, 20);
+    }).slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
   }, [filteredServices]);
 
   const familyItems = useMemo(() => {
@@ -1285,7 +1358,7 @@ export default function CategoriesPage() {
       return scoreB - scoreA;
     });
 
-    if (sorted.length > 0) return sorted.slice(0, 20);
+    if (sorted.length > 0) return sorted.slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
 
     return [];
   }, [filteredServices]);
@@ -1304,7 +1377,7 @@ export default function CategoriesPage() {
       return score != null && score >= 7.5;
     });
 
-    const ranked = rankByScore(topBooks.length > 0 ? topBooks : books).slice(0, 20);
+    const ranked = rankByScore(topBooks.length > 0 ? topBooks : books).slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
     if (ranked.length > 0) return ranked;
 
     const items = filteredServices.filter((item) => {
@@ -1312,7 +1385,7 @@ export default function CategoriesPage() {
       const score = getBestApiScore(item) ?? normalizeRatingScore(item.rating);
       return score != null && score >= 7.5;
     });
-    const fallbackRanked = rankByScore(items).slice(0, 20);
+    const fallbackRanked = rankByScore(items).slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
     if (fallbackRanked.length > 0) return fallbackRanked;
 
     const withViews = filteredServices
@@ -1325,28 +1398,28 @@ export default function CategoriesPage() {
           const viewsB = (b.viewsWeek ?? 0) * 1.5 + (b.viewsTotal ?? 0);
           return viewsB - viewsA;
         })
-        .slice(0, 20);
+        .slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
     }
 
     return [...filteredServices]
       .filter((item) => item.category !== "videojuegos")
       .sort((a, b) => b.year - a.year)
-      .slice(0, 20);
+      .slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
   }, [filteredServices]);
 
   const standardOpinifyItems = useMemo(() => {
-    /*
-     * TODO: Reactivar cuando el backend incluya `puntuacion` en los listados.
-     *
-     * return filteredServices
-     *   .filter((item) => normalizeRatingScore(item.rating) != null)
-     *   .sort((a, b) => {
-     *     const scoreA = normalizeRatingScore(a.rating) ?? 0;
-     *     const scoreB = normalizeRatingScore(b.rating) ?? 0;
-     *     return scoreB - scoreA;
-     *   })
-     *   .slice(0, 20);
-     */
+    const rankedByOpinify = filteredServices
+      .filter((item) => normalizeRatingScore(item.rating) != null)
+      .sort((a, b) => {
+        const scoreA = normalizeRatingScore(a.rating) ?? 0;
+        const scoreB = normalizeRatingScore(b.rating) ?? 0;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return a.title.localeCompare(b.title);
+      })
+      .slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
+
+    if (rankedByOpinify.length > 0) return rankedByOpinify;
+
     const grouped = {
       peliculas: filteredServices.filter((item) => item.category === "peliculas"),
       series: filteredServices.filter((item) => item.category === "series"),
@@ -1361,14 +1434,14 @@ export default function CategoriesPage() {
       grouped.videojuegos.length,
     );
 
-    for (let index = 0; index < maxLength && mixed.length < 20; index += 1) {
+    for (let index = 0; index < maxLength && mixed.length < MAIN_CAROUSEL_ITEM_LIMIT; index += 1) {
       const row = [
         grouped.peliculas[index],
         grouped.series[index],
         grouped.libros[index],
         grouped.videojuegos[index],
       ].filter((item): item is ServiceListItem => Boolean(item));
-      mixed.push(...row.slice(0, 20 - mixed.length));
+      mixed.push(...row.slice(0, MAIN_CAROUSEL_ITEM_LIMIT - mixed.length));
     }
 
     return mixed;
@@ -1390,7 +1463,7 @@ export default function CategoriesPage() {
         const scoreB = getBestApiScore(b) ?? normalizeRatingScore(b.rating) ?? 0;
         return scoreB - scoreA;
       })
-      .slice(0, 20);
+      .slice(0, MAIN_CAROUSEL_ITEM_LIMIT);
   }, [filteredServices]);
 
   const showServicesSkeleton =
@@ -1526,21 +1599,25 @@ export default function CategoriesPage() {
           {/* Contenido según categoría */}
           <div className="mx-auto w-full max-w-7xl px-0 sm:px-6">
             {showServicesSkeleton && (
-              <div className="space-y-4">
-                <Skeleton className="h-8 w-52" />
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  {Array.from({ length: 8 }).map((_, index) => (
-                    <div
-                      key={`services-skeleton-${index}`}
-                      className="space-y-3 rounded-xl border border-violet-100 bg-white p-3"
-                    >
-                      <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  ))}
+              category == null ? (
+                <MainCarouselsSkeleton />
+              ) : (
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-52" />
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    {Array.from({ length: 8 }).map((_, index) => (
+                      <div
+                        key={`services-skeleton-${index}`}
+                        className="space-y-3 rounded-xl border border-violet-100 bg-white p-3"
+                      >
+                        <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )
             )}
             {!showServicesSkeleton && error && <p className="text-red-600">{error}</p>}
 
@@ -1555,6 +1632,7 @@ export default function CategoriesPage() {
                         title="Para un maratón"
                         icon={<Tv />}
                         items={marathonItems}
+                        marqueeDirection="left"
                       />
                     )}
                     {familyItems.length > 0 && (
@@ -1562,6 +1640,7 @@ export default function CategoriesPage() {
                         title="Para toda la familia"
                         icon={<Popcorn />}
                         items={familyItems}
+                        marqueeDirection="right"
                       />
                     )}
                     {mustSeeItems.length > 0 && (
@@ -1569,6 +1648,7 @@ export default function CategoriesPage() {
                         title="Imperdibles"
                         icon={<BookOpen />}
                         items={mustSeeItems}
+                        marqueeDirection="left"
                       />
                     )}
                     {iconicGameItems.length > 0 && (
@@ -1576,6 +1656,7 @@ export default function CategoriesPage() {
                         title="Juegos míticos"
                         icon={<Gamepad2 />}
                         items={iconicGameItems}
+                        marqueeDirection="right"
                       />
                     )}
                     {standardOpinifyItems.length > 0 && (
@@ -1583,6 +1664,7 @@ export default function CategoriesPage() {
                         title="Lo mejor valorado de Opinify"
                         icon={<Star />}
                         items={standardOpinifyItems}
+                        marqueeDirection="left"
                       />
                     )}
                   </>
