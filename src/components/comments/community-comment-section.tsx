@@ -206,18 +206,23 @@ export function CommunityCommentSection({
                   ) : null}
 
                   {showQuotedComment ? (
+                    <div className="min-w-0 max-w-full overflow-hidden break-words whitespace-pre-wrap">
+                      <CommentMessage
+                        message={post.comment}
+                        quoted
+                        onClick={() => void onOpenPostDetail(post)}
+                      />
+                    </div>
+                  ) : null}
+
+                  {isCommentPost && post.comment?.trim() ? (
+                    <div className="min-w-0 max-w-full overflow-hidden break-words whitespace-pre-wrap">
                     <CommentMessage
                       message={post.comment}
                       quoted
                       onClick={() => void onOpenPostDetail(post)}
                     />
-                  ) : null}
-
-                  {isCommentPost && post.comment?.trim() ? (
-                    <CommentMessage
-                      message={post.comment}
-                      onClick={() => void onOpenPostDetail(post)}
-                    />
+                  </div>
                   ) : null}
 
                   {(canLikeThisPost ||

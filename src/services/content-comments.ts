@@ -4,45 +4,44 @@ const API_URL =
   import.meta.env.VITE_API_URL ??
   "https://tfg-web-valoraciones-back-i9b5.onrender.com";
 
+export type CommentUserPayload = {
+  userId?: number;
+  username?: string;
+  tipo?: string;
+  reputacion?: number;
+  avatarPath?: string;
+  avatarUrl?: string;
+};
+
+export type CommentReactionPayload = {
+  like?: number;
+  dislike?: number;
+  total?: number;
+  userReaction?: string;
+};
+
+export type CommentPayload = {
+  commentId?: number;
+  userId?: number;
+  contenidoId?: number;
+  parentId?: number | null;
+  mensaje?: string;
+  imagenUrl?: string | null;
+  createDate?: string;
+  updateDate?: string;
+  usuario?: CommentUserPayload;
+  reacciones?: CommentReactionPayload;
+  respuestas?: CommentPayload[];
+};
+
 export type CreateCommentPayload = {
-  comentario?: {
-    commentId?: number;
-    userId?: number;
-    contenidoId?: number;
-    parentId?: number | null;
-    mensaje?: string;
-    createDate?: string;
-    updateDate?: string;
-  };
+  comentario?: CommentPayload;
 };
 
 export type UpdateCommentPayload = CreateCommentPayload;
 
 export type ListCommentsPayload = {
-  comentarios?: Array<{
-    commentId?: number;
-    userId?: number;
-    contenidoId?: number;
-    parentId?: number | null;
-    mensaje?: string;
-    createDate?: string;
-    updateDate?: string;
-    usuario?: {
-      userId?: number;
-      username?: string;
-      tipo?: string;
-      reputacion?: number;
-      avatarPath?: string;
-      avatarUrl?: string;
-    };
-    reacciones?: {
-      like?: number;
-      dislike?: number;
-      total?: number;
-      userReaction?: string;
-    };
-    respuestas?: unknown[];
-  }>;
+  comentarios?: CommentPayload[];
   pagination?: {
     page?: number;
     pageSize?: number;
@@ -54,19 +53,35 @@ export type ListCommentsPayload = {
 export async function createContentComment(
   contenidoId: string | number,
   mensaje: string,
-  parentId?: number | null
+  parentId?: number | null,
+  imagen?: File | null
 ) {
-  const body: Record<string, unknown> = { mensaje };
-  if (typeof parentId === "number") {
-    body.parentId = parentId;
+  const hasImage = imagen instanceof File;
+
+  const body = hasImage
+    ? new FormData()
+    : JSON.stringify({
+        mensaje,
+        ...(typeof parentId === "number" ? { parentId } : {}),
+      });
+
+  if (hasImage && body instanceof FormData) {
+    body.append("mensaje", mensaje);
+
+    if (typeof parentId === "number") {
+      body.append("parentId", String(parentId));
+    }
+
+    body.append("imagen", imagen);
   }
 
   const res = await fetch(`${API_URL}/contenidos/${contenidoId}/comentarios`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: hasImage ? undefined : { "Content-Type": "application/json" },
+    body,
   });
+
   handleUnauthorizedResponse(res.status, `/contenidos/${contenidoId}/comentarios`);
 
   if (!res.ok) {
@@ -88,21 +103,28 @@ export async function listContentComments(
 ) {
   const query = new URLSearchParams();
   const shouldPaginate = options?.paginate !== false;
+
   if (shouldPaginate) {
     if (Number.isFinite(options?.page) && Number(options?.page) > 0) {
       query.set("page", String(Number(options?.page)));
     }
+
     if (Number.isFinite(options?.pageSize) && Number(options?.pageSize) > 0) {
       query.set("pageSize", String(Number(options?.pageSize)));
     }
   }
+
   const suffix = query.toString() ? `?${query.toString()}` : "";
 
-  const res = await fetch(`${API_URL}/contenidos/${contenidoId}/comentarios${suffix}`, {
-    method: "GET",
-    credentials: "include",
-    signal: options?.signal,
-  });
+  const res = await fetch(
+    `${API_URL}/contenidos/${contenidoId}/comentarios${suffix}`,
+    {
+      method: "GET",
+      credentials: "include",
+      signal: options?.signal,
+    }
+  );
+
   handleUnauthorizedResponse(res.status, `/contenidos/${contenidoId}/comentarios`);
 
   if (!res.ok) {
@@ -124,6 +146,7 @@ export async function deleteContentComment(
       credentials: "include",
     }
   );
+
   handleUnauthorizedResponse(
     res.status,
     `/contenidos/${contenidoId}/comentarios/${commentId}`
@@ -151,6 +174,7 @@ export async function updateContentComment(
       body: JSON.stringify({ mensaje }),
     }
   );
+
   handleUnauthorizedResponse(
     res.status,
     `/contenidos/${contenidoId}/comentarios/${commentId}`
@@ -178,6 +202,7 @@ export async function reactToContentComment(
       body: JSON.stringify({ tipo }),
     }
   );
+
   handleUnauthorizedResponse(
     res.status,
     `/contenidos/${contenidoId}/comentarios/${commentId}/reacciones`

@@ -66,67 +66,6 @@ type ApiSearchSuggestion = {
   type: ExternalType;
 };
 
-const MAIN_CAROUSEL_SKELETONS = [
-  { title: "Para un maratón", direction: "left" },
-  { title: "Para toda la familia", direction: "right" },
-  { title: "Imperdibles", direction: "left" },
-  { title: "Juegos míticos", direction: "right" },
-  { title: "Lo mejor valorado de Opinify", direction: "left" },
-];
-
-function CategoryCarouselSkeleton({
-  title,
-  direction,
-}: {
-  title: string;
-  direction: string;
-}) {
-  return (
-    <section className="my-7 mx-auto max-w-7xl px-4 sm:my-8">
-      <div className="mb-3 flex items-center gap-2">
-        <Skeleton className="h-7 w-7 rounded-full" />
-        <Skeleton className="h-8 w-56 max-w-[70vw]" />
-        <span className="sr-only">{title}</span>
-      </div>
-      <div className="home-marquee overflow-hidden py-1">
-        <div
-          className={[
-            "home-marquee-track flex w-max gap-4",
-            direction === "right"
-              ? "home-marquee-track--right"
-              : "home-marquee-track--left",
-          ].join(" ")}
-        >
-          {Array.from({ length: 24 }).map((_, index) => (
-            <div
-              key={`${title}-carousel-skeleton-${index}`}
-              className="w-[min(68vw,240px)] shrink-0 space-y-3 rounded-xl border border-violet-100 bg-white p-3 sm:w-[220px] md:w-[240px]"
-            >
-              <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function MainCarouselsSkeleton() {
-  return (
-    <>
-      {MAIN_CAROUSEL_SKELETONS.map((item) => (
-        <CategoryCarouselSkeleton
-          key={item.title}
-          title={item.title}
-          direction={item.direction}
-        />
-      ))}
-    </>
-  );
-}
-
 const API_URL = (
   import.meta.env.VITE_API_URL ??
   "https://tfg-web-valoraciones-back-i9b5.onrender.com"
@@ -1599,25 +1538,21 @@ export default function CategoriesPage() {
           {/* Contenido según categoría */}
           <div className="mx-auto w-full max-w-7xl px-0 sm:px-6">
             {showServicesSkeleton && (
-              category == null ? (
-                <MainCarouselsSkeleton />
-              ) : (
-                <div className="space-y-4">
-                  <Skeleton className="h-8 w-52" />
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    {Array.from({ length: 8 }).map((_, index) => (
-                      <div
-                        key={`services-skeleton-${index}`}
-                        className="space-y-3 rounded-xl border border-violet-100 bg-white p-3"
-                      >
-                        <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                      </div>
-                    ))}
-                  </div>
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-52" />
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <div
+                      key={`services-skeleton-${index}`}
+                      className="space-y-3 rounded-xl border border-violet-100 bg-white p-3"
+                    >
+                      <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  ))}
                 </div>
-              )
+              </div>
             )}
             {!showServicesSkeleton && error && <p className="text-red-600">{error}</p>}
 
@@ -1632,7 +1567,6 @@ export default function CategoriesPage() {
                         title="Para un maratón"
                         icon={<Tv />}
                         items={marathonItems}
-                        marqueeDirection="left"
                       />
                     )}
                     {familyItems.length > 0 && (
@@ -1640,7 +1574,6 @@ export default function CategoriesPage() {
                         title="Para toda la familia"
                         icon={<Popcorn />}
                         items={familyItems}
-                        marqueeDirection="right"
                       />
                     )}
                     {mustSeeItems.length > 0 && (
@@ -1648,7 +1581,6 @@ export default function CategoriesPage() {
                         title="Imperdibles"
                         icon={<BookOpen />}
                         items={mustSeeItems}
-                        marqueeDirection="left"
                       />
                     )}
                     {iconicGameItems.length > 0 && (
@@ -1656,7 +1588,6 @@ export default function CategoriesPage() {
                         title="Juegos míticos"
                         icon={<Gamepad2 />}
                         items={iconicGameItems}
-                        marqueeDirection="right"
                       />
                     )}
                     {standardOpinifyItems.length > 0 && (
@@ -1664,7 +1595,6 @@ export default function CategoriesPage() {
                         title="Lo mejor valorado de Opinify"
                         icon={<Star />}
                         items={standardOpinifyItems}
-                        marqueeDirection="left"
                       />
                     )}
                   </>

@@ -465,12 +465,16 @@ export function useDetailComments({
       try {
         const messageForApi =
           normalizedMessage || (imageFile ? IMAGE_ONLY_COMMENT_PLACEHOLDER : "");
+      
         const data = await createContentComment(
           normalizedId,
           messageForApi,
-          Number.isFinite(parentId) ? parentId : undefined
+          Number.isFinite(parentId) ? parentId : undefined,
+          imageFile
         );
+      
         let createdCommentId: string | null = null;
+      
         const createdComment =
           data?.comentario != null
             ? {
@@ -478,15 +482,20 @@ export function useDetailComments({
                 parentId: data.comentario.parentId ?? parentId ?? undefined,
               }
             : null;
+      
         let mergedLocalImages = localCommentImages;
+      
         if (createdComment) {
           const createdId = String(createdComment.commentId ?? "").trim();
+      
           if (createdId) createdCommentId = createdId;
+      
           if (createdId && imageFile) {
             const localUrl = URL.createObjectURL(imageFile);
             mergedLocalImages = { ...localCommentImages, [createdId]: localUrl };
             setLocalCommentImages(mergedLocalImages);
           }
+      
           setComments((prev) => [
             mapApiComment(
               createdComment,

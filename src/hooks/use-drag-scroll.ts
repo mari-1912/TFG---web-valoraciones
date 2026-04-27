@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent, type PointerEvent } from "react";
+import { useRef, type DragEvent, type MouseEvent, type PointerEvent } from "react";
 
 export function useDragScroll<T extends HTMLElement>() {
   const scrollRef = useRef<T | null>(null);
@@ -56,6 +56,9 @@ export function useDragScroll<T extends HTMLElement>() {
       event.preventDefault();
       event.stopPropagation();
       dragRef.current.moved = false;
+    },
+    onDragStart: (event: DragEvent<T>) => {
+      event.preventDefault();
     },
   };
 }
