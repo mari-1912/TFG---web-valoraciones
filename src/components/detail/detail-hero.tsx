@@ -6,7 +6,7 @@ import {
   type PointerEvent,
   type TouchEvent,
 } from "react";
-import { Check, ChevronDown, ListPlus, Plus, Star, X } from "lucide-react";
+import { Check, ChevronDown, ListPlus, Plus, Star, Trash2, X } from "lucide-react";
 import type { ContentStatus } from "@/services/content-status";
 import {
   addContentToList,
@@ -53,6 +53,10 @@ type DetailHeroProps = {
   onClearRating?: () => void;
   ratingMessage?: string | null;
   ratingEnabled?: boolean;
+  canDeleteContent?: boolean;
+  contentDeleting?: boolean;
+  onDeleteContent?: () => void;
+  deleteContentMessage?: string | null;
 };
 
 // tipoContenidos opcional para filtrar el dropdown por tipo de contenido actual
@@ -174,6 +178,10 @@ export function DetailHero({
   onClearRating,
   ratingMessage,
   ratingEnabled = true,
+  canDeleteContent = false,
+  contentDeleting = false,
+  onDeleteContent,
+  deleteContentMessage,
 }: DetailHeroProps) {
   const [showVideo, setShowVideo] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -575,6 +583,23 @@ export function DetailHero({
         {/* Columna acciones */}
         <div className="col-span-2 space-y-5 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
           <div className="space-y-3">
+            {canDeleteContent ? (
+              <button
+                type="button"
+                onClick={onDeleteContent}
+                disabled={contentDeleting}
+                className={[
+                  "flex w-full items-center justify-center gap-2 rounded-xl border border-rose-300/60 bg-rose-500/15 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-rose-100 shadow-[0_10px_28px_rgba(127,29,29,0.24)] transition",
+                  contentDeleting
+                    ? "cursor-not-allowed opacity-60"
+                    : "hover:border-rose-200/80 hover:bg-rose-500/25",
+                ].join(" ")}
+              >
+                <Trash2 className="h-4 w-4" />
+                {contentDeleting ? "Eliminando..." : "Eliminar contenido"}
+              </button>
+            ) : null}
+
             {/* Estado */}
             <DropdownMenu open={statusMenuOpen} onOpenChange={setStatusMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -745,6 +770,9 @@ export function DetailHero({
           ) : null}
           {statusMessage ? (
             <p className="text-xs text-white/80">{statusMessage}</p>
+          ) : null}
+          {deleteContentMessage ? (
+            <p className="text-xs text-rose-200">{deleteContentMessage}</p>
           ) : null}
 
           {/* Valoración */}

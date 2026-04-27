@@ -247,9 +247,7 @@ export function ProfileHero({
                         @{username}
                       </p>
                       <p className="truncate text-xs text-gray-500">
-                        {[user.tipo, Number.isFinite(user.reputacion) ? `${user.reputacion} rep` : null]
-                          .filter(Boolean)
-                          .join(" • ") || "Usuario"}
+                        {user.tipo || "Usuario"}
                       </p>
                     </div>
                   </Link>

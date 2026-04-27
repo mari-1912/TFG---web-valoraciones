@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { DetailComments } from "../components/detail/detail-comments";
 import { DetailHero } from "../components/detail/detail-hero";
@@ -27,6 +27,7 @@ import {
   slugifyDetailTitle,
 } from "@/lib/detail-route";
 import { getContentRatingSnapshot } from "@/services/content-rating";
+import { deleteContentFromDatabase } from "@/services/content-admin";
 import movies from "../data/movies.json";
 import books from "../data/books.json";
 import videoGames from "../data/video-games.json";
@@ -60,6 +61,13 @@ const TYPE_LABELS: Record<string, string> = {
   "juego-mesa": "Juego de mesa",
 };
 
+const CATEGORY_ROUTE_BY_TYPE: Record<string, string> = {
+  pelicula: "peliculas",
+  serie: "series",
+  libro: "libros",
+  videojuego: "videojuegos",
+};
+
 const TMDB_IMG_BASE = "https://image.tmdb.org/t/p/";
 
 function extractOpinifyRating(source: any) {
@@ -80,6 +88,7 @@ function extractOpinifyRating(source: any) {
 export function DetailPage() {
   const { id: detailSegment, type } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const locationState = location.state as
     | {
         item?: any;
@@ -163,6 +172,10 @@ export function DetailPage() {
     isLoggedIn,
     refreshKey: normalizedId,
   });
+  const [contentDeleting, setContentDeleting] = useState(false);
+  const [deleteContentMessage, setDeleteContentMessage] = useState<string | null>(
+    null
+  );
 
   const tmdbContent = item?.metadataApi?.tmdb?.content;
   const rawgContent = item?.metadataApi?.rawg?.content;
@@ -593,6 +606,44 @@ export function DetailPage() {
     apiUrl: API_URL,
   });
 
+  const handleDeleteContent = useCallback(async () => {
+    if (!currentUserIsAdmin || contentDeleting) return;
+    if (!normalizedId) {
+      setDeleteContentMessage("No se pudo identificar el contenido.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `¿Eliminar "${title}" de la base de datos? Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    setContentDeleting(true);
+    setDeleteContentMessage(null);
+    try {
+      await deleteContentFromDatabase(normalizedId, normalizedType);
+      const categoryRoute = CATEGORY_ROUTE_BY_TYPE[normalizedType] ?? "";
+      navigate(categoryRoute ? `/categorías/${categoryRoute}` : "/categorías", {
+        replace: true,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "No se pudo eliminar el contenido.";
+      setDeleteContentMessage(message);
+    } finally {
+      setContentDeleting(false);
+    }
+  }, [
+    contentDeleting,
+    currentUserIsAdmin,
+    navigate,
+    normalizedId,
+    normalizedType,
+    title,
+  ]);
+
   return (
     <>
       <main className="min-h-screen bg-gray-50 pb-12">
@@ -648,6 +699,10 @@ export function DetailPage() {
                 onClearRating={handleClearRating}
                 ratingMessage={ratingMessage}
                 ratingEnabled={isCompletedForRating}
+                canDeleteContent={currentUserIsAdmin}
+                contentDeleting={contentDeleting}
+                onDeleteContent={handleDeleteContent}
+                deleteContentMessage={deleteContentMessage}
               />
 
               <div className="space-y-10 px-6">
