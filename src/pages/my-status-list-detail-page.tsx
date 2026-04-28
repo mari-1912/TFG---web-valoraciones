@@ -226,27 +226,6 @@ export default function MyStatusListDetailPage() {
         style={{ background: "hsl(264 100% 99%)" }}
       >
         <div className="max-w-6xl mx-auto">
-          <nav
-            className="flex items-center gap-2 text-xs mb-8"
-            style={{ color: "hsl(258 16% 55%)", animation: "fadeUp 0.4s ease both" }}
-          >
-            <Link to="/listas" style={{ color: "hsl(268 84% 62%)" }} className="hover:underline">Listas</Link>
-            <span>/</span>
-            {targetUserId != null ? (
-              <Link
-                to={`/perfil?userId=${targetUserId}`}
-                style={{ color: "hsl(268 84% 62%)" }}
-                className="hover:underline"
-              >
-                {ownerLabel ? `Perfil ${ownerLabel}` : "Perfil"}
-              </Link>
-            ) : (
-              <Link to="/listas/mis-listas" style={{ color: "hsl(268 84% 62%)" }} className="hover:underline">Mis listas</Link>
-            )}
-            <span>/</span>
-            <span>{title}</span>
-          </nav>
-
           {!isLoggedIn ? (
             <div className="rounded-3xl p-10 text-center max-w-md mx-auto"
               style={{ background: "hsl(270 40% 96%)", border: "1.5px solid hsl(270 30% 88%)" }}>

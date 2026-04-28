@@ -667,6 +667,7 @@ export default function ProfilePage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [username, setUsername] = useState("");
+  const [usernameDraft, setUsernameDraft] = useState("");
   const [role, setRole] = useState("");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
@@ -812,7 +813,9 @@ export default function ProfilePage() {
           setInitialIsFollowing(null);
         }
 
-        setUsername(String(perfil.username ?? ""));
+        const resolvedUsername = String(perfil.username ?? "");
+        setUsername(resolvedUsername);
+        setUsernameDraft(resolvedUsername);        
         setRole(String(perfil.tipo ?? "Base"));
         const resolvedBio = String(perfil.descripcion ?? "");
         setBio(resolvedBio);
@@ -1345,30 +1348,49 @@ export default function ProfilePage() {
         setFollowersCount((prev) => Math.max(0, prev + delta)),
     });
 
-  const handleStartEdit = () => {
-    if (!canEdit) return;
-    setSaveError(null);
-    setIsEditing(true);
-  };
+    const handleStartEdit = () => {
+      if (!canEdit) return;
+      setSaveError(null);
+      setUsernameDraft(username);
+      setBio(savedBio);
+      setIsEditing(true);
+    };
 
-  const handleCancelEdit = () => {
-    if (!canEdit) return;
-    setSaveError(null);
-    setBio(savedBio);
-    setIsEditing(false);
-  };
+    const handleCancelEdit = () => {
+      if (!canEdit) return;
+      setSaveError(null);
+      setUsernameDraft(username);
+      setBio(savedBio);
+      setIsEditing(false);
+    };
 
-  const handleSaveEdit = async () => {
-    if (!canEdit || !isEditing) return;
-    setSaveError(null);
-    const result = await updateProfile({ descripcion: bio });
-    if (!result.success) {
-      setSaveError(result.message ?? "No se pudo actualizar el perfil.");
-      return;
-    }
-    setSavedBio(bio);
-    setIsEditing(false);
-  };
+    const handleSaveEdit = async () => {
+      if (!canEdit || !isEditing) return;
+    
+      const cleanUsername = usernameDraft.trim();
+    
+      if (cleanUsername.length < 3) {
+        setSaveError("El nombre de usuario debe tener al menos 3 caracteres.");
+        return;
+      }
+    
+      setSaveError(null);
+    
+      const result = await updateProfile({
+        username: cleanUsername,
+        descripcion: bio,
+      });
+    
+      if (!result.success) {
+        setSaveError(result.message ?? "No se pudo actualizar el perfil.");
+        return;
+      }
+    
+      setUsername(cleanUsername);
+      setUsernameDraft(cleanUsername);
+      setSavedBio(bio);
+      setIsEditing(false);
+    };
 
   const handleAvatarClick = () => {
     if (!canEdit || !isEditing) return;
@@ -1663,6 +1685,9 @@ export default function ProfilePage() {
         coverInputRef={coverFileInputRef}
         onAvatarChange={handleAvatarChange}
         onCoverChange={handleCoverChange}
+usernameDraft={usernameDraft}
+onUsernameChange={setUsernameDraft}    
+        
       />
 
       <section className="mx-auto max-w-6xl px-4 py-10">

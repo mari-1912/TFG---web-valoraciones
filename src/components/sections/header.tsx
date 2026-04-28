@@ -1,4 +1,4 @@
-import { LogOut, Search, Menu, User, UserCircle } from "lucide-react";
+import { LogOut, Menu, User, UserCircle } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LogoPng from "@/assets/LOGO.png";
@@ -9,12 +9,15 @@ import {
 } from "@/services/auth-service";
 import { fetchMyProfile } from "@/services/profile-service";
 import {
-  searchContentsAcrossCategories,
-  searchUsers,
-  type ContentSearchItem,
-  type UserSearchItem,
-} from "@/services/search-service";
+  importExternalContent,
+  type ExternalContentType,
+} from "@/hooks/search/use-external-content-search";
+import {
+  useGlobalSearch,
+  type GlobalSearchResultItem,
+} from "@/hooks/search/use-global-search";
 import { buildDetailPath } from "@/lib/detail-route";
+import { SearchBox } from "@/components/search/search-box";
 
 
 import {
@@ -40,79 +43,9 @@ import {
 //import { useIsMobile } from "@/hooks/use-mobile";
 import { AppBreadcrumb } from "../global-breadcrumb";
 
-type ExternalType = "pelicula" | "serie" | "libro" | "videojuego";
-
-type SearchResultItem = ContentSearchItem & {
-  source?: "local" | "external";
-  externalId?: string | number;
-  provider?: string;
-};
-
-type ExternalSearchItem = {
-  externalId?: string | number;
-  titulo?: string;
-  title?: string;
-  aliases?: string[];
-  tipo?: string;
-  portada?: string;
-  anio_lanzamiento?: number;
-  anioLanzamiento?: number;
-};
-
-const API_URL = (
-  import.meta.env.VITE_API_URL ??
-  "https://tfg-web-valoraciones-back-i9b5.onrender.com"
-).replace(/\/+$/, "");
-
-const EXTERNAL_SEARCH_ENDPOINTS: Record<ExternalType, string> = {
-  pelicula: "peliculas/tmdb/search",
-  serie: "series/tmdb/search",
-  libro: "libros/google/search",
-  videojuego: "videojuegos/rawg/search",
-};
-
-const EXTERNAL_IMPORT_ENDPOINTS: Record<ExternalType, string> = {
-  pelicula: "peliculas/import/tmdb",
-  serie: "series/import/tmdb",
-  libro: "libros/import/google",
-  videojuego: "videojuegos/import/rawg",
-};
-
-const EXTERNAL_PROVIDER_LABEL: Record<ExternalType, string> = {
-  pelicula: "TMDB",
-  serie: "TMDB",
-  libro: "Google Books",
-  videojuego: "RAWG",
-};
-
-const normalizeText = (value: string) =>
-  value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-const buildApiUrl = (path: string) =>
-  `${API_URL}/${path.replace(/^\/+/, "")}`;
-
-const pickExternalTitle = (item: ExternalSearchItem) =>
-  (typeof item.titulo === "string" && item.titulo.trim()) ||
-  (typeof item.title === "string" && item.title.trim())
-    ? (item.titulo ?? item.title ?? "").trim()
-    : "";
-
-const getAliases = (item: ExternalSearchItem) =>
-  Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [];
-
 
 export function Header() {
   ///const isMobile = useIsMobile();
-  const [query, setQuery] = useState("");
-  const [searchItems, setSearchItems] = useState<SearchResultItem[]>([]);
-  const [searchUserResults, setSearchUserResults] = useState<UserSearchItem[]>(
-    []
-  );
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
@@ -126,8 +59,16 @@ export function Header() {
   const headerRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const MIN_QUERY_LENGTH = 2;
-  const SEARCH_DEBOUNCE_MS = 300;
+  const {
+    query,
+    setQuery,
+    items: searchItems,
+    users: searchUserResults,
+    loading: searchLoading,
+    error: searchError,
+    minLength: MIN_QUERY_LENGTH,
+    runSearch,
+  } = useGlobalSearch();
   const CONTENT_TYPE_ORDER = [
     "pelicula",
     "serie",
@@ -142,7 +83,7 @@ export function Header() {
     videojuego: "Videojuegos",
     "juego-mesa": "Juegos de mesa",
   };
-  const groupContentItems = (items: SearchResultItem[]) =>
+  const groupContentItems = (items: GlobalSearchResultItem[]) =>
     items.reduce(
       (acc, item) => {
         const key = item.tipo ?? "otros";
@@ -150,9 +91,9 @@ export function Header() {
         acc[key].push(item);
         return acc;
       },
-      {} as Record<string, SearchResultItem[]>
+      {} as Record<string, GlobalSearchResultItem[]>
     );
-  const getOrderedTypes = (grouped: Record<string, SearchResultItem[]>) => [
+  const getOrderedTypes = (grouped: Record<string, GlobalSearchResultItem[]>) => [
     ...CONTENT_TYPE_ORDER.filter((key) => grouped[key]?.length),
     ...Object.keys(grouped).filter(
       (key) => !CONTENT_TYPE_ORDER.includes(key)
@@ -183,185 +124,6 @@ export function Header() {
       window.removeEventListener("resize", updateOffset);
     };
   }, []);
-
-  const scoreExternalMatch = (item: ExternalSearchItem, q: string) => {
-    const normalizedQuery = normalizeText(q);
-    const title = pickExternalTitle(item);
-    const normalizedTitle = normalizeText(title);
-    const aliases = getAliases(item).map((alias) => normalizeText(alias));
-
-    let score = 0;
-    if (normalizedTitle === normalizedQuery) score = 4;
-    else if (normalizedTitle.includes(normalizedQuery)) score = 2;
-
-    for (const alias of aliases) {
-      if (alias === normalizedQuery) score = Math.max(score, 3);
-      else if (alias.includes(normalizedQuery)) score = Math.max(score, 1);
-    }
-
-    return score;
-  };
-
-  const fetchExternalSearchResults = async (
-    endpoint: string,
-    q: string,
-    signal?: AbortSignal
-  ) => {
-    const attempt = async (param: "q" | "query") => {
-      const url = new URL(buildApiUrl(endpoint));
-      url.searchParams.set(param, q);
-      const res = await fetch(url.toString(), { signal });
-      if (!res.ok) return null;
-      const data = await res.json().catch(() => null);
-      const items = Array.isArray(data)
-        ? data
-        : data?.items ?? data?.results ?? data?.data ?? [];
-      return Array.isArray(items) ? items : [];
-    };
-
-    const primary = await attempt("q");
-    if (primary && primary.length > 0) return primary;
-    const fallback = await attempt("query");
-    return fallback ?? primary ?? [];
-  };
-
-  const searchExternalContents = async (
-    q: string,
-    signal?: AbortSignal
-  ): Promise<SearchResultItem[]> => {
-    const types: ExternalType[] = [
-      "pelicula",
-      "serie",
-      "libro",
-      "videojuego",
-    ];
-
-    const results = await Promise.all(
-      types.map(async (type) => {
-        const endpoint = EXTERNAL_SEARCH_ENDPOINTS[type];
-        const items = await fetchExternalSearchResults(
-          endpoint,
-          q,
-          signal
-        );
-        return items.map((item: ExternalSearchItem) => ({ type, item }));
-      })
-    );
-
-    const flattened = results.flat();
-    const scored = flattened
-      .map((candidate) => ({
-        type: candidate.type,
-        item: candidate.item,
-        score: scoreExternalMatch(candidate.item, q),
-      }))
-      .filter((entry) => entry.score > 0);
-
-    return scored
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20)
-      .map((entry) => {
-        const title = pickExternalTitle(entry.item);
-        return {
-          id: `external-${entry.type}-${entry.item.externalId ?? title}`,
-          tipo: (entry.item.tipo as string) ?? entry.type,
-          titulo: title || "Sin título",
-          portada: entry.item.portada ?? null,
-          puntuacion: null,
-          puntuacionApi: null,
-          source: "external" as const,
-          externalId: entry.item.externalId,
-          provider: EXTERNAL_PROVIDER_LABEL[entry.type],
-        };
-      })
-      .filter((item) => item.externalId != null);
-  };
-
-  const importExternalItem = async (
-    type: ExternalType,
-    externalId: string | number
-  ) => {
-    const endpoint = EXTERNAL_IMPORT_ENDPOINTS[type];
-    const url = buildApiUrl(
-      `${endpoint}/${encodeURIComponent(String(externalId))}`
-    );
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`${res.status} ${text}`.trim());
-    }
-    const text = await res.text();
-    return text ? JSON.parse(text) : null;
-  };
-
-  const fetchSearchResults = async (
-    q: string,
-    signal?: AbortSignal
-  ): Promise<{
-    items: SearchResultItem[];
-    users: UserSearchItem[];
-    error: string | null;
-  }> => {
-    const [itemsRes, usersRes] = await Promise.allSettled([
-      searchContentsAcrossCategories(q, signal, { pageSize: 100 }),
-      searchUsers(q, signal),
-    ]);
-
-    const localItems =
-      itemsRes.status === "fulfilled"
-        ? (itemsRes.value.items ?? []).map((item) => ({
-            ...item,
-            source: "local" as const,
-          }))
-        : [];
-    const users =
-      usersRes.status === "fulfilled" ? usersRes.value.results ?? [] : [];
-
-    const error =
-      itemsRes.status === "rejected" && usersRes.status === "rejected"
-        ? "No se pudo buscar ahora mismo."
-        : null;
-
-    let externalItems: SearchResultItem[] = [];
-
-    if (!signal?.aborted && q.trim().length >= MIN_QUERY_LENGTH) {
-      try {
-        externalItems = await searchExternalContents(q, signal);
-      } catch (err) {
-        if ((err as { name?: string })?.name !== "AbortError") {
-          console.error("Error buscando en APIs externas:", err);
-        }
-      }
-    }
-
-    if (localItems.length > 0 && externalItems.length > 0) {
-      const seen = new Set(
-        localItems.map((item) =>
-          `${item.tipo}:${normalizeText(item.titulo)}`
-        )
-      );
-      externalItems = externalItems.filter(
-        (item) => !seen.has(`${item.tipo}:${normalizeText(item.titulo)}`)
-      );
-    }
-
-    return { items: [...localItems, ...externalItems], users, error };
-  };
-
-  const handleSearch = async () => {
-    const q = query.trim();
-    if (!q) return;
-
-    setIsSearchOpen(true);
-    setSearchLoading(true);
-    setSearchError(null);
-
-    const { items, users, error } = await fetchSearchResults(q);
-    setSearchItems(items);
-    setSearchUserResults(users);
-    setSearchError(error);
-    setSearchLoading(false);
-  };
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -425,38 +187,6 @@ export function Header() {
     return () => controller.abort();
   }, [isLoggedIn]);
 
-  useEffect(() => {
-    const q = query.trim();
-
-    if (q.length < MIN_QUERY_LENGTH) {
-      setSearchItems([]);
-      setSearchUserResults([]);
-      setSearchError(null);
-      setSearchLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setSearchLoading(true);
-      setSearchError(null);
-      const { items, users, error } = await fetchSearchResults(
-        q,
-        controller.signal
-      );
-      if (controller.signal.aborted) return;
-      setSearchItems(items);
-      setSearchUserResults(users);
-      setSearchError(error);
-      setSearchLoading(false);
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [query]);
-
   const handleLogout = async () => {
     try {
       await logoutUser();
@@ -467,18 +197,16 @@ export function Header() {
   };
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
-  const openSearch = () => setIsSearchOpen(true);
-  const closeSearch = () => setIsSearchOpen(false);
 
   const handleContentSelect = async (
-    item: SearchResultItem,
+    item: GlobalSearchResultItem,
     onSelect?: () => void
   ) => {
     if (item.source === "external" && item.externalId != null) {
       setIsImporting(true);
       try {
-        const imported = await importExternalItem(
-          item.tipo as ExternalType,
+        const imported = await importExternalContent(
+          item.tipo as ExternalContentType,
           item.externalId
         );
         const importedItem = imported?.item ?? imported;
@@ -835,7 +563,7 @@ export function Header() {
   return (
     <header
       ref={headerRef}
-      className="fixed left-0 top-0 z-50 w-full [background-image:var(--gradient-primary)]"
+      className="fixed left-0 top-0 z-[120] w-full [background-image:var(--gradient-primary)]"
     >
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 text-white lg:grid lg:min-w-0 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
         {/* LOGO */}
@@ -877,32 +605,27 @@ export function Header() {
             <Menu className="h-5 w-5" />
           </button>
           {/* Buscador */}
-          <div className="relative hidden lg:block w-full max-w-[14rem] xl:max-w-[20rem]">
-            <input
-              type="search"
-              placeholder="Buscar..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              onFocus={openSearch}
-              onBlur={() => window.setTimeout(closeSearch, 150)}
-              className="rounded-md border border-white/40 bg-transparent pl-10 pr-4 py-2 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
-            />
-            <Search
-              onClick={handleSearch}
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 cursor-pointer text-indigo-200 transition hover:text-white"
-            />
-            {isSearchOpen && query.trim().length >= MIN_QUERY_LENGTH && (
-              <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-[16rem] max-w-[28rem] max-h-[70vh] overflow-y-auto rounded-lg border border-white/20 bg-[hsl(var(--color-primary-strong))] text-white shadow-lg">
-                {renderSearchResults(() => {
-                  setIsSearchOpen(false);
-                  setIsMobileMenuOpen(false);
-                })}
-              </div>
-            )}
-          </div>
-
+          <SearchBox
+            value={query}
+            onValueChange={setQuery}
+            placeholder="Buscar..."
+            minLength={MIN_QUERY_LENGTH}
+            open={isSearchOpen}
+            onOpenChange={setIsSearchOpen}
+            onSubmit={() => {
+              setIsSearchOpen(true);
+              void runSearch();
+            }}
+            className="relative hidden w-full max-w-[14rem] lg:block xl:max-w-[20rem]"
+            inputClassName="w-full rounded-md border border-white/40 bg-transparent py-2 pl-10 pr-4 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
+            iconClassName="text-indigo-200 transition hover:text-white"
+            panelClassName="absolute left-0 top-full z-50 mt-2 w-full min-w-[16rem] max-w-[28rem] max-h-[70vh] overflow-y-auto rounded-lg border border-white/20 bg-[hsl(var(--color-primary-strong))] text-white shadow-lg"
+          >
+            {renderSearchResults(() => {
+              setIsSearchOpen(false);
+              setIsMobileMenuOpen(false);
+            })}
+          </SearchBox>
 
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
@@ -929,7 +652,7 @@ export function Header() {
                 <DropdownMenuContent
                   align="end"
                   sideOffset={10}
-                  className="w-56 overflow-hidden rounded-xl border border-white/25 bg-[hsl(var(--color-primary-strong))] p-0 text-white shadow-[0_18px_45px_rgba(80,15,120,0.35)]"
+                  className="z-[9999] w-56 overflow-hidden rounded-xl border border-white/25 bg-[hsl(var(--color-primary-strong))] p-0 text-white shadow-[0_18px_45px_rgba(80,15,120,0.35)]"
                 >
                   <div className="flex items-center gap-3 border-b border-white/15 bg-white/10 px-3 py-3">
                     {profileImage ? (
@@ -991,33 +714,27 @@ export function Header() {
       </div>
       {isMobileMenuOpen && (
         <div className="mx-auto max-w-7xl px-6 pb-4 lg:hidden">
-          <div className="mb-3">
-            <div className="relative">
-              <input
-                type="search"
-                placeholder="Buscar..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                onFocus={openSearch}
-                onBlur={() => window.setTimeout(closeSearch, 150)}
-                className="w-full rounded-md border border-white/40 bg-transparent pl-10 pr-4 py-2 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
-              />
-              <Search
-                onClick={handleSearch}
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 cursor-pointer text-indigo-200 transition hover:text-white"
-              />
-            </div>
-          </div>
-          {isSearchOpen && query.trim().length >= MIN_QUERY_LENGTH && (
-            <div className="mb-3 max-h-[60vh] overflow-y-auto rounded-lg border border-white/20 bg-[hsl(var(--color-primary-strong))] text-white shadow-lg">
-              {renderSearchResults(() => {
-                setIsSearchOpen(false);
-                setIsMobileMenuOpen(false);
-              })}
-            </div>
-          )}
+          <SearchBox
+            value={query}
+            onValueChange={setQuery}
+            placeholder="Buscar..."
+            minLength={MIN_QUERY_LENGTH}
+            open={isSearchOpen}
+            onOpenChange={setIsSearchOpen}
+            onSubmit={() => {
+              setIsSearchOpen(true);
+              void runSearch();
+            }}
+            className="relative mb-3"
+            inputClassName="w-full rounded-md border border-white/40 bg-transparent py-2 pl-10 pr-4 text-white placeholder-gray-200 transition duration-200 ease-in-out hover:border-white/80 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/80"
+            iconClassName="text-indigo-200 transition hover:text-white"
+            panelClassName="absolute left-0 right-0 top-full z-50 mt-2 max-h-[60vh] overflow-y-auto rounded-lg border border-white/20 bg-[hsl(var(--color-primary-strong))] text-white shadow-lg"
+          >
+            {renderSearchResults(() => {
+              setIsSearchOpen(false);
+              setIsMobileMenuOpen(false);
+            })}
+          </SearchBox>
           <NavigationMenu viewport={false} className="w-full">
             <NavigationMenuList className="flex w-full flex-wrap justify-start gap-2">
               <NavItems onNavigate={closeMobileMenu} />
