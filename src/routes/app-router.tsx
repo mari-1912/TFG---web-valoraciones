@@ -3,6 +3,8 @@ import type { ReactElement } from "react";
 import HomePage from "../pages/home-page";
 import CategoriesPage from "../pages/categories-page";
 import LoginPage from "../pages/login-page";
+import ForgotPasswordPage from "../pages/forgot-password-page";
+import ResetPasswordPage from "../pages/reset-password-page";
 import { DetailPage } from "../pages/detail-page";
 import CommunityPage from "../pages/community-page";
 import RegisterPage from "../pages/register-page";
@@ -175,6 +177,8 @@ export const RoutesComponent = () => {
         }
       />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/recuperar-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/registro" element={<RegisterPage />} />
       <Route
         path="/perfil"

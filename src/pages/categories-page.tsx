@@ -751,7 +751,7 @@ export default function CategoriesPage() {
     pages: number;
   } | null>(null);
   const PAGE_SIZE = 16;
-  const CAROUSEL_PAGE_SIZE = 100;
+  const CAROUSEL_PAGE_SIZE = 50;
   const MAIN_CAROUSEL_ITEM_LIMIT = 12;
 
   // -------------------------
@@ -1039,10 +1039,7 @@ export default function CategoriesPage() {
               : [];
           const videoGameItems =
             results[3].status === "fulfilled"
-              ? await enrichVideoGamePlatforms(
-                  normalizeServiceItems(results[3].value, "videojuegos"),
-                  controller.signal
-                )
+              ? normalizeServiceItems(results[3].value, "videojuegos")
               : [];
 
           const combined = [
@@ -1139,10 +1136,29 @@ export default function CategoriesPage() {
                 : await fetchVideoGames(params as any);
 
         const items = normalizeServiceItems(data, category);
+        setServices((prev) => (isAppending ? [...prev, ...items] : items));
+        setPagination(extractPagination(data));
+
         const needsDateEnrichment =
           sort === "newest" || sort === "oldest";
         const needsSeriesRuntimeEnrichment =
           category === "series" && duration !== "all";
+        const needsEnrichment =
+          category === "videojuegos" ||
+          needsSeriesRuntimeEnrichment ||
+          (category === "libros" && needsDateEnrichment) ||
+          (category === "peliculas" && needsDateEnrichment);
+
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+          setHasLoadedOnce(true);
+        }
+
+        if (!needsEnrichment) {
+          return;
+        }
+
         const enrichedItems =
           category === "videojuegos"
             ? await enrichVideoGamePlatforms(items, controller.signal)
@@ -1153,10 +1169,12 @@ export default function CategoriesPage() {
               : category === "peliculas" && needsDateEnrichment
                 ? await enrichMovieDates(items, controller.signal)
                 : items;
+
+        if (controller.signal.aborted) return;
+
         setServices((prev) =>
           isAppending ? [...prev, ...enrichedItems] : enrichedItems
         );
-        setPagination(extractPagination(data));
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         console.error("Error cargando servicios:", err);

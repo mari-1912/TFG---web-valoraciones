@@ -121,7 +121,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="text-violet-700 hover:underline"
-                onClick={() => alert("Pendiente: recuperar contraseña")}
+                onClick={() => navigate("/recuperar-password")}
               >
                 ¿Has olvidado la contraseña?
               </button>
