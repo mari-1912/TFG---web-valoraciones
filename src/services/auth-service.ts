@@ -216,6 +216,67 @@ export async function loginUser(
 }
 
 /**
+ * Solicita el email de recuperación.
+ * Backend pendiente:
+ * POST /auth/forgot-password body: { email, redirectUrl }
+ */
+export async function requestPasswordReset(
+  email: string,
+  redirectUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined
+): Promise<{ success: boolean; message: string }> {
+  const { res, data } = await api("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email, redirectUrl }),
+  });
+
+  if (!res.ok) {
+    return {
+      success: false,
+      message:
+        data?.message ??
+        "No se pudo enviar el enlace de recuperación. Inténtalo de nuevo.",
+    };
+  }
+
+  return {
+    success: true,
+    message:
+      data?.message ??
+      "Si existe una cuenta con ese email, recibirás un enlace para restablecer la contraseña.",
+  };
+}
+
+/**
+ * Restablece la contraseña usando el token recibido por email.
+ * Backend pendiente:
+ * POST /auth/reset-password body: { token, password }
+ */
+export async function resetPassword(
+  token: string,
+  password: string
+): Promise<{ success: boolean; message: string }> {
+  const { res, data } = await api("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+
+  if (!res.ok) {
+    return {
+      success: false,
+      message:
+        data?.message ??
+        "El enlace no es válido o ha caducado. Solicita uno nuevo.",
+    };
+  }
+
+  return {
+    success: true,
+    message: data?.message ?? "Contraseña actualizada correctamente.",
+  };
+}
+
+/**
  * LOGOUT real
  * POST /auth/logout -> borra cookie
  */
