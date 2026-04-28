@@ -76,6 +76,8 @@ type ProfileHeroProps = {
   coverImage: string | null;
   profileImage: string | null;
   displayName: string;
+  usernameDraft: string;
+  onUsernameChange: (value: string) => void;
   displayRole: string;
   bio: string;
   canEdit: boolean;
@@ -114,6 +116,8 @@ export function ProfileHero({
   coverImage,
   profileImage,
   displayName,
+  usernameDraft,
+  onUsernameChange,  
   displayRole,
   bio,
   canEdit,
@@ -148,7 +152,8 @@ export function ProfileHero({
   onCoverChange,
 }: ProfileHeroProps) {
   const baseQuickStatClassName =
-  "flex min-w-0 flex-col items-center justify-center rounded-2xl border border-violet-200/80 bg-white/85 px-3 py-2 text-center text-violet-700 shadow-[0_10px_30px_rgba(124,58,237,0.14)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white";  const dropdownPanelClassName =
+    "flex min-w-0 flex-col items-center justify-center rounded-2xl border border-violet-200/80 bg-white/85 px-2 py-2 text-center text-violet-700 shadow-[0_10px_30px_rgba(124,58,237,0.14)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white sm:px-3";
+  const dropdownPanelClassName =
     "w-[min(92vw,24rem)] overflow-hidden rounded-2xl border border-violet-200/80 bg-[#f7f3ff] p-0 text-gray-900 shadow-[0_18px_40px_rgba(124,58,237,0.22)] backdrop-blur";
   const dropdownHeaderClassName =
     "border-b border-violet-200/70 bg-gradient-to-r from-violet-100 via-fuchsia-50 to-indigo-100 px-4 py-3";
@@ -178,13 +183,13 @@ export function ProfileHero({
             className={`${baseQuickStatClassName} cursor-pointer transition hover:border-violet-200/70 hover:bg-black/40`}
             aria-label={`Mostrar ${label.toLowerCase()} de ${displayName}`}
           >
-          <p className="text-xl font-bold leading-none text-violet-700 sm:text-2xl">
-  {stat.value}
-</p>
+            <p className="text-lg font-bold leading-none text-violet-700 sm:text-2xl">
+              {stat.value}
+            </p>
 
-<p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-violet-800 sm:text-xs sm:tracking-widest">
-  {stat.label}
-</p>
+            <p className="mt-1 max-w-full break-words text-center text-[8px] font-semibold uppercase leading-tight tracking-normal text-violet-800 sm:text-[10px] sm:tracking-[0.08em]">
+              {stat.label}
+            </p>
           </button>
         </DropdownMenuTrigger>
 
@@ -387,6 +392,39 @@ export function ProfileHero({
       <div className="absolute inset-x-0 bottom-0 top-40 bg-black/35 sm:top-48 md:top-56" />
 
       <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-24 sm:pt-28 md:pt-32">
+        {!canEdit && showFollowAction ? (
+          <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-1.5 sm:right-5 sm:top-5">
+            {isFollowing ? (
+              <button
+                type="button"
+                disabled
+                className="inline-flex max-w-[8.5rem] items-center justify-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-400/25 px-2.5 py-1 text-[10px] font-semibold text-emerald-50 backdrop-blur sm:max-w-none sm:px-3 sm:text-[11px]"
+              >
+                <UserCheck2 className="h-3 w-3 shrink-0" />
+                <span className="truncate">Siguiendo</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onToggleFollow}
+                disabled={followDisabled}
+                className="inline-flex max-w-[8.5rem] items-center justify-center gap-1.5 rounded-full border border-violet-200/70 bg-violet-600/80 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur transition hover:bg-violet-700 disabled:opacity-60 sm:max-w-none sm:px-3 sm:text-[11px]"
+              >
+                <UserPlus className="h-3 w-3 shrink-0" />
+                <span className="truncate">Seguir</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onToggleFollow}
+              disabled={followDisabled || !isFollowing}
+              className="inline-flex max-w-[8.5rem] items-center justify-center rounded-full border border-white/45 bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur transition hover:bg-white hover:text-indigo-700 disabled:opacity-50 sm:max-w-none sm:px-3 sm:text-[11px]"
+            >
+              <span className="truncate">Dejar de seguir</span>
+            </button>
+          </div>
+        ) : null}
         {canEdit && !isEditing ? (
           <div className="group absolute right-4 top-4 z-10">
             <button
@@ -538,32 +576,50 @@ export function ProfileHero({
               </div>
 
               <div className="mt-5 min-w-0 flex-1 sm:mt-8 md:mt-10">
-                <div className="flex min-w-0 items-center gap-2 sm:flex-wrap">
-                  <h1
-                    className="min-w-0 text-2xl font-semibold leading-tight sm:text-4xl"
-                    title={displayName}
-                  >
-                    {displayName}
-                  </h1>
-                  <div className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-violet-100">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {displayRole}
-                  </div>
+                <div className="flex min-w-0 flex-col items-start gap-1">
+                  {displayRole.trim().toLowerCase() === "admin" ? (
+                    <div className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-violet-100">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {displayRole}
+                    </div>
+                  ) : null}
+                  {canEdit && isEditing ? (
+  <input
+    type="text"
+    value={usernameDraft}
+    onChange={(event) =>
+      onUsernameChange(
+        event.target.value
+          .trimStart()
+          .slice(0, 30)
+      )
+    }
+    placeholder="Nombre de usuario"
+    className="min-w-0 rounded-lg border border-white/25 bg-white/15 px-3 py-2 text-2xl font-semibold leading-tight text-white outline-none placeholder:text-white/60 focus:border-white/70 sm:text-4xl"
+  />
+) : (
+  <h1
+    className="min-w-0 text-2xl font-semibold leading-tight sm:text-4xl"
+    title={displayName}
+  >
+    {displayName}
+  </h1>
+)}
                 </div>
 
                 <div className="mt-5 flex items-start justify-between gap-3">
   
   {/* STATS */}
   <div
-    className={`grid w-full max-w-[260px] grid-cols-2 gap-1.5`}
+    className="grid w-full min-w-0 max-w-[210px] grid-cols-2 gap-1.5 sm:max-w-[260px]"
   >
     {quickStats.map((stat) => {
       const fallbackCard = (
         <div key={stat.label} className={baseQuickStatClassName}>
-          <p className="text-sm font-semibold leading-none text-violet-800">
+          <p className="text-lg font-bold leading-none text-violet-800 sm:text-sm">
             {stat.value}
           </p>
-          <p className="mt-0.5 text-[8px] uppercase tracking-[0.1em] text-violet-900">
+          <p className="mt-1 max-w-full break-words text-center text-[8px] font-semibold uppercase leading-tight tracking-normal text-violet-900 sm:mt-0.5 sm:tracking-[0.08em]">
             {stat.label}
           </p>
         </div>
@@ -586,45 +642,6 @@ export function ProfileHero({
       );
     })}
   </div>
-
-  {/* BOTONES EN COLUMNA */}
-  {!canEdit && showFollowAction ? (
-    <div className="flex flex-col gap-1.5">
-      
-      {/* Siguiendo */}
-      {isFollowing ? (
-        <button
-          type="button"
-          disabled
-          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-400/20 px-3 py-1 text-[11px] font-semibold text-emerald-100"
-        >
-          <UserCheck2 className="h-3 w-3" />
-          Siguiendo
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onToggleFollow}
-          disabled={followDisabled}
-          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-violet-400 px-3 py-1 text-[11px] font-semibold text-white hover:bg-violet-600"
-        >
-          <UserPlus className="h-3 w-3" />
-          Seguir
-        </button>
-      )}
-
-      {/* Dejar de seguir */}
-      <button
-        type="button"
-        onClick={onToggleFollow}
-        disabled={followDisabled || !isFollowing}
-        className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white hover:bg-white hover:text-indigo-700 disabled:opacity-50"
-      >
-        Dejar de seguir
-      </button>
-
-    </div>
-  ) : null}
 
 </div>
               </div>

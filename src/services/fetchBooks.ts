@@ -12,6 +12,8 @@ type FetchListOptions = {
   anioTo?: number;
   duracionMin?: number;
   duracionMax?: number;
+  paginasMin?: number;
+  paginasMax?: number;
   order?: string;
   desc?: boolean;
   recommend?: boolean;
@@ -38,6 +40,8 @@ const buildParams = (options: FetchListOptions) => {
   if (options.anioTo) params.set("anioTo", String(options.anioTo));
   if (options.duracionMin != null) params.set("duracionMin", String(options.duracionMin));
   if (options.duracionMax != null) params.set("duracionMax", String(options.duracionMax));
+  if (options.paginasMin != null) params.set("paginasMin", String(options.paginasMin));
+  if (options.paginasMax != null) params.set("paginasMax", String(options.paginasMax));
   if (options.order) params.set("order", options.order);
   if (options.desc != null) params.set("desc", String(options.desc));
   if (options.recommend != null) params.set("recommend", String(options.recommend));

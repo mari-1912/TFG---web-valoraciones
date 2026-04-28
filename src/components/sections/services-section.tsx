@@ -176,7 +176,7 @@ export default function ServiceSection({
         {filteredItems.length === 0 ? (
           <p className="text-gray-500">No hay elementos para mostrar.</p>
         ) : (
-          <div className="grid w-full grid-cols-3 gap-1 sm:gap-3 md:grid-cols-4 lg:grid-cols-4">
+          <div className="grid w-full grid-cols-3 gap-1 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {filteredItems.map((service) => {
               const detailType = toDetailType(service.category);
 

@@ -5,7 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Footer from "../components/sections/footer";
 import { fetchBookById, fetchBooks } from "@/services/fetchBooks";
 import { fetchMovieById, fetchMovies } from "@/services/fetchMovies";
-import { fetchSeries, fetchSeriesById } from "@/services/fetchSeries";
+import { fetchSeries } from "@/services/fetchSeries";
 import { fetchVideoGameById, fetchVideoGames } from "@/services/fetchVideogames";
 import type { ServiceList } from "@/services/services-list";
 import { buildDetailPath } from "@/lib/detail-route";
@@ -22,6 +22,11 @@ import {
 } from "../components/service-filters";
 import { CategoryApiSearchBar } from "@/components/categories/category-api-search-bar";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  importExternalContent,
+  useExternalContentSearch,
+  type ExternalContentType,
+} from "@/hooks/search/use-external-content-search";
 
 type ServiceListItem = ServiceList & {
   imgSrc?: string;
@@ -39,57 +44,6 @@ type ServiceListItem = ServiceList & {
   createDate?: number;
   viewsTotal?: number;
   viewsWeek?: number;
-};
-
-type ExternalType = "pelicula" | "serie" | "libro" | "videojuego";
-
-type ExternalSearchItem = {
-  externalId?: string | number;
-  id?: string | number;
-  tmdbId?: string | number;
-  rawgId?: string | number;
-  googleId?: string | number;
-  titulo?: string;
-  title?: string;
-  aliases?: string[];
-  portada?: string;
-  poster?: string;
-  image?: string;
-};
-
-type ApiSearchSuggestion = {
-  id: string;
-  title: string;
-  image?: string | null;
-  provider: string;
-  externalId: string | number;
-  type: ExternalType;
-};
-
-const API_URL = (
-  import.meta.env.VITE_API_URL ??
-  "https://tfg-web-valoraciones-back-i9b5.onrender.com"
-).replace(/\/+$/, "");
-
-const EXTERNAL_SEARCH_ENDPOINTS: Record<ExternalType, string> = {
-  pelicula: "peliculas/tmdb/search",
-  serie: "series/tmdb/search",
-  libro: "libros/google/search",
-  videojuego: "videojuegos/rawg/search",
-};
-
-const EXTERNAL_IMPORT_ENDPOINTS: Record<ExternalType, string> = {
-  pelicula: "peliculas/import/tmdb",
-  serie: "series/import/tmdb",
-  libro: "libros/import/google",
-  videojuego: "videojuegos/import/rawg",
-};
-
-const EXTERNAL_PROVIDER_LABEL: Record<ExternalType, string> = {
-  pelicula: "TMDB",
-  serie: "TMDB",
-  libro: "Google Books",
-  videojuego: "RAWG",
 };
 
 const normalizeGenres = (value: unknown): string[] => {
@@ -154,19 +108,7 @@ const normalizeSearchText = (value: unknown) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-const buildApiUrl = (path: string) =>
-  `${API_URL}/${path.replace(/^\/+/, "")}`;
-
-const pickExternalTitle = (item: ExternalSearchItem) =>
-  (typeof item.titulo === "string" && item.titulo.trim()) ||
-  (typeof item.title === "string" && item.title.trim())
-    ? (item.titulo ?? item.title ?? "").trim()
-    : "";
-
-const getAliases = (item: ExternalSearchItem) =>
-  Array.isArray(item.aliases) ? item.aliases.filter(Boolean) : [];
-
-const resolveExternalType = (category: ServiceCategory): ExternalType =>
+const resolveExternalType = (category: ServiceCategory): ExternalContentType =>
   category === "peliculas"
     ? "pelicula"
     : category === "series"
@@ -174,36 +116,6 @@ const resolveExternalType = (category: ServiceCategory): ExternalType =>
       : category === "libros"
         ? "libro"
         : "videojuego";
-
-const scoreExternalMatch = (item: ExternalSearchItem, q: string) => {
-  const normalizedQuery = normalizeSearchText(q).trim();
-  if (!normalizedQuery) return 0;
-
-  const title = pickExternalTitle(item);
-  if (!title) return 0;
-  const normalizedTitle = normalizeSearchText(title);
-
-  if (normalizedTitle === normalizedQuery) return 1_000;
-  if (normalizedTitle.startsWith(normalizedQuery)) return 700;
-  if (normalizedTitle.includes(normalizedQuery)) return 500;
-
-  const aliases = getAliases(item).map((alias) => normalizeSearchText(alias));
-  if (aliases.some((alias) => alias === normalizedQuery)) return 450;
-  if (aliases.some((alias) => alias.startsWith(normalizedQuery))) return 300;
-  if (aliases.some((alias) => alias.includes(normalizedQuery))) return 200;
-
-  return 0;
-};
-
-const extractExternalRows = (payload: unknown): ExternalSearchItem[] => {
-  if (Array.isArray(payload)) return payload as ExternalSearchItem[];
-  const maybeObject = payload as { items?: unknown; results?: unknown; data?: { items?: unknown; results?: unknown } };
-  if (Array.isArray(maybeObject?.items)) return maybeObject.items as ExternalSearchItem[];
-  if (Array.isArray(maybeObject?.results)) return maybeObject.results as ExternalSearchItem[];
-  if (Array.isArray(maybeObject?.data?.items)) return maybeObject.data.items as ExternalSearchItem[];
-  if (Array.isArray(maybeObject?.data?.results)) return maybeObject.data.results as ExternalSearchItem[];
-  return [];
-};
 
 const toTimestamp = (value: unknown) => {
   if (value == null) return undefined;
@@ -245,6 +157,21 @@ const getRawPlatforms = (item: any) =>
   item?.metadataApi?.rawg?.content?.platforms ??
   item?.metadataApi?.rawg?.raw?.platforms ??
   "";
+
+const getBookPages = (item: any) => {
+  const value =
+    item?.paginas ??
+    item?.pages ??
+    item?.pageCount ??
+    item?.page_count ??
+    item?.numPaginas ??
+    item?.numeroPaginas ??
+    item?.metadataApi?.googleBooks?.content?.page_count ??
+    item?.metadataApi?.googleBooks?.content?.pageCount ??
+    item?.metadataApi?.googleBooks?.raw?.volumeInfo?.pageCount;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
 
 const GENRE_ALIASES: Record<string, string> = {
   "sci fi": "ciencia ficcion",
@@ -336,9 +263,22 @@ const normalizeServiceItems = (
         item?.studio;
       const rawDuration = toNumber(
         category === "series"
-          ? item?.runtime_min
+          ? item?.runtime_min ??
+              item?.runtimeMin ??
+              item?.runtime ??
+              item?.duracion_min ??
+              item?.duracionMin ??
+              item?.duracion ??
+              item?.episode_run_time ??
+              item?.episodeRunTime ??
+              item?.metadataApi?.tmdb?.content?.runtime_min ??
+              item?.metadataApi?.tmdb?.content?.runtime ??
+              item?.metadataApi?.tmdb?.content?.episode_run_time?.[0] ??
+              item?.metadataApi?.tmdb?.raw?.episode_run_time?.[0]
           : category === "videojuegos"
             ? item?.duracion
+          : category === "libros"
+            ? getBookPages(item)
           : (item?.duracionMin ?? item?.duracion_min),
       );
       const duration =
@@ -664,6 +604,40 @@ const enrichBookDates = async (
   });
 };
 
+const enrichBookPages = async (
+  items: ServiceListItem[],
+  signal?: AbortSignal
+) => {
+  const missing = items.filter((item) => item.duration == null);
+  if (missing.length === 0) return items;
+
+  const results = await Promise.allSettled(
+    missing.map((item) => fetchBookById(item.id, signal))
+  );
+
+  const pagesMap = new Map<string, number>();
+  results.forEach((result, index) => {
+    if (result.status !== "fulfilled") return;
+    const root = result.value ?? {};
+    const rawItem = {
+      ...root,
+      ...(root?.item ?? {}),
+      ...(root?.contenido ?? {}),
+      ...(root?.libro ?? {}),
+    };
+    const pages = getBookPages(rawItem);
+    if (pages == null) return;
+    pagesMap.set(String(missing[index].id), pages);
+  });
+
+  if (pagesMap.size === 0) return items;
+
+  return items.map((item) => {
+    const pages = pagesMap.get(String(item.id));
+    return pages == null ? item : { ...item, duration: pages };
+  });
+};
+
 const enrichMovieDates = async (
   items: ServiceListItem[],
   signal?: AbortSignal
@@ -693,34 +667,6 @@ const enrichMovieDates = async (
   });
 };
 
-const enrichSeriesRuntime = async (
-  items: ServiceListItem[],
-  signal?: AbortSignal
-) => {
-  const missing = items.filter((item) => item.duration == null);
-  if (missing.length === 0) return items;
-
-  const results = await Promise.allSettled(
-    missing.map((item) => fetchSeriesById(item.id, signal))
-  );
-
-  const runtimeMap = new Map<string, number>();
-  results.forEach((result, index) => {
-    if (result.status !== "fulfilled") return;
-    const rawItem = result.value?.contenido ?? result.value?.item ?? result.value;
-    const runtime = Number(rawItem?.runtime_min);
-    if (!Number.isFinite(runtime) || runtime <= 0) return;
-    runtimeMap.set(String(missing[index].id), runtime);
-  });
-
-  if (runtimeMap.size === 0) return items;
-
-  return items.map((item) => {
-    const runtime = runtimeMap.get(String(item.id));
-    return runtime == null ? item : { ...item, duration: runtime };
-  });
-};
-
 export default function CategoriesPage() {
   const [category, setCategory] = useState<ServiceCategory | null>(null);
   const [sort, setSort] = useState<SortKey>("none");
@@ -729,12 +675,6 @@ export default function CategoriesPage() {
   const [seasons, setSeasons] = useState<SeasonKey>("all");
   const [bookSeries, setBookSeries] = useState<BookSeriesKey>("all");
   const [platform, setPlatform] = useState<PlatformKey>("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [apiSearchSuggestions, setApiSearchSuggestions] = useState<
-    ApiSearchSuggestion[]
-  >([]);
-  const [apiSearchLoading, setApiSearchLoading] = useState(false);
-  const [apiSearchError, setApiSearchError] = useState<string | null>(null);
   const { pathname } = useLocation();
   const { categoria } = useParams<{ categoria?: string }>();
   const navigate = useNavigate();
@@ -753,6 +693,20 @@ export default function CategoriesPage() {
   const PAGE_SIZE = 16;
   const CAROUSEL_PAGE_SIZE = 50;
   const MAIN_CAROUSEL_ITEM_LIMIT = 12;
+  const externalSearchType = category == null ? null : resolveExternalType(category);
+  const categorySearch = useExternalContentSearch({
+    type: externalSearchType,
+    pageSize: 12,
+    limit: 8,
+  });
+  const {
+    query: categorySearchQuery,
+    setQuery: setCategorySearchQuery,
+    suggestions: categorySearchSuggestions,
+    loading: categorySearchLoading,
+    error: categorySearchError,
+    clear: clearCategorySearch,
+  } = categorySearch;
 
   // -------------------------
   // Géneros por categoría (fijos)
@@ -869,115 +823,17 @@ export default function CategoriesPage() {
       setSeasons("all");
       setBookSeries("all");
       setPlatform("all");
-      setSearchQuery("");
-      setApiSearchSuggestions([]);
-      setApiSearchError(null);
+      clearCategorySearch();
       setPage(1);
     }
-  }, [category]);
-
-  useEffect(() => {
-    const q = searchQuery.trim();
-    if (category == null || q.length < 2) {
-      setApiSearchSuggestions([]);
-      setApiSearchError(null);
-      setApiSearchLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    const externalType = resolveExternalType(category);
-    const endpoint = EXTERNAL_SEARCH_ENDPOINTS[externalType];
-
-    const timer = window.setTimeout(async () => {
-      setApiSearchLoading(true);
-      setApiSearchError(null);
-      try {
-        const url = new URL(buildApiUrl(endpoint));
-        url.searchParams.set("q", q);
-        url.searchParams.set("pageSize", "12");
-        const res = await fetch(url.toString(), { signal: controller.signal });
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`${res.status} ${text}`.trim());
-        }
-
-        const payload = await res.json();
-        if (controller.signal.aborted) return;
-
-        const scoredSuggestions: Array<ApiSearchSuggestion & { __score: number }> = [];
-        extractExternalRows(payload).forEach((item, index) => {
-          const title = pickExternalTitle(item);
-          const externalId =
-            item.externalId ??
-            item.id ??
-            item.tmdbId ??
-            item.rawgId ??
-            item.googleId;
-          if (!title || externalId == null) return;
-
-          const image =
-            typeof item.portada === "string"
-              ? item.portada
-              : typeof item.poster === "string"
-                ? item.poster
-                : typeof item.image === "string"
-                  ? item.image
-                  : null;
-
-          scoredSuggestions.push({
-            id: `${externalType}-${String(externalId)}-${index}`,
-            title,
-            image,
-            provider: EXTERNAL_PROVIDER_LABEL[externalType],
-            externalId,
-            type: externalType,
-            __score: scoreExternalMatch(item, q),
-          });
-        });
-
-        const suggestions = scoredSuggestions
-          .filter((item) => item.__score > 0)
-          .sort((a, b) => b.__score - a.__score)
-          .slice(0, 8)
-          .map(({ __score, ...item }) => item);
-
-        setApiSearchSuggestions(suggestions);
-      } catch (err) {
-        if ((err as { name?: string })?.name === "AbortError") return;
-        console.error("Error buscando en API externa:", err);
-        setApiSearchSuggestions([]);
-        setApiSearchError("No se pudo buscar en API externa.");
-      } finally {
-        if (!controller.signal.aborted) {
-          setApiSearchLoading(false);
-        }
-      }
-    }, 300);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [category, searchQuery]);
+  }, [category, clearCategorySearch]);
 
   const handleApiSuggestionSelect = async (id: string) => {
-    const suggestion = apiSearchSuggestions.find((item) => item.id === id);
+    const suggestion = categorySearchSuggestions.find((item) => item.id === id);
     if (!suggestion) return;
 
     try {
-      setApiSearchError(null);
-      const endpoint = EXTERNAL_IMPORT_ENDPOINTS[suggestion.type];
-      const url = buildApiUrl(
-        `${endpoint}/${encodeURIComponent(String(suggestion.externalId))}`
-      );
-      const res = await fetch(url, { method: "GET" });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`${res.status} ${text}`.trim());
-      }
-      const text = await res.text();
-      const payload = text ? JSON.parse(text) : null;
+      const payload = await importExternalContent(suggestion.type, suggestion.externalId);
       const importedItem = payload?.item ?? payload;
       const importedId = importedItem?.id ?? importedItem?._id;
 
@@ -988,8 +844,7 @@ export default function CategoriesPage() {
       const resolvedTitle =
         importedItem?.titulo ?? importedItem?.title ?? suggestion.title;
 
-      setSearchQuery("");
-      setApiSearchSuggestions([]);
+      clearCategorySearch();
       navigate(buildDetailPath(suggestion.type, importedId, resolvedTitle), {
         state: {
           item: { ...importedItem, tipo: suggestion.type },
@@ -997,7 +852,6 @@ export default function CategoriesPage() {
       });
     } catch (err) {
       console.error("Error importando contenido externo:", err);
-      setApiSearchError("No se pudo importar el contenido seleccionado.");
     }
   };
 
@@ -1099,10 +953,7 @@ export default function CategoriesPage() {
           params.desc = sortParams.desc;
         }
 
-        if (
-          category === "peliculas" ||
-          category === "libros"
-        ) {
+        if (category === "peliculas") {
           if (duration === "short") {
             params.duracionMax = 60;
           } else if (duration === "medium") {
@@ -1110,6 +961,15 @@ export default function CategoriesPage() {
             params.duracionMax = 90;
           } else if (duration === "long") {
             params.duracionMin = 91;
+          }
+        } else if (category === "libros") {
+          if (duration === "short") {
+            params.paginasMax = 250;
+          } else if (duration === "medium") {
+            params.paginasMin = 251;
+            params.paginasMax = 500;
+          } else if (duration === "long") {
+            params.paginasMin = 501;
           }
         } else if (category === "videojuegos") {
           if (duration === "short") {
@@ -1136,20 +996,20 @@ export default function CategoriesPage() {
                 : await fetchVideoGames(params as any);
 
         const items = normalizeServiceItems(data, category);
-        setServices((prev) => (isAppending ? [...prev, ...items] : items));
-        setPagination(extractPagination(data));
-
         const needsDateEnrichment =
           sort === "newest" || sort === "oldest";
-        const needsSeriesRuntimeEnrichment =
-          category === "series" && duration !== "all";
+        const needsBookPagesEnrichment =
+          category === "libros" && duration !== "all";
         const needsEnrichment =
           category === "videojuegos" ||
-          needsSeriesRuntimeEnrichment ||
+          needsBookPagesEnrichment ||
           (category === "libros" && needsDateEnrichment) ||
           (category === "peliculas" && needsDateEnrichment);
+        const shouldWaitForEnrichment = needsBookPagesEnrichment;
 
-        if (!controller.signal.aborted) {
+        if (!shouldWaitForEnrichment && !controller.signal.aborted) {
+          setServices((prev) => (isAppending ? [...prev, ...items] : items));
+          setPagination(extractPagination(data));
           setLoading(false);
           setLoadingMore(false);
           setHasLoadedOnce(true);
@@ -1159,22 +1019,26 @@ export default function CategoriesPage() {
           return;
         }
 
-        const enrichedItems =
-          category === "videojuegos"
-            ? await enrichVideoGamePlatforms(items, controller.signal)
-            : needsSeriesRuntimeEnrichment
-              ? await enrichSeriesRuntime(items, controller.signal)
-            : category === "libros" && needsDateEnrichment
-              ? await enrichBookDates(items, controller.signal)
-              : category === "peliculas" && needsDateEnrichment
-                ? await enrichMovieDates(items, controller.signal)
-                : items;
+        let enrichedItems = items;
+        if (category === "videojuegos") {
+          enrichedItems = await enrichVideoGamePlatforms(items, controller.signal);
+        } else if (category === "libros") {
+          if (needsBookPagesEnrichment) {
+            enrichedItems = await enrichBookPages(enrichedItems, controller.signal);
+          }
+          if (needsDateEnrichment) {
+            enrichedItems = await enrichBookDates(enrichedItems, controller.signal);
+          }
+        } else if (category === "peliculas" && needsDateEnrichment) {
+          enrichedItems = await enrichMovieDates(items, controller.signal);
+        }
 
         if (controller.signal.aborted) return;
 
         setServices((prev) =>
           isAppending ? [...prev, ...enrichedItems] : enrichedItems
         );
+        setPagination(extractPagination(data));
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         console.error("Error cargando servicios:", err);
@@ -1197,7 +1061,7 @@ export default function CategoriesPage() {
   // Filtrado y orden
   // -------------------------
   const filteredServices = useMemo(() => {
-    const normalizedSearch = normalizeSearchText(searchQuery).trim();
+    const normalizedSearch = normalizeSearchText(categorySearchQuery).trim();
     const hasGenreData = services.some((s) => Boolean(s.genre));
     const hasDurationData = services.some((s) => s.duration != null);
     const hasSeasonsData = services.some((s) => s.seasonsCount != null);
@@ -1223,15 +1087,17 @@ export default function CategoriesPage() {
         genre && hasGenreData ? matchesGenre(s.genre, genre) : true,
       )
       .filter((s) => {
-        if (!hasDurationData) return true;
+        if (category === "series") return true;
         if (duration === "all") return true;
-        if (s.duration == null) return false;
-        if (category === "series") {
-          if (duration === "short") return s.duration <= 20;
-          if (duration === "medium") return s.duration <= 45;
-          if (duration === "long") return s.duration <= 60;
+        if (category === "libros") {
+          if (s.duration == null) return false;
+          if (duration === "short") return s.duration <= 250;
+          if (duration === "medium") return s.duration > 250 && s.duration <= 500;
+          if (duration === "long") return s.duration > 500;
           return true;
         }
+        if (!hasDurationData) return true;
+        if (s.duration == null) return false;
         if (category === "videojuegos") {
           if (duration === "short") return s.duration > 0 && s.duration <= 5;
           if (duration === "medium") return s.duration >= 6 && s.duration <= 20;
@@ -1291,7 +1157,7 @@ export default function CategoriesPage() {
       if (sort === "oldest") return getSortDate(a) - getSortDate(b);
       return 0;
     });
-  }, [services, category, genre, duration, seasons, bookSeries, platform, sort, searchQuery]);
+  }, [services, category, genre, duration, seasons, bookSeries, platform, sort, categorySearchQuery]);
 
   const marathonItems = useMemo(() => {
     const items = filteredServices.filter(
@@ -1536,14 +1402,14 @@ export default function CategoriesPage() {
             searchBar={
               category != null ? (
                 <CategoryApiSearchBar
-                  query={searchQuery}
+                  query={categorySearchQuery}
                   onQueryChange={(next) => {
-                    setSearchQuery(next);
+                    setCategorySearchQuery(next);
                     setPage(1);
                   }}
-                  suggestions={apiSearchSuggestions}
-                  loading={apiSearchLoading}
-                  error={apiSearchError}
+                  suggestions={categorySearchSuggestions}
+                  loading={categorySearchLoading}
+                  error={categorySearchError}
                   onSelectSuggestion={handleApiSuggestionSelect}
                 />
               ) : null
