@@ -26,7 +26,7 @@ export function buildDetailPath(
   const normalizedType = (type ?? "").trim().toLowerCase() || "pelicula";
   const fallback = String(id ?? "").trim();
   const slug = slugifyDetailTitle(title ?? "");
-  const segment = slug || fallback || "detalle";
-  return `/detail/${encodeURIComponent(normalizedType)}/${encodeURIComponent(segment)}`;
+  const idSegment = fallback || slug || "detalle";
+  const path = `/detail/${encodeURIComponent(normalizedType)}/${encodeURIComponent(idSegment)}`;
+  return fallback && slug ? `${path}/${encodeURIComponent(slug)}` : path;
 }
-

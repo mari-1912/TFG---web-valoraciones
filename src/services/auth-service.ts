@@ -10,9 +10,12 @@ export type AuthUser = {
 const API_URL = import.meta.env.VITE_API_URL ?? "https://tfg-web-valoraciones-back-i9b5.onrender.com";
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const REMEMBER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CURRENT_USER_KEY = "currentUser";
+const CURRENT_USER_ID_KEY = "currentUserId";
 const SESSION_ISSUED_AT_KEY = "sessionIssuedAt";
 const SESSION_EXPIRES_AT_KEY = "sessionExpiresAt";
 export const AUTH_EXPIRED_EVENT = "opinify:auth-expired";
+export const AUTH_CHANGED_EVENT = "opinify:auth-changed";
 let authRedirectInProgress = false;
 
 function resolveSessionTtl(remember: boolean) {
@@ -21,6 +24,12 @@ function resolveSessionTtl(remember: boolean) {
 
 function getRememberPreference() {
   return localStorage.getItem("rememberMe") === "true";
+}
+
+function emitAuthChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  }
 }
 
 export function getSessionExpiry(): number | null {
@@ -47,7 +56,13 @@ export function ensureSessionValid(now = Date.now()): boolean {
 }
 
 function setSession(
-  user: { username?: string; role?: string },
+  user: {
+    user_id?: number;
+    userId?: number;
+    id?: number;
+    username?: string;
+    role?: string;
+  },
   options: { remember?: boolean; expiresAt?: number } = {}
 ) {
   const remember = options.remember ?? getRememberPreference();
@@ -58,21 +73,30 @@ function setSession(
 
   localStorage.setItem("isLoggedIn", "true");
   localStorage.setItem("userRole", (user.role ?? "base").toString().toLowerCase());
-  localStorage.setItem("currentUser", user.username ?? "");
+  localStorage.setItem(CURRENT_USER_KEY, user.username ?? "");
+  const userId = Number(user.user_id ?? user.userId ?? user.id ?? 0);
+  if (Number.isFinite(userId) && userId > 0) {
+    localStorage.setItem(CURRENT_USER_ID_KEY, String(userId));
+  } else {
+    localStorage.removeItem(CURRENT_USER_ID_KEY);
+  }
   localStorage.setItem(SESSION_ISSUED_AT_KEY, String(now));
   localStorage.setItem(SESSION_EXPIRES_AT_KEY, String(expiresAt));
   localStorage.setItem("rememberMe", remember ? "true" : "false");
+  emitAuthChanged();
 }
 
 function clearSession(options: { preserveRemember?: boolean } = {}) {
   localStorage.removeItem("isLoggedIn");
   localStorage.removeItem("userRole");
-  localStorage.removeItem("currentUser");
+  localStorage.removeItem(CURRENT_USER_KEY);
+  localStorage.removeItem(CURRENT_USER_ID_KEY);
   localStorage.removeItem(SESSION_ISSUED_AT_KEY);
   localStorage.removeItem(SESSION_EXPIRES_AT_KEY);
   if (!options.preserveRemember) {
     localStorage.removeItem("rememberMe");
   }
+  emitAuthChanged();
 }
 
 function getCurrentPath() {
@@ -112,17 +136,55 @@ export function handleUnauthorizedResponse(status: number, reason = "401") {
   return true;
 }
 
-async function api(path: string, options: RequestInit = {}) {
+async function api(
+  path: string,
+  options: RequestInit = {},
+  apiOptions: { handleUnauthorized?: boolean } = {}
+) {
   const res = await fetch(`${API_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
     credentials: "include", // <-- CLAVE: enviar/recibir cookies HttpOnly
     ...options,
   });
 
-  handleUnauthorizedResponse(res.status, path);
+  const shouldHandleUnauthorized =
+    apiOptions.handleUnauthorized ?? !path.startsWith("/auth/");
+  if (shouldHandleUnauthorized) {
+    handleUnauthorizedResponse(res.status, path);
+  }
 
   const data = await res.json().catch(() => ({}));
   return { res, data };
+}
+
+function parseAuthUser(data: unknown, fallbackUsername = ""): AuthUser | null {
+  if (!data || typeof data !== "object") return null;
+  const root = data as Record<string, unknown>;
+  const user =
+    (root.user as Record<string, unknown> | undefined) ??
+    (root.usuario as Record<string, unknown> | undefined) ??
+    (root.perfil as Record<string, unknown> | undefined) ??
+    root;
+
+  const userId = Number(
+    user.userId ?? user.user_id ?? user.id ?? user.usuarioId ?? user.usuario_id ?? 0
+  );
+  const username = String(
+    user.username ?? user.nombreUsuario ?? user.nombre_usuario ?? fallbackUsername
+  ).trim();
+  const email = typeof user.email === "string" ? user.email : undefined;
+  const role = String(user.tipo ?? user.role ?? user.rol ?? "base").toLowerCase();
+
+  if ((!Number.isFinite(userId) || userId <= 0) && !username && !email) {
+    return null;
+  }
+
+  return {
+    user_id: Number.isFinite(userId) && userId > 0 ? userId : 0,
+    email,
+    role,
+    username: username || email,
+  };
 }
 
 /**
@@ -141,6 +203,8 @@ export async function registerUser(
   const { res, data } = await api("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
+  }, {
+    handleUnauthorized: false,
   });
 
   if (!res.ok) {
@@ -150,12 +214,19 @@ export async function registerUser(
     };
   }
 
-  // Como el backend setea cookie, ya estás autenticado.
-  // Mantenemos localStorage para compatibilidad con el resto de la app.
-  const username = data?.user?.username ?? payload.username;
-  const role = (data?.user?.tipo ?? "base").toString().toLowerCase();
-
-  setSession({ username, role }, { remember: options.remember });
+  const me = await getMe({ suppressUnauthorizedRedirect: true });
+  if (me.success && me.user) {
+    setSession(
+      {
+        user_id: me.user.user_id,
+        role: (me.user.role ?? "base").toLowerCase(),
+        username: me.user.username ?? me.user.email ?? payload.username,
+      },
+      { remember: options.remember }
+    );
+  } else {
+    clearSession({ preserveRemember: true });
+  }
 
   return { success: true, message: data?.message ?? "Registro exitoso." };
 }
@@ -171,6 +242,18 @@ export async function loginUser(
   remember = false
 ): Promise<{ success: boolean; message: string }> {
   const normalized = identifier.trim();
+
+  clearSession({ preserveRemember: true });
+  try {
+    await api(
+      "/auth/logout",
+      { method: "POST" },
+      { handleUnauthorized: false }
+    );
+  } catch {
+    // Si el logout previo falla por red/CORS, intentamos login igualmente.
+  }
+
   const payload: Record<string, string> = {
     password,
     // Algunos backends usan un único campo para email/username.
@@ -188,6 +271,8 @@ export async function loginUser(
   const { res, data } = await api("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
+  }, {
+    handleUnauthorized: false,
   });
 
   if (!res.ok) {
@@ -197,19 +282,51 @@ export async function loginUser(
     };
   }
 
+  const loginResponseUser = parseAuthUser(data, normalized);
+
   // Cookie ya puesta: sincronizamos datos llamando a /auth/me
-  const me = await getMe();
+  let me = await getMe({ suppressUnauthorizedRedirect: true });
+  if (
+    loginResponseUser?.user_id &&
+    me.success &&
+    me.user?.user_id &&
+    loginResponseUser.user_id !== me.user.user_id
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    me = await getMe({ suppressUnauthorizedRedirect: true });
+  }
+
+  if (
+    loginResponseUser?.user_id &&
+    me.success &&
+    me.user?.user_id &&
+    loginResponseUser.user_id !== me.user.user_id
+  ) {
+    clearSession({ preserveRemember: true });
+    return {
+      success: false,
+      message:
+        "No se pudo cambiar a este usuario porque el navegador mantiene otra sesión activa. Cierra sesión e inténtalo de nuevo.",
+    };
+  }
+
   if (me.success && me.user) {
     setSession(
       {
+        user_id: me.user.user_id,
         role: (me.user.role ?? "base").toLowerCase(),
         username: me.user.username ?? me.user.email ?? "",
       },
       { remember }
     );
   } else {
-    // Aunque /me falle por lo que sea, consideramos login hecho
-    setSession({ role: "base", username: normalized }, { remember });
+    clearSession({ preserveRemember: true });
+    return {
+      success: false,
+      message:
+        data?.message ??
+        "Login aceptado, pero no se pudo verificar la sesión. Comprueba que el email esté verificado e inténtalo de nuevo.",
+    };
   }
 
   return { success: true, message: data?.message ?? "Login correcto." };
@@ -228,6 +345,8 @@ export async function requestPasswordReset(
   const { res, data } = await api("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email, redirectUrl }),
+  }, {
+    handleUnauthorized: false,
   });
 
   if (!res.ok) {
@@ -259,6 +378,8 @@ export async function resetPassword(
   const { res, data } = await api("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ token, password }),
+  }, {
+    handleUnauthorized: false,
   });
 
   if (!res.ok) {
@@ -273,6 +394,34 @@ export async function resetPassword(
   return {
     success: true,
     message: data?.message ?? "Contraseña actualizada correctamente.",
+  };
+}
+
+/**
+ * Verifica el email usando el token recibido por correo.
+ * GET /auth/verify-email?token=...
+ */
+export async function verifyEmail(
+  token: string
+): Promise<{ success: boolean; message: string }> {
+  const { res, data } = await api(
+    `/auth/verify-email?token=${encodeURIComponent(token)}`,
+    { method: "GET" },
+    { handleUnauthorized: false }
+  );
+
+  if (!res.ok) {
+    return {
+      success: false,
+      message:
+        data?.message ??
+        "El enlace de verificación no es válido o ha caducado.",
+    };
+  }
+
+  return {
+    success: true,
+    message: data?.message ?? "Email verificado correctamente.",
   };
 }
 
@@ -294,16 +443,23 @@ export async function logoutUser(): Promise<void> {
  * ME real
  * GET /usuarios/perfil -> { perfil: { userId, username, tipo, ... } }
  */
-export async function getMe(): Promise<{
+export async function getMe(options: {
+  suppressUnauthorizedRedirect?: boolean;
+} = {}): Promise<{
   success: boolean;
   user?: AuthUser;
   message?: string;
 }> {
-  const { res, data } = await api("/usuarios/perfil", { method: "GET" });
+  const { res, data } = await api(
+    "/usuarios/perfil",
+    { method: "GET" },
+    { handleUnauthorized: !options.suppressUnauthorizedRedirect }
+  );
 
   if (!res.ok) {
-    // Si la cookie no es válida, limpiamos estado local
-    handleUnauthorizedResponse(res.status, "/usuarios/perfil");
+    if (options.suppressUnauthorizedRedirect) {
+      clearSession({ preserveRemember: true });
+    }
     return { success: false, message: data?.message ?? "No autenticado." };
   }
 
@@ -311,7 +467,14 @@ export async function getMe(): Promise<{
   return {
     success: true,
     user: {
-      user_id: Number(perfil.userId ?? perfil.user_id ?? 0),
+      user_id: Number(
+        perfil.userId ??
+          perfil.user_id ??
+          perfil.id ??
+          perfil.usuarioId ??
+          perfil.usuario_id ??
+          0
+      ),
       email: perfil.email,
       role: (perfil.tipo ?? perfil.role ?? "base").toString().toLowerCase(),
       username: perfil.username,
@@ -338,6 +501,7 @@ export async function bootstrapAuth(): Promise<void> {
   if (me.success && me.user) {
     setSession(
       {
+        user_id: me.user.user_id,
         role: (me.user.role ?? "base").toLowerCase(),
         username: me.user.username ?? me.user.email ?? "",
       },
