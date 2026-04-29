@@ -5,6 +5,21 @@ import { ArrowLeft, Eye, EyeOff, User } from "lucide-react";
 import Footer from "@/components/sections/footer";
 import { loginUser } from "@/services/auth-service";
 
+function resolvePostLoginTarget(target: string) {
+  if (typeof window === "undefined") return target || "/home";
+
+  try {
+    const url = new URL(target || "/home", window.location.origin);
+    if (url.origin !== window.location.origin) return "/home";
+    if (url.pathname === "/perfil" && url.searchParams.has("userId")) {
+      return "/perfil";
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/home";
+  }
+}
+
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -44,7 +59,7 @@ export default function LoginPage() {
 
       setSuccess(result.message);
 
-      setTimeout(() => navigate(from), 200);
+      setTimeout(() => navigate(resolvePostLoginTarget(from)), 200);
     } finally {
       setLoading(false);
     }

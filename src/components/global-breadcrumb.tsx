@@ -9,12 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import moviesData from "../data/movies.json";
-import seriesData from "../data/series.json";
-import videoGamesData from "../data/video-games.json";
-import booksData from "../data/books.json";
-import boardGamesData from "../data/board-games.json";
-
 import {
   Breadcrumb,
   BreadcrumbEllipsis,
@@ -64,14 +58,6 @@ const TYPE_ENDPOINTS: Record<string, string> = {
   serie: "series",
   libro: "libros",
   videojuego: "videojuegos",
-};
-
-const CATALOGS: Record<string, Array<{ id: string; title?: string; titulo?: string }>> = {
-  pelicula: moviesData as Array<{ id: string; title?: string; titulo?: string }>,
-  serie: seriesData as Array<{ id: string; title?: string; titulo?: string }>,
-  videojuego: videoGamesData as Array<{ id: string; title?: string; titulo?: string }>,
-  libro: booksData as Array<{ id: string; title?: string; titulo?: string }>,
-  "juego-mesa": boardGamesData as Array<{ id: string; title?: string; titulo?: string }>,
 };
 
 const DETAIL_CRUMBS: Record<string, { label: string; to?: string }> = {
@@ -144,13 +130,7 @@ export function AppBreadcrumb() {
     const itemFromState = (state as { item?: any } | null)?.item;
     const stateTitle = pickTitle(itemFromState?.title, itemFromState?.titulo);
     if (stateTitle) return stateTitle;
-
-    const dataset = CATALOGS[detailInfo.type];
-    if (!dataset) return null;
-    const found = dataset.find(
-      (entry) => String(entry.id) === String(detailInfo.id)
-    );
-    return pickTitle(found?.title, found?.titulo);
+    return null;
   }, [detailInfo, state]);
 
   useEffect(() => {

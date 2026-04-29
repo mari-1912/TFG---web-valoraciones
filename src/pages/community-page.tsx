@@ -26,12 +26,6 @@ import {
 } from "../services/content-comments";
 import { buildDetailPath } from "@/lib/detail-route";
 
-// Catálogos para sacar posters reales
-import moviesData from "../data/movies.json";
-import seriesData from "../data/series.json";
-import videoGamesData from "../data/video-games.json";
-import booksData from "../data/books.json";
-
 function pickString(...values: unknown[]) {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -326,31 +320,6 @@ async function hydrateAvatars(
   });
 }
 
-type CatalogItem = { id: string; title: string; imgSrc?: string };
-
-const MOVIES = moviesData as CatalogItem[];
-const SERIES = seriesData as CatalogItem[];
-const GAMES = videoGamesData as CatalogItem[];
-const BOOKS = booksData as CatalogItem[];
-
-const CATALOGS: Record<string, CatalogItem[]> = {
-  pelicula: MOVIES,
-  película: MOVIES,
-  serie: SERIES,
-  videojuego: GAMES,
-  libro: BOOKS,
-};
-
-const DETAIL_TYPE_CATALOGS: Array<{
-  type: NonNullable<CommunityPost["detailType"]>;
-  list: CatalogItem[];
-}> = [
-  { type: "pelicula", list: MOVIES },
-  { type: "serie", list: SERIES },
-  { type: "videojuego", list: GAMES },
-  { type: "libro", list: BOOKS },
-];
-
 const COMMUNITY_PAGE_SIZE = 20;
 
 function normalizeKey(s?: string) {
@@ -364,21 +333,6 @@ function normalizeKey(s?: string) {
     .replaceAll("ú", "u");
 }
 
-function findPosterByType(contentType?: string, title?: string) {
-  if (!contentType || !title) return undefined;
-  const key = normalizeKey(contentType);
-  const list = CATALOGS[key] ?? [];
-  const t = title.trim().toLowerCase();
-  return list.find((x) => x.title.trim().toLowerCase() === t)?.imgSrc;
-}
-
-function findPosterAnywhere(title?: string) {
-  if (!title) return undefined;
-  const t = title.trim().toLowerCase();
-  const all = [...MOVIES, ...SERIES, ...GAMES, ...BOOKS];
-  return all.find((x) => x.title.trim().toLowerCase() === t)?.imgSrc;
-}
-
 function inferDetailTypeFromPost(post: CommunityPost): CommunityPost["detailType"] {
   if (post.detailType) return post.detailType;
 
@@ -387,24 +341,6 @@ function inferDetailTypeFromPost(post: CommunityPost): CommunityPost["detailType
   if (normalizedContentType === "serie") return "serie";
   if (normalizedContentType === "videojuego") return "videojuego";
   if (normalizedContentType === "libro") return "libro";
-
-  if (post.contentId != null) {
-    const contentId = String(post.contentId);
-    for (const entry of DETAIL_TYPE_CATALOGS) {
-      if (entry.list.some((item) => String(item.id) === contentId)) {
-        return entry.type;
-      }
-    }
-  }
-
-  const normalizedTitle = post.title?.trim().toLowerCase();
-  if (normalizedTitle) {
-    for (const entry of DETAIL_TYPE_CATALOGS) {
-      if (entry.list.some((item) => item.title.trim().toLowerCase() === normalizedTitle)) {
-        return entry.type;
-      }
-    }
-  }
 
   return "pelicula";
 }
@@ -983,11 +919,7 @@ export default function CommunityPage() {
             onReplyComment={handleReplyFromFeed}
             onEditComment={handleEditFromFeed}
             onDeleteComment={handleDeleteFromFeed}
-            getPosterSrc={(post) =>
-              post.poster ??
-              findPosterByType(post.contentType, post.title) ??
-              findPosterAnywhere(post.title)
-            }
+            getPosterSrc={(post) => post.poster}
             currentPage={currentPage}
             totalPages={totalPages}
             loadingMore={loadingMore}

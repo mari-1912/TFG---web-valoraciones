@@ -48,12 +48,35 @@ function writeStoredFollowerIds(userId: number, followerIds: number[]) {
   );
 }
 
+function normalizeFollowerNotifications(
+  notifications: FollowerNotification[]
+): FollowerNotification[] {
+  const byFollowerId = new Map<number, FollowerNotification>();
+
+  for (const notification of notifications) {
+    const existing = byFollowerId.get(notification.userId);
+    if (!existing) {
+      byFollowerId.set(notification.userId, notification);
+      continue;
+    }
+
+    byFollowerId.set(notification.userId, {
+      ...existing,
+      username: notification.username || existing.username,
+      avatarUrl: notification.avatarUrl ?? existing.avatarUrl,
+      read: existing.read || notification.read,
+    });
+  }
+
+  return [...byFollowerId.values()].slice(0, 20);
+}
+
 function readStoredFollowerNotifications(userId: number): FollowerNotification[] {
   try {
     const raw = localStorage.getItem(`${FOLLOWER_NOTIFICATIONS_PREFIX}${userId}`);
     const parsed = raw ? JSON.parse(raw) : null;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
+    return normalizeFollowerNotifications(parsed.filter(
       (item): item is FollowerNotification =>
         item &&
         typeof item === "object" &&
@@ -62,7 +85,7 @@ function readStoredFollowerNotifications(userId: number): FollowerNotification[]
         typeof item.username === "string" &&
         typeof item.detectedAt === "string" &&
         typeof item.read === "boolean"
-    );
+    ));
   } catch {
     return [];
   }
@@ -74,7 +97,7 @@ function writeStoredFollowerNotifications(
 ) {
   localStorage.setItem(
     `${FOLLOWER_NOTIFICATIONS_PREFIX}${userId}`,
-    JSON.stringify(notifications.slice(0, 20))
+    JSON.stringify(normalizeFollowerNotifications(notifications))
   );
 }
 
@@ -150,18 +173,21 @@ export function FollowerNotificationsMenu({
 
         const latestIds = followers.map((user) => user.userId);
         const previousIds = readStoredFollowerIds(userId);
+        const storedNotifications = readStoredFollowerNotifications(userId);
         if (previousIds == null) {
           writeStoredFollowerIds(userId, latestIds);
           return;
         }
 
         const previousSet = new Set(previousIds);
+        const notifiedSet = new Set(
+          storedNotifications.map((notification) => notification.userId)
+        );
         const newFollowers = followers.filter(
-          (user) => !previousSet.has(user.userId)
+          (user) => !previousSet.has(user.userId) && !notifiedSet.has(user.userId)
         );
 
         if (newFollowers.length > 0) {
-          const storedNotifications = readStoredFollowerNotifications(userId);
           const nextNotifications = [
             ...newFollowers.map(createFollowerNotification),
             ...storedNotifications,
@@ -242,7 +268,7 @@ export function FollowerNotificationsMenu({
       <DropdownMenuContent
         align="end"
         sideOffset={10}
-        className="w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-200 bg-white p-0 text-gray-900 shadow-xl"
+        className="z-[9999] w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-200 bg-white p-0 text-gray-900 shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3">
           <div>

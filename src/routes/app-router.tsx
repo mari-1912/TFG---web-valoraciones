@@ -5,6 +5,7 @@ import CategoriesPage from "../pages/categories-page";
 import LoginPage from "../pages/login-page";
 import ForgotPasswordPage from "../pages/forgot-password-page";
 import ResetPasswordPage from "../pages/reset-password-page";
+import VerifyEmailPage from "../pages/verify-email-page";
 import { DetailPage } from "../pages/detail-page";
 import CommunityPage from "../pages/community-page";
 import RegisterPage from "../pages/register-page";
@@ -179,6 +180,7 @@ export const RoutesComponent = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/recuperar-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verificar-email" element={<VerifyEmailPage />} />
       <Route path="/registro" element={<RegisterPage />} />
       <Route
         path="/perfil"
@@ -193,6 +195,14 @@ export const RoutesComponent = () => {
         element={
           <RequireAuth>
             <ProfileStatsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/detail/:type/:id/:slug"
+        element={
+          <RequireAuth>
+            <DetailPage />
           </RequireAuth>
         }
       />
