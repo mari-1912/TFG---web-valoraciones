@@ -493,9 +493,9 @@ export function DetailHero({
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-transparent pointer-events-none" />
 
-      <div className="relative z-10 grid grid-cols-[minmax(120px,34vw)_minmax(0,1fr)] gap-4 p-4 sm:gap-6 sm:p-6 md:grid-cols-[minmax(190px,28vh)_minmax(0,1fr)] md:gap-8 md:p-8 lg:grid-cols-[minmax(220px,32vh)_minmax(0,1fr)_240px]">
+      <div className="relative z-10 grid grid-cols-[minmax(100px,30vw)_minmax(0,1fr)] gap-4 p-4 sm:gap-6 sm:p-6 md:grid-cols-[minmax(160px,24vh)_minmax(0,1fr)] md:gap-8 md:p-8 lg:grid-cols-[minmax(180px,26vh)_minmax(0,1fr)_240px]">
         {/* Columna portada */}
-        <div className="w-full max-w-[min(34vh,280px)] space-y-3 sm:space-y-4">
+        <div className="w-full max-w-[min(28vh,240px)] space-y-3 sm:space-y-4">
           {image ? (
             <img
             src={image}

@@ -186,20 +186,13 @@ export function ServicesFilters({
           )}
 
 
-          {category && duration && onDurationChange && (
+          {category && category !== "series" && duration && onDurationChange && (
             <select
               value={duration}
               onChange={(e) => onDurationChange(e.target.value as DurationKey)}
               className={selectBaseClass}
             >
-              {category === "series" ? (
-                <>
-                  <option value="all">Duración por capítulo</option>
-                  <option value="short">Hasta 20min</option>
-                  <option value="medium">Hasta 45min</option>
-                  <option value="long">Hasta 1h</option>
-                </>
-              ) : category === "videojuegos" ? (
+              {category === "videojuegos" ? (
                 <>
                   <option value="all">Duración</option>
                   <option value="short">Cortos (hasta 5h)</option>
@@ -210,9 +203,9 @@ export function ServicesFilters({
               ) : category === "libros" ? (
                 <>
                   <option value="all">Extensión</option>
-                  <option value="short">Cortos</option>
-                  <option value="medium">Medios</option>
-                  <option value="long">Largos</option>
+                  <option value="short">Cortos (hasta 250 pág.)</option>
+                  <option value="medium">Medios (251-500 pág.)</option>
+                  <option value="long">Largos (más de 500 pág.)</option>
                 </>
               ) : (
                 <>
