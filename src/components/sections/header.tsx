@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LogoPng from "@/assets/LOGO.png";
 import {
+  AUTH_CHANGED_EVENT,
   ensureSessionValid,
   getSessionExpiry,
   logoutUser,
@@ -132,7 +133,10 @@ export function Header() {
       }
     };
 
+    const syncAuthState = () => setIsLoggedIn(ensureSessionValid());
+
     window.addEventListener("storage", handleStorage);
+    window.addEventListener(AUTH_CHANGED_EVENT, syncAuthState);
     const handleProfileImageUpdate = (event: Event) => {
       const detail =
         event instanceof CustomEvent ? (event.detail as string | null) : null;
@@ -143,6 +147,7 @@ export function Header() {
     window.addEventListener("profile-image-updated", handleProfileImageUpdate);
     return () => {
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
       window.removeEventListener("profile-image-updated", handleProfileImageUpdate);
     };
   }, []);
@@ -150,7 +155,7 @@ export function Header() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     setIsLoggedIn(ensureSessionValid());
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -235,7 +240,9 @@ export function Header() {
       return;
     }
 
-    navigate(buildDetailPath(item.tipo, item.id, item.titulo));
+    navigate(buildDetailPath(item.tipo, item.id, item.titulo), {
+      state: { item },
+    });
     onSelect?.();
   };
 

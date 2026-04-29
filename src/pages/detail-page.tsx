@@ -22,29 +22,13 @@ import { useDetailRating } from "@/hooks/detail/use-detail-rating";
 import { useDetailComments } from "@/hooks/detail/use-detail-comments";
 import { useDetailContent } from "@/hooks/detail/use-detail-content";
 import { useDetailCurrentUser } from "@/hooks/detail/use-detail-current-user";
-import {
-  isNumericDetailSegment,
-  slugifyDetailTitle,
-} from "@/lib/detail-route";
+import { isNumericDetailSegment } from "@/lib/detail-route";
 import { getContentRatingSnapshot } from "@/services/content-rating";
 import { deleteContentFromDatabase } from "@/services/content-admin";
-import movies from "../data/movies.json";
-import books from "../data/books.json";
-import videoGames from "../data/video-games.json";
-import series from "../data/series.json";
-import boardGames from "../data/board-games.json";
 
 const API_URL =
   import.meta.env.VITE_API_URL ??
   "https://tfg-web-valoraciones-back-i9b5.onrender.com";
-
-const LOCAL_DATASETS: Record<string, any[]> = {
-  pelicula: movies,
-  serie: series,
-  libro: books,
-  videojuego: videoGames,
-  "juego-mesa": boardGames,
-};
 
 const TYPE_ENDPOINTS: Record<string, string> = {
   pelicula: "peliculas",
@@ -116,24 +100,6 @@ export function DetailPage() {
     () => decodeURIComponent(detailSegment ?? "").trim(),
     [detailSegment]
   );
-  const localItem = useMemo(() => {
-    if (!type || !normalizedDetailSegment) return null;
-    const dataset = LOCAL_DATASETS[type];
-    if (!Array.isArray(dataset)) return null;
-    const isNumeric = isNumericDetailSegment(normalizedDetailSegment);
-    if (isNumeric) {
-      return (
-        dataset.find((i) => String(i.id) === String(normalizedDetailSegment)) ??
-        null
-      );
-    }
-    return (
-      dataset.find((i) => {
-        const candidateTitle = pickString(i?.title, i?.titulo, i?.nombre);
-        return slugifyDetailTitle(candidateTitle) === normalizedDetailSegment;
-      }) ?? null
-    );
-  }, [type, normalizedDetailSegment]);
 
   const resolvedDetailId = useMemo(() => {
     const fromState =
@@ -142,26 +108,18 @@ export function DetailPage() {
       stateItem?.contenidoId ??
       stateItem?.contenido_id;
     if (fromState != null && String(fromState).trim()) return String(fromState);
-    const fromLocal =
-      localItem?.id ??
-      localItem?._id ??
-      localItem?.contenidoId ??
-      localItem?.contenido_id;
-    if (fromLocal != null && String(fromLocal).trim()) {
-      return String(fromLocal);
-    }
     if (isNumericDetailSegment(normalizedDetailSegment)) {
       return normalizedDetailSegment;
     }
     return "";
-  }, [stateItem, localItem, normalizedDetailSegment]);
+  }, [stateItem, normalizedDetailSegment]);
 
   const { item, normalizedId, normalizedType } =
     useDetailContent({
       id: resolvedDetailId || undefined,
       type,
       stateItem,
-      localItem,
+      localItem: null,
       apiUrl: API_URL,
       typeEndpoints: TYPE_ENDPOINTS,
     });
