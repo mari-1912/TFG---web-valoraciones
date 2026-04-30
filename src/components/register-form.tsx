@@ -86,10 +86,11 @@ export default function RegisterForm({ onClose }: RegisterFormProps) {
 
     setLoading(true);
     try {
-      const result = await registerUser(
-        { username: username.trim(), email: email.trim(), password },
-        { remember }
-      );
+      const result = await registerUser({
+        username: username.trim(),
+        email: email.trim(),
+        password,
+      });
 
       if (!result.success) { setError(result.message); return; }
 
