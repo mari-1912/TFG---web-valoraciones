@@ -282,33 +282,34 @@ export async function loginUser(
     };
   }
 
-  const loginResponseUser = parseAuthUser(data, normalized);
+  const me = await getMe({ suppressUnauthorizedRedirect: true });
+  // const loginResponseUser = parseAuthUser(data, normalized);
 
-  // Cookie ya puesta: sincronizamos datos llamando a /auth/me
-  let me = await getMe({ suppressUnauthorizedRedirect: true });
-  if (
-    loginResponseUser?.user_id &&
-    me.success &&
-    me.user?.user_id &&
-    loginResponseUser.user_id !== me.user.user_id
-  ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    me = await getMe({ suppressUnauthorizedRedirect: true });
-  }
+  // // Cookie ya puesta: sincronizamos datos llamando a /auth/me
+  // let me = await getMe({ suppressUnauthorizedRedirect: true });
+  // if (
+  //   loginResponseUser?.user_id &&
+  //   me.success &&
+  //   me.user?.user_id &&
+  //   loginResponseUser.user_id !== me.user.user_id
+  // ) {
+  //   await new Promise((resolve) => setTimeout(resolve, 250));
+  //   me = await getMe({ suppressUnauthorizedRedirect: true });
+  // }
 
-  if (
-    loginResponseUser?.user_id &&
-    me.success &&
-    me.user?.user_id &&
-    loginResponseUser.user_id !== me.user.user_id
-  ) {
-    clearSession({ preserveRemember: true });
-    return {
-      success: false,
-      message:
-        "No se pudo cambiar a este usuario porque el navegador mantiene otra sesión activa. Cierra sesión e inténtalo de nuevo.",
-    };
-  }
+  // if (
+  //   loginResponseUser?.user_id &&
+  //   me.success &&
+  //   me.user?.user_id &&
+  //   loginResponseUser.user_id !== me.user.user_id
+  // ) {
+  //   clearSession({ preserveRemember: true });
+  //   return {
+  //     success: false,
+  //     message:
+  //       "No se pudo cambiar a este usuario porque el navegador mantiene otra sesión activa. Cierra sesión e inténtalo de nuevo.",
+  //   };
+  // }
 
   if (me.success && me.user) {
     setSession(
@@ -320,12 +321,16 @@ export async function loginUser(
       { remember }
     );
   } else {
+    const statusDetail = me.status ? ` (/usuarios/perfil: ${me.status})` : "";
+    const verificationMessage =
+      me.status === 401 || me.status === 403
+        ? `Login aceptado, pero no se pudo confirmar la sesión${statusDetail}. Es probable que la cookie access_token no se esté guardando o enviando correctamente por CORS/SameSite/Secure.`
+        : `Login aceptado, pero no se pudo verificar la sesión${statusDetail}.`;
+
     clearSession({ preserveRemember: true });
     return {
       success: false,
-      message:
-        data?.message ??
-        "Login aceptado, pero no se pudo verificar la sesión. Comprueba que el email esté verificado e inténtalo de nuevo.",
+      message: me.message ? `${verificationMessage} ${me.message}` : verificationMessage,
     };
   }
 
@@ -449,6 +454,7 @@ export async function getMe(options: {
   success: boolean;
   user?: AuthUser;
   message?: string;
+  status?: number;
 }> {
   const { res, data } = await api(
     "/usuarios/perfil",
@@ -460,26 +466,26 @@ export async function getMe(options: {
     if (options.suppressUnauthorizedRedirect) {
       clearSession({ preserveRemember: true });
     }
-    return { success: false, message: data?.message ?? "No autenticado." };
+    return {
+      success: false,
+      message: data?.message ?? "No autenticado.",
+      status: res.status,
+    };
   }
 
-  const perfil = data?.perfil ?? data ?? {};
-  return {
-    success: true,
-    user: {
-      user_id: Number(
-        perfil.userId ??
-          perfil.user_id ??
-          perfil.id ??
-          perfil.usuarioId ??
-          perfil.usuario_id ??
-          0
-      ),
-      email: perfil.email,
-      role: (perfil.tipo ?? perfil.role ?? "base").toString().toLowerCase(),
-      username: perfil.username,
-    },
-  };
+  const user = parseAuthUser(data);
+  if (!user) {
+    if (options.suppressUnauthorizedRedirect) {
+      clearSession({ preserveRemember: true });
+    }
+    return {
+      success: false,
+      message: "Perfil recibido sin datos de usuario válidos.",
+      status: res.status,
+    };
+  }
+
+  return { success: true, user, status: res.status };
 }
 
 /**
