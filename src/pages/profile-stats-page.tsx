@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Footer from "@/components/sections/footer";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Skeleton } from "@/components/ui/skeleton";
 import ContentCard from "@/components/content-card";
 import { buildDetailPath } from "@/lib/detail-route";
@@ -928,6 +929,10 @@ export default function ProfileStatsPage() {
 
           {isLoading ? (
             <div className="space-y-6">
+              <PageLoader
+                title="Cargando estadísticas"
+                message="Estamos preparando las listas y métricas del perfil."
+              />
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, idx) => (
                   <section

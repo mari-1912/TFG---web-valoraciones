@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Footer from "../components/sections/footer";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CommunityCommentSection,
@@ -839,6 +840,11 @@ export default function CommunityPage() {
                 Estás visualizando las últimas valoraciones y comentarios de los usuarios que sigues
               </p>
             </div>
+            <PageLoader
+              title="Cargando comunidad"
+              message="Preparando la actividad reciente y comentarios."
+              className="mb-4"
+            />
             {Array.from({ length: 3 }).map((_, index) => (
               <div
                 key={`community-skeleton-${index}`}
