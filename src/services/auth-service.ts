@@ -200,12 +200,30 @@ export async function registerUser(
   },
   options: { remember?: boolean } = {}
 ): Promise<{ success: boolean; message: string }> {
-  const { res, data } = await api("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }, {
-    handleUnauthorized: false,
-  });
+
+  // limpiar cualquier sesión previa
+  clearSession({ preserveRemember: true });
+
+  try {
+    await api(
+      "/auth/logout",
+      { method: "POST" },
+      { handleUnauthorized: false }
+    );
+  } catch {
+    // si falla no pasa nada
+  }
+
+  const { res, data } = await api(
+    "/auth/register",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    {
+      handleUnauthorized: false,
+    }
+  );
 
   if (!res.ok) {
     return {
@@ -213,22 +231,14 @@ export async function registerUser(
       message: data?.message ?? "Registro fallido.",
     };
   }
+  clearSession({ preserveRemember: true });
 
-  const me = await getMe({ suppressUnauthorizedRedirect: true });
-  if (me.success && me.user) {
-    setSession(
-      {
-        user_id: me.user.user_id,
-        role: (me.user.role ?? "base").toLowerCase(),
-        username: me.user.username ?? me.user.email ?? payload.username,
-      },
-      { remember: options.remember }
-    );
-  } else {
-    clearSession({ preserveRemember: true });
-  }
-
-  return { success: true, message: data?.message ?? "Registro exitoso." };
+  return {
+    success: true,
+    message:
+      data?.message ??
+      "Registro exitoso. Revisa tu email para verificar la cuenta.",
+  };
 }
 
 /**
