@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { ArrowLeft, Eye, EyeOff, User } from "lucide-react";
 
 import Footer from "@/components/sections/footer";
+import { PageLoader } from "@/components/ui/page-loader";
 import { loginUser } from "@/services/auth-service";
 
 function resolvePostLoginTarget(target: string) {
@@ -68,7 +69,14 @@ export default function LoginPage() {
       };
 
   return (
-    <main className="min-h-screen flex flex-col bg-white">
+    <main className="min-h-screen flex flex-col bg-white" aria-busy={loading}>
+      {loading ? (
+        <PageLoader
+          overlay
+          title="Iniciando sesión"
+          message="Puede tardar unos segundos."
+        />
+      ) : null}
       <section className="relative flex-1 flex items-center justify-center px-4 py-20">
         <button
           type="button"

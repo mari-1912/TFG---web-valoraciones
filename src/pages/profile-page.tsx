@@ -14,6 +14,7 @@ import { ProfileStatsSection } from "@/components/profile/profile-stats-section"
 import { ProfileTimeline } from "@/components/profile/profile-timeline";
 import { StatusCardsSection, type StatusCardGroup } from "@/components/status/status-cards-section";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createCroppedImage, type CropAreaPixels } from "@/lib/image-crop";
 import {
@@ -1615,6 +1616,11 @@ export default function ProfilePage() {
     return (
       <main className="min-h-screen bg-white">
         <div className="mx-auto max-w-6xl px-4 pb-10">
+          <PageLoader
+            title="Cargando perfil"
+            message="Estamos preparando la información, actividad y listas del perfil."
+            className="mb-6"
+          />
           <div className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm">
             <Skeleton className="h-28 w-full rounded-2xl" />
             <div className="mt-5 flex items-center gap-4">

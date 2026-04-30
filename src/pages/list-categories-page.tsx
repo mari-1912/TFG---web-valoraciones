@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, X } from "lucide-react";
 import { ListCard, type Lista } from "@/components/lists/list-card";
+import { PageLoader } from "@/components/ui/page-loader";
 import { StatusCardsSection, type StatusCardGroup } from "@/components/status/status-cards-section";
 import {
   STATUS_ORDER,
@@ -396,9 +397,16 @@ export default function ListsCategory({ type }: ListsCategoryProps) {
             </div>
 
           ) : loading ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => <CardSkeleton key={i} />)}
-            </div>
+            <>
+              <PageLoader
+                title={type === "nuestras" ? "Cargando listas" : "Cargando tus listas"}
+                message="Estamos preparando las listas y sus contenidos."
+                className="mb-6"
+              />
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, i) => <CardSkeleton key={i} />)}
+              </div>
+            </>
 
           ) : error ? (
             <div className="rounded-3xl p-8 mx-auto max-w-md text-center"
