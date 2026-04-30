@@ -43,27 +43,29 @@ export default function LoginPage() {
       ? fromState
       : fromState?.pathname ?? (fromQuery?.trim() || "/home");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
-
-    try {
-      const result = await loginUser(identifier.trim(), password, remember);
-
-      if (!result.success) {
-        setError(result.message);
-        return;
-      }
-
-      setSuccess(result.message);
-
-      setTimeout(() => navigate(resolvePostLoginTarget(from)), 200);
-    } finally {
-      setLoading(false);
-    }
-  };
+      const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+      
+        if (loading) return;
+      
+        setError(null);
+        setSuccess(null);
+        setLoading(true);
+      
+        try {
+          const result = await loginUser(identifier.trim(), password, remember);
+      
+          if (!result.success) {
+            setError(result.message);
+            return;
+          }
+      
+          setSuccess(result.message);
+          navigate(resolvePostLoginTarget(from), { replace: true });
+        } finally {
+          setLoading(false);
+        }
+      };
 
   return (
     <main className="min-h-screen flex flex-col bg-white">
