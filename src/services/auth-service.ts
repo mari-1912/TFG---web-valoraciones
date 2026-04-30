@@ -198,7 +198,6 @@ export async function registerUser(
     email: string;
     password: string;
   },
-  options: { remember?: boolean } = {}
 ): Promise<{ success: boolean; message: string }> {
 
   // limpiar cualquier sesión previa
